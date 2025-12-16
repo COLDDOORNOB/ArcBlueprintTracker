@@ -706,10 +706,24 @@ const details = document.createElement("div");
 
     frame.style.cursor = "pointer";
         frame.onclick = () => {
-      const open = !details.classList.contains("hidden");
+      const isOpen = !details.classList.contains("hidden");
+
       // close any other open overlays
-      document.querySelectorAll(".details-overlay").forEach(d => { if (d !== details) d.classList.add("hidden"); });
-      details.classList.toggle("hidden", open);
+      document.querySelectorAll(".details-overlay").forEach(d => {
+        if (d !== details) {
+          d.classList.add("hidden");
+          const parent = d.closest(".card-compact");
+          if (parent) parent.classList.remove("card-open");
+        }
+      });
+
+      if (isOpen) {
+        details.classList.add("hidden");
+        card.classList.remove("card-open");
+      } else {
+        details.classList.remove("hidden");
+        card.classList.add("card-open");
+      }
     };
 frame.appendChild(imgWrap);
 

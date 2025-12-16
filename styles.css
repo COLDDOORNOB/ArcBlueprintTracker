@@ -1,13 +1,13 @@
 
 .rarity-frame{border-width:4px;border-style:solid;border-radius:18px;box-shadow:0 0 0 1px rgba(24,24,27,0.6) inset}
 .rarity-glow{filter:drop-shadow(0 0 8px rgba(255,255,255,0.05))}
-.type-tab{position:absolute;top:12px;left:12px;border-radius:999px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,0.10);backdrop-filter:blur(10px);background:rgba(24,24,27,0.35)}
-.type-tab img{width:26px;height:26px;image-rendering:-webkit-optimize-contrast}
+.type-tab{position:absolute;top:12px;left:50%;transform:translateX(-50%);border-radius:999px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);background:rgba(24,24,27,0.40);white-space:nowrap;max-width:calc(var(--cardSize) * 1.45);overflow:visible}
+.type-tab img{width:28px;height:28px;flex:0 0 auto;image-rendering:-webkit-optimize-contrast}
 .card-compact{transition:transform 120ms ease,background-color 120ms ease}
 .card-compact:hover{transform:translateY(-2px)}
-.details-row{display:grid;grid-template-columns:minmax(70px,0.40fr) 1fr;gap:clamp(6px, calc(var(--cardSize)/55), 10px);align-items:start}
-.details-label{color:rgb(161 161 170);font-size:clamp(12px, calc(var(--cardSize)/20), 13px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.details-value{color:rgb(228 228 231);font-size:clamp(12px, calc(var(--cardSize)/18), 14px);overflow-wrap:anywhere;min-width:0}
+.details-row{display:grid;grid-template-columns:minmax(90px,0.40fr) 1fr;gap:clamp(6px, calc(var(--cardSize)/70), 10px);align-items:start}
+.details-label{color:rgb(161 161 170);font-size:clamp(14px, calc(var(--cardSize)/18), 15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.details-value{color:rgb(228 228 231);font-size:clamp(14px, calc(var(--cardSize)/16), 16px);overflow-wrap:anywhere;min-width:0}
 .chip{border:1px solid rgb(39 39 42);background:rgb(24 24 27);color:rgb(228 228 231);border-radius:999px;padding:6px 10px;font-size:12px}
 .chip:hover{background:rgb(39 39 42)}
 .chip-active{border-color:rgb(82 82 91);background:rgb(39 39 42)}
@@ -22,5 +22,10 @@
 .type-tab{padding:5px 7px}
 .type-tab img{width:16px;height:16px;image-rendering:auto}
 
-.details-overlay{position:absolute;left:8px;right:8px;top:calc(100% + 8px);z-index:50;border-radius:16px;padding:12px 12px;border:1px solid rgba(255,255,255,0.10);backdrop-filter:blur(10px);background:rgba(24,24,27,0.35);box-shadow:0 12px 30px rgba(0,0,0,0.45)}
+border-radius:16px;padding:12px 12px;border:1px solid rgba(255,255,255,0.10);backdrop-filter:blur(10px);background:rgba(24,24,27,0.35);box-shadow:0 12px 30px rgba(0,0,0,0.45)}
 .details-overlay.hidden{display:none}
+
+#grid{overflow:visible; position:relative;}
+
+.card-open{z-index:1000;}
+.card-open:hover{transform:none;}
