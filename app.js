@@ -621,6 +621,8 @@ function renderGrid() {
   for (const it of state.filtered) {
     const card = document.createElement("div");
     card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2";
+    card.style.position = "relative";
+    card.style.overflow = "visible";
 
     const frame = document.createElement("div");
     frame.className = "rarity-frame rarity-glow relative overflow-hidden";
@@ -652,8 +654,10 @@ function renderGrid() {
     tabIcon.alt = it.type;
 
     const tabText = document.createElement("span");
+    tabText.style.fontSize = "clamp(12px, calc(var(--cardSize)/16), 15px)";
+    tabText.style.fontWeight = "700";
     tabText.className = "text-[11px] font-semibold";
-    tabText.textContent = it.rarity || "—";
+    tabText.textContent = it.type || "—";
 
     tab.appendChild(tabIcon);
     tab.appendChild(tabText);
@@ -668,17 +672,9 @@ function renderGrid() {
     name.className = "font-semibold leading-tight";
     name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
     name.textContent = it.name;
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "text-zinc-400 mt-1";
-    subtitle.style.fontSize = "clamp(11px, calc(var(--cardSize)/22), 13px)";
-    subtitle.textContent = it.type || "—";
-
     title.appendChild(name);
-    title.appendChild(subtitle);
-
-    const details = document.createElement("div");
-    details.className = "mt-2 hidden border-t border-zinc-800 pt-2 px-1 pb-1";
+const details = document.createElement("div");
+    details.className = "details-overlay hidden";
 
     const makeRow = (label, value) => {
       if (!value) return null;
@@ -709,9 +705,13 @@ function renderGrid() {
     }
 
     frame.style.cursor = "pointer";
-    frame.onclick = () => details.classList.toggle("hidden");
-
-    frame.appendChild(imgWrap);
+        frame.onclick = () => {
+      const open = !details.classList.contains("hidden");
+      // close any other open overlays
+      document.querySelectorAll(".details-overlay").forEach(d => { if (d !== details) d.classList.add("hidden"); });
+      details.classList.toggle("hidden", open);
+    };
+frame.appendChild(imgWrap);
 
     card.appendChild(frame);
     card.appendChild(title);
