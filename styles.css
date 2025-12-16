@@ -1,7 +1,7 @@
 
 .rarity-frame{border-width:4px;border-style:solid;border-radius:18px;box-shadow:0 0 0 1px rgba(24,24,27,0.6) inset}
 .rarity-glow{filter:drop-shadow(0 0 8px rgba(255,255,255,0.05))}
-.type-tab{position:absolute;top:10px;left:10px;border-radius:999px;padding:clamp(8px, calc(var(--cardSize)/22), 14px) clamp(10px, calc(var(--cardSize)/18), 16px);display:flex;align-items:center;gap:clamp(8px, calc(var(--cardSize)/26), 12px);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);background:rgba(24,24,27,0.40);white-space:nowrap;max-width:calc(var(--cardSize) - 20px);overflow:hidden;text-overflow:ellipsis}
+.type-tab{position:absolute;top:12px;left:12px;border-radius:999px;padding:clamp(8px, calc(var(--cardSize)/22), 14px) clamp(10px, calc(var(--cardSize)/18), 16px);display:flex;align-items:center;gap:clamp(8px, calc(var(--cardSize)/26), 12px);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);background:rgba(24,24,27,0.40);white-space:nowrap;max-width:calc(var(--cardSize) - 24px);overflow:hidden;text-overflow:ellipsis}
 .type-tab img{width:clamp(18px, calc(var(--cardSize)/16), 28px);height:clamp(18px, calc(var(--cardSize)/16), 28px);flex:0 0 auto;image-rendering:-webkit-optimize-contrast}
 .card-compact{transition:transform 120ms ease,background-color 120ms ease}
 .card-compact:hover{transform:translateY(-2px)}
