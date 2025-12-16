@@ -1,6 +1,143 @@
 
 const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
 
+
+// === Local assets ===
+// If you host this site under /arcblueprinttracker/, put images in:
+//   arcblueprinttracker/images/<files...>
+// and type icons in:
+//   arcblueprinttracker/icons/<ItemCategory_*.png>
+const LOCAL_IMAGE_BASE = "./images/";
+const LOCAL_ICON_BASE  = "./icons/";
+
+// Build a lookup of base filename -> hashed filename, e.g.
+// "Anvil-Level1" -> "Anvil-Level1_4008ab9b4b.png"
+const LOCAL_IMAGE_FILES = [
+  "Extended_Medium_Mag_III_00531083a8.png",
+  "Extended_Medium_Mag_II_2e66ba96e7.png",
+  "Extended_Light_Mag_III_d9347dc8af.png",
+  "Extended_Barrel_6f57d82e2b.png",
+  "Extended_Light_Mag_II_95a5cf317a.png",
+  "Explosive_Mine_f3f7dddb30.png",
+  "Complex_Gun_Parts_a4523a546f.png",
+  "Defibrillator_cbd07c7d0a.png",
+  "Compensator_II_9efd71b2c0.png",
+  "Compensator_III_0d2d5c294d.png",
+  "Combat_Mk._3__Flanking__b8b75b54bf.png",
+  "Combat_Mk._3__Aggressive__0c49a269d1.png",
+  "Bobcat-Level1_542f741fbd.png",
+  "Burletta-Level1_a959085f9a.png",
+  "Blaze_Grenade_b6c426c6f1.png",
+  "Barricade_Kit_b941aff2b2.png",
+  "Bettina_6c889eadf0.png",
+  "Aphelion_55eb3c8526.png",
+  "Angled_Grip_II_7b2a8db317.png",
+  "Angled_Grip_III_ba0d742697.png",
+  "Anvil-Level1_4008ab9b4c.png",
+  "Wolfpack_5d69c9575c.png",
+  "Vulcano-Level1_4e6ad17258.png",
+  "Vita_Spray_7142499abc.png",
+  "Vita_Shot_245f6df518.png",
+  "Vertical_Grip_III_e157ba22cd.png",
+  "Venator-Level1_f745282e98.png",
+  "Vertical_Grip_II_06f0877aa5.png",
+  "Trigger_Nade_a68e53c662.png",
+  "Torrente-Level1_4c179e6909.png",
+  "Tempest-Level1_3e74f4b8f2.png",
+  "Tagging_Grenade_76f0885a0b.png",
+  "Tactical_Mk._3__Healing__3e45bd6fe9.png",
+  "Tactical_Mk._3__Defensive__7ef33e823b.png",
+  "Stable_Stock_III_14dce56e4f.png",
+  "Stable_Stock_II_49853b0d73.png",
+  "Smoke_Grenade_d211fd4b6e.png",
+  "Snap_Hook_652f25b1ec.png",
+  "Silencer_I_e702af3150.png",
+  "Silencer_II_c3b8f6cd10.png",
+  "Showstopper_80e11cbf02.png",
+  "Shotgun_Silencer_e77598809f.png",
+  "Shotgun_Choke_II_0fb1aeefc5.png",
+  "Shotgun_Choke_III_d60e0aa440.png",
+  "Padded_Stock_2d6217c623.png",
+  "Remote_Raider_Flare_68128283b2.png",
+  "Osprey-Level1_14b1a9548e.png",
+  "Muzzle_Brake_III_d7c83e1c81.png",
+  "Medium_Gun_Parts_fb4d3a320f.png",
+  "Muzzle_Brake_II_65024a4a81.png",
+  "Lure_Grenade_fdb536acb5.png",
+  "Looting_Mk._3__Survivor__f49308eb27.png",
+  "Blue_Light_Stick_d11f5037e4.png",
+  "Lightweight_Stock_ff34cc3948.png",
+  "Light_Gun_Parts_48a0ac28f7.png",
+  "Jupiter_7c063c26c9.png",
+  "Jolt_Mine_4b49b4b521.png",
+  "Il_Toro-Level1_68a279b4f2.png",
+  "Hullcracker-Level1_487079afcf.png",
+  "Horizontal_Grip_0fc841c520.png",
+  "Heavy_Gun_Parts_7d1986dfd5.png",
+  "Equalizer_2299676690.png",
+  "Extended_Shotgun_Mag_III_ddfb6650ba.png",
+  "Extended_Shotgun_Mag_II_ccad252d22.png"
+];
+const LOCAL_IMAGE_MAP = (() => {
+  const m = new Map();
+  for (const f of LOCAL_IMAGE_FILES) {
+    // strip ".png" and trailing "_<hash>"
+    const stem = f.replace(/\.png$/i, "");
+    const base = stem.replace(/_[0-9a-f]{10}$/i, "");
+    m.set(base, f);
+  }
+  return m;
+})();
+
+function normalizeWikiStem(stem) {
+  if (!stem) return "";
+  try { stem = decodeURIComponent(stem); } catch (_e) {}
+  stem = stem.replace(/\.webp$/i,"").replace(/\.png$/i,"");
+  // Convert common wiki filename quirks into our local naming scheme
+  // Combat_Mk._3_(Flanking) -> Combat_Mk._3__Flanking__
+  stem = stem.replace(/\(/g, "__").replace(/\)/g, "");
+  // Trigger_'Nade -> Trigger_Nade
+  stem = stem.replace(/['’]/g, "");
+  // Spaces -> underscores
+  stem = stem.replace(/\s+/g, "_");
+  return stem;
+}
+
+function resolveLocalImageUrl(imgUrl, itemName) {
+  // 1) If sheet already points to a local image path, keep it.
+  if (imgUrl && (imgUrl.startsWith("./images/") || imgUrl.includes("/arcblueprinttracker/images/"))) return imgUrl;
+
+  // 2) Prefer deriving from sheet Image URL filename (arcraiders.wiki/.../<File>.png)
+  let stem = "";
+  if (imgUrl) {
+    const parts = imgUrl.split("?");
+    const path = parts[0];
+    stem = path.split("/").pop() || "";
+  }
+  stem = normalizeWikiStem(stem);
+
+  // 3) Fallback: derive from item name (spaces -> underscores)
+  const fromName = normalizeWikiStem((itemName || "").trim());
+
+  // Try exact matches in map
+  const candidates = [stem, fromName];
+  for (const c of candidates) {
+    if (!c) continue;
+    if (LOCAL_IMAGE_MAP.has(c)) return LOCAL_IMAGE_BASE + LOCAL_IMAGE_MAP.get(c);
+  }
+
+  // Try loose match: if any local base starts with candidate
+  for (const c of candidates) {
+    if (!c) continue;
+    for (const [base, filename] of LOCAL_IMAGE_MAP.entries()) {
+      if (base === c) return LOCAL_IMAGE_BASE + filename;
+      if (base.startsWith(c)) return LOCAL_IMAGE_BASE + filename;
+    }
+  }
+
+  // Give up: return original (might still work)
+  return imgUrl || "";
+}
 const GRID = {
   min: 120,
   max: 220,
@@ -41,7 +178,7 @@ const ICON_FILE_BY_TYPE = [
 // Place your icon files in: arcblueprinttracker/icons/
 // and ensure they're served at: ./icons/<filename>
 function localIconPath(fileName) {
-  return "icons/" + encodeURIComponent(fileName);
+  return LOCAL_ICON_BASE + encodeURIComponent(fileName);
 }
 
 function setGridSize(px) {
@@ -287,7 +424,8 @@ function loadData() {
         const cond = norm(r[colCond]);
         const loc = norm(r[colLoc]);
         const cont = norm(r[colCont]);
-        const img = norm(r[colImg]);
+        const imgRaw = norm(r[colImg]);
+        const img = resolveLocalImageUrl(imgRaw, name);
         const rarity = parseRarity(r[colRarity]);
         const wiki = norm(r[colWiki]);
 
