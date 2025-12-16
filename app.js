@@ -266,6 +266,7 @@ function rarityColor(r) { return (RARITY[r]?.color) || "#3f3f46"; }
 function rarityRank(r) { return (RARITY[r]?.rank) || 0; }
 
 const state = {
+  sortKey: "rarity_desc",
   all: [],
   filtered: [],
   columns: {},
