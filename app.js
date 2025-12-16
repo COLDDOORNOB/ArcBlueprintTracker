@@ -665,11 +665,13 @@ function renderGrid() {
     title.className = "mt-2 px-1 pb-1";
 
     const name = document.createElement("div");
-    name.className = "text-sm font-semibold leading-tight";
+    name.className = "font-semibold leading-tight";
+    name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
     name.textContent = it.name;
 
     const subtitle = document.createElement("div");
-    subtitle.className = "text-xs text-zinc-400 mt-1";
+    subtitle.className = "text-zinc-400 mt-1";
+    subtitle.style.fontSize = "clamp(11px, calc(var(--cardSize)/22), 13px)";
     subtitle.textContent = it.type || "—";
 
     title.appendChild(name);
@@ -710,9 +712,9 @@ function renderGrid() {
     frame.onclick = () => details.classList.toggle("hidden");
 
     frame.appendChild(imgWrap);
-    frame.appendChild(title);
 
     card.appendChild(frame);
+    card.appendChild(title);
     card.appendChild(details);
     grid.appendChild(card);
   }
