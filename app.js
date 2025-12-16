@@ -17,43 +17,41 @@ const RARITY = {
   Legendary: { color: "#FBC700", rank: 5 },
 };
 
-// Uses Special:FilePath/<filename> (files listed in Category:UI Icons). 
-// This avoids hardcoding hashed /w/images/... URLs. 
+// Item Type → local icon filename mapping.
+// You provided these files:
+//   ItemCategory_Misc.png
+//   ItemCategory_Material.png
+//   ItemCategory_Grenade.png
+//   ItemCategory_Weapon.png
+//   ItemCategory_QuickUse.png
+//   ItemCategory_Mod.png
+//   ItemCategory_Augment.png
+// Store them in: ./icons/
 const ICON_FILE_BY_TYPE = [
-  // Broad categories
-  { re: /weapon/i, file: "ItemCategory Weapon.png" },
-  { re: /ammo/i, file: "ItemCategory Ammo.png" },
-  { re: /consumable|med|healing|vita/i, file: "ItemCategory Regenerative.png" },
-  { re: /craft|material|parts/i, file: "ItemCategory Material.png" },
-  { re: /tool|utility|flare|hook/i, file: "ItemCategory Utility.png" },
-  { re: /augment/i, file: "ItemCategory Augment.png" },
-  { re: /grenade/i, file: "ItemCategory Grenade.png" },
-  { re: /trap|mine/i, file: "ItemCategory Trap.png" },
-  { re: /shield/i, file: "ItemCategory Shield.png" },
-  { re: /gadget/i, file: "ItemCategory Gadget.png" },
-  { re: /key/i, file: "ItemCategory Key.png" },
-  { re: /trinket/i, file: "ItemCategory Trinket.png" },
-  { re: /regenerative/i, file: "ItemCategory Regenerative.png" },
-  { re: /muzzle/i, file: "Mods Muzzle.png" },
-  { re: /underbarrel|grip/i, file: "Mods Underbarrel.png" },
-  { re: /stock/i, file: "Mods Stock.png" },
-  { re: /shotgun.*mag/i, file: "Mods Shotgun-Mag.png" },
-  { re: /shotgun.*muzzle/i, file: "Mods Shotgun-Muzzle.png" },
-  { re: /light.*mag/i, file: "Mods Light-Mag.png" },
-  { re: /medium.*mag/i, file: "Mods Medium-Mag.png" },
-  { re: /heavy.*mag/i, file: "Mods Heavy-Mag.png" },
-  { re: /tech/i, file: "Mods Tech-Mod.png" },
-  { re: /mod/i, file: "Mods Tech-Mod.png" },
-  { re: /misc/i, file: "ItemCategory Misc.png" },
+  { re: /weapon/i, file: "ItemCategory_Weapon.png" },
+  { re: /grenade/i, file: "ItemCategory_Grenade.png" },
+  { re: /quick\s*use|quickuse|consumable|med|healing|vita|tool|utility/i, file: "ItemCategory_QuickUse.png" },
+  { re: /augment/i, file: "ItemCategory_Augment.png" },
+  { re: /mod|attachment|barrel|muzzle|brake|choke|silencer|stock|grip|mag/i, file: "ItemCategory_Mod.png" },
+  { re: /material|parts|craft|component/i, file: "ItemCategory_Material.png" },
+  { re: /misc|key|trinket|other/i, file: "ItemCategory_Misc.png" },
 ];
 
-function wikiFilePath(fileName) {
-  return "https://arcraiders.wiki/wiki/Special:FilePath/" + encodeURIComponent(fileName);
+// Local type icons (self-hosted)
+// Place your icon files in: arcblueprinttracker/icons/
+// and ensure they're served at: ./icons/<filename>
+function localIconPath(fileName) {
+  return "icons/" + encodeURIComponent(fileName);
 }
 
 function setGridSize(px) {
   const val = Math.max(GRID.min, Math.min(GRID.max, Number(px) || GRID.default));
   document.documentElement.style.setProperty("--cardSize", `${val}px`);
+  // Also set inline style as a fallback in case CSS isn't loading/cached.
+  const grid = document.getElementById("grid");
+  if (grid) {
+    grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${val}px, 1fr))`;
+  }
   try { localStorage.setItem(GRID.storageKey, String(val)); } catch {}
   const l1 = document.getElementById("gridSizeLabel");
   const l2 = document.getElementById("gridSizeLabelMobile");
@@ -71,21 +69,33 @@ function loadGridSize() {
 }
 
 function detectIconForType(typeText) {
-  const t = (typeText || "").toString();
+  const t = (typeText || "").toString().trim();
+  const k = t.toLowerCase().replace(/\s+/g, "");
+
+  // First try exact-ish matches (best for clean sheets)
+  if (k === "weapon") return localIconPath("ItemCategory_Weapon.png");
+  if (k === "grenade") return localIconPath("ItemCategory_Grenade.png");
+  if (k === "quickuse") return localIconPath("ItemCategory_QuickUse.png");
+  if (k === "mod") return localIconPath("ItemCategory_Mod.png");
+  if (k === "augment") return localIconPath("ItemCategory_Augment.png");
+  if (k === "material") return localIconPath("ItemCategory_Material.png");
+  if (k === "misc") return localIconPath("ItemCategory_Misc.png");
+
+  // Then fall back to regex classification
   for (const entry of ICON_FILE_BY_TYPE) {
-    if (entry.re.test(t)) return wikiFilePath(entry.file);
+    if (entry.re.test(t)) return localIconPath(entry.file);
   }
-  return wikiFilePath("ItemCategory Misc.png");
+  return localIconPath("ItemCategory_Misc.png");
 }
 
-// If the sheet provides an icon URL or icon filename, use it.
+// If the sheet provides a custom icon value, use it.
 // - If value starts with http(s), treat as a direct URL.
-// - Otherwise treat as a wiki filename (e.g., "Mods Muzzle.png") and resolve via Special:FilePath.
+// - Otherwise treat as a local filename under ./icons/
 function iconFromCellValue(v) {
   const raw = norm(v);
   if (!raw) return "";
   if (/^https?:\/\//i.test(raw)) return raw;
-  return wikiFilePath(raw);
+  return localIconPath(raw);
 }
 
 function norm(s) { return (s ?? "").toString().trim(); }
@@ -480,11 +490,18 @@ function renderGrid() {
 
     const imgWrap = document.createElement("div");
     imgWrap.className = "relative aspect-square bg-zinc-900/50 rounded-[16px] flex items-center justify-center overflow-hidden";
+    // Inline fallbacks in case a utility class doesn't load.
+    imgWrap.style.aspectRatio = "1 / 1";
+    imgWrap.style.width = "100%";
 
     const img = document.createElement("img");
     img.src = it.img || "";
     img.alt = it.name;
     img.className = "w-full h-full object-contain p-2";
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "contain";
+    img.style.padding = "8px";
     img.loading = "lazy";
 
     const tab = document.createElement("div");
