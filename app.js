@@ -623,6 +623,8 @@ function renderGrid() {
     card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2";
     card.style.position = "relative";
     card.style.overflow = "visible";
+    card.style.position = "relative";
+    card.style.overflow = "visible";
 
     const frame = document.createElement("div");
     frame.className = "rarity-frame rarity-glow relative overflow-hidden";
