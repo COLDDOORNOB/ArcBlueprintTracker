@@ -266,7 +266,6 @@ function rarityColor(r) { return (RARITY[r]?.color) || "#3f3f46"; }
 function rarityRank(r) { return (RARITY[r]?.rank) || 0; }
 
 const state = {
-  sortKey: "rarity_desc",
   all: [],
   filtered: [],
   columns: {},
@@ -276,7 +275,7 @@ const state = {
     maps: new Set(),
     conds: new Set(),
     search: "",
-    sort: "name_asc",
+    sort: "rarity_desc",
   },
   facets: {
     rarities: [],
@@ -332,11 +331,11 @@ function initUI() {
     state.filters.maps.clear();
     state.filters.conds.clear();
     state.filters.search = "";
-    state.filters.sort = "name_asc";
+    state.filters.sort = "rarity_desc";
     if (s1) s1.value = "";
     if (s2) s2.value = "";
-    if (sort1) sort1.value = "name_asc";
-    if (sort2) sort2.value = "name_asc";
+    if (sort1) sort1.value = "rarity_desc";
+    if (sort2) sort2.value = "rarity_desc";
     applyFilters();
     renderFacets();
   };
