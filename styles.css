@@ -22,7 +22,21 @@
 .type-tab{padding:5px 7px}
 .type-tab img{width:16px;height:16px;image-rendering:auto}
 
-.details-overlay{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:clamp(360px, 42vw, 560px);max-width:calc(100vw - 24px);z-index:2000;border-radius:16px;padding:14px 14px;border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);background:rgba(24,24,27,0.40);box-shadow:0 12px 30px rgba(0,0,0,0.55)}
+.details-overlay{
+  position:absolute;
+  top:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  width:clamp(280px, 28vw, 420px);
+  max-width:calc(100vw - 24px);
+  z-index:2000;
+  border-radius:16px;
+  padding:14px 14px;
+  border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(12px);
+  background:rgba(24,24,27,0.40);
+  box-shadow:0 12px 30px rgba(0,0,0,0.55);
+}
 .details-overlay.hidden{display:none}
 
 #grid{overflow:visible; position:relative;}
