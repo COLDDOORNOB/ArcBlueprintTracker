@@ -1,0 +1,13 @@
+
+.rarity-frame{border-width:2px;border-style:solid;border-radius:18px;box-shadow:0 0 0 1px rgba(24,24,27,0.6) inset}
+.rarity-glow{filter:drop-shadow(0 0 8px rgba(255,255,255,0.05))}
+.type-tab{position:absolute;top:10px;left:10px;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.35);backdrop-filter:blur(6px)}
+.type-tab img{width:18px;height:18px;image-rendering:-webkit-optimize-contrast}
+.card-compact{transition:transform 120ms ease,background-color 120ms ease}
+.card-compact:hover{transform:translateY(-2px)}
+.details-row{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.details-label{color:rgb(161 161 170);font-size:12px}
+.details-value{color:rgb(228 228 231);font-size:13px}
+.chip{border:1px solid rgb(39 39 42);background:rgb(24 24 27);color:rgb(228 228 231);border-radius:999px;padding:6px 10px;font-size:12px}
+.chip:hover{background:rgb(39 39 42)}
+.chip-active{border-color:rgb(82 82 91);background:rgb(39 39 42)}
