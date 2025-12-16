@@ -1,6 +1,14 @@
 
 const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
 
+const GRID = {
+  min: 120,
+  max: 220,
+  step: 10,
+  default: 220,
+  storageKey: "arc_gridSize",
+};
+
 const RARITY = {
   Common: { color: "#717471", rank: 1 },
   Uncommon: { color: "#41EB6A", rank: 2 },
@@ -12,14 +20,18 @@ const RARITY = {
 // Uses Special:FilePath/<filename> (files listed in Category:UI Icons). 
 // This avoids hardcoding hashed /w/images/... URLs. 
 const ICON_FILE_BY_TYPE = [
+  // Broad categories
+  { re: /weapon/i, file: "ItemCategory Weapon.png" },
+  { re: /ammo/i, file: "ItemCategory Ammo.png" },
+  { re: /consumable|med|healing|vita/i, file: "ItemCategory Regenerative.png" },
+  { re: /craft|material|parts/i, file: "ItemCategory Material.png" },
+  { re: /tool|utility|flare|hook/i, file: "ItemCategory Utility.png" },
   { re: /augment/i, file: "ItemCategory Augment.png" },
   { re: /grenade/i, file: "ItemCategory Grenade.png" },
-  { re: /trap/i, file: "ItemCategory Trap.png" },
+  { re: /trap|mine/i, file: "ItemCategory Trap.png" },
   { re: /shield/i, file: "ItemCategory Shield.png" },
   { re: /gadget/i, file: "ItemCategory Gadget.png" },
-  { re: /utility/i, file: "ItemCategory Utility.png" },
   { re: /key/i, file: "ItemCategory Key.png" },
-  { re: /material/i, file: "ItemCategory Material.png" },
   { re: /trinket/i, file: "ItemCategory Trinket.png" },
   { re: /regenerative/i, file: "ItemCategory Regenerative.png" },
   { re: /muzzle/i, file: "Mods Muzzle.png" },
@@ -31,11 +43,31 @@ const ICON_FILE_BY_TYPE = [
   { re: /medium.*mag/i, file: "Mods Medium-Mag.png" },
   { re: /heavy.*mag/i, file: "Mods Heavy-Mag.png" },
   { re: /tech/i, file: "Mods Tech-Mod.png" },
+  { re: /mod/i, file: "Mods Tech-Mod.png" },
   { re: /misc/i, file: "ItemCategory Misc.png" },
 ];
 
 function wikiFilePath(fileName) {
   return "https://arcraiders.wiki/wiki/Special:FilePath/" + encodeURIComponent(fileName);
+}
+
+function setGridSize(px) {
+  const val = Math.max(GRID.min, Math.min(GRID.max, Number(px) || GRID.default));
+  document.documentElement.style.setProperty("--cardSize", `${val}px`);
+  try { localStorage.setItem(GRID.storageKey, String(val)); } catch {}
+  const l1 = document.getElementById("gridSizeLabel");
+  const l2 = document.getElementById("gridSizeLabelMobile");
+  if (l1) l1.textContent = `${val}px`;
+  if (l2) l2.textContent = `${val}px`;
+}
+
+function loadGridSize() {
+  try {
+    const v = localStorage.getItem(GRID.storageKey);
+    return v ? Number(v) : GRID.default;
+  } catch {
+    return GRID.default;
+  }
 }
 
 function detectIconForType(typeText) {
@@ -44,6 +76,16 @@ function detectIconForType(typeText) {
     if (entry.re.test(t)) return wikiFilePath(entry.file);
   }
   return wikiFilePath("ItemCategory Misc.png");
+}
+
+// If the sheet provides an icon URL or icon filename, use it.
+// - If value starts with http(s), treat as a direct URL.
+// - Otherwise treat as a wiki filename (e.g., "Mods Muzzle.png") and resolve via Special:FilePath.
+function iconFromCellValue(v) {
+  const raw = norm(v);
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return wikiFilePath(raw);
 }
 
 function norm(s) { return (s ?? "").toString().trim(); }
@@ -167,6 +209,30 @@ function initUI() {
   bindAll("typeAllBtnMobile", state.filters.types);
   bindAll("mapAllBtnMobile", state.filters.maps);
   bindAll("condAllBtnMobile", state.filters.conds);
+
+  // Grid size slider (desktop + mobile), persisted in localStorage
+  const gs1 = document.getElementById("gridSize");
+  const gs2 = document.getElementById("gridSizeMobile");
+  const initial = loadGridSize();
+  setGridSize(initial);
+  if (gs1) {
+    gs1.min = String(GRID.min); gs1.max = String(GRID.max); gs1.step = String(GRID.step);
+    gs1.value = String(initial);
+    gs1.addEventListener("input", (e) => {
+      const v = e.target.value;
+      if (gs2) gs2.value = v;
+      setGridSize(v);
+    });
+  }
+  if (gs2) {
+    gs2.min = String(GRID.min); gs2.max = String(GRID.max); gs2.step = String(GRID.step);
+    gs2.value = String(initial);
+    gs2.addEventListener("input", (e) => {
+      const v = e.target.value;
+      if (gs1) gs1.value = v;
+      setGridSize(v);
+    });
+  }
 }
 
 function loadData() {
@@ -183,6 +249,14 @@ function loadData() {
 
       const colName = findHeader(headers, ["Blueprint Name","Item Name","Name","Item"]);
       const colType = findHeader(headers, ["Item Type","Type"]);
+      const colTypeIcon = findHeader(headers, [
+        "Item Type Icon",
+        "Type Icon",
+        "Item Type Icon URL",
+        "Type Icon URL",
+        "Item Type Icon File",
+        "Type Icon File",
+      ]);
       const colMap = findHeader(headers, ["Most Likely Map","Map"]);
       const colCond = findHeader(headers, ["Most Likely Condition","Condition"]);
       const colLoc = findHeader(headers, ["Most Likely Location","Location"]);
@@ -191,7 +265,7 @@ function loadData() {
       const colRarity = findHeader(headers, ["Rarity","Item Rarity"]);
       const colWiki = findHeader(headers, ["Item URL","Wiki URL","URL","Link"]);
 
-      state.columns = { name: colName, type: colType, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, wiki: colWiki };
+      state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, wiki: colWiki };
 
       const items = [];
       for (const r of rows) {
@@ -207,7 +281,9 @@ function loadData() {
         const rarity = parseRarity(r[colRarity]);
         const wiki = norm(r[colWiki]);
 
-        items.push({ name, type, map, cond, loc, cont, img, rarity, wiki, typeIcon: detectIconForType(type) });
+        const iconFromSheet = colTypeIcon ? iconFromCellValue(r[colTypeIcon]) : "";
+        const typeIcon = iconFromSheet || detectIconForType(type);
+        items.push({ name, type, map, cond, loc, cont, img, rarity, wiki, typeIcon });
       }
 
       state.all = items;

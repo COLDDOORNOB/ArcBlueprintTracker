@@ -37,6 +37,14 @@
         </select>
       </div>
 
+      <div class="mt-4">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-zinc-400">Grid size</label>
+          <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
+        </div>
+        <input id="gridSize" type="range" min="120" max="220" step="10" value="220" class="mt-2 w-full" />
+      </div>
+
       <div class="mt-6">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold">Rarity</h2>
@@ -93,7 +101,7 @@
         <div class="text-xs text-zinc-400" id="resultCount"></div>
       </div>
 
-      <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3"></div>
+      <div id="grid" class="grid gap-3"></div>
 
       <div id="emptyState" class="hidden mt-16 text-center text-zinc-400">
         <div class="text-sm">No items match your filters.</div>
@@ -120,6 +128,14 @@
           <option value="type_asc">Type (A → Z)</option>
           <option value="map_asc">Map (A → Z)</option>
         </select>
+      </div>
+
+      <div class="mt-4">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-zinc-400">Grid size</label>
+          <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
+        </div>
+        <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="220" class="mt-2 w-full" />
       </div>
 
       <div class="mt-6">

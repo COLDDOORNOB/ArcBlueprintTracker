@@ -11,3 +11,13 @@
 .chip{border:1px solid rgb(39 39 42);background:rgb(24 24 27);color:rgb(228 228 231);border-radius:999px;padding:6px 10px;font-size:12px}
 .chip:hover{background:rgb(39 39 42)}
 .chip-active{border-color:rgb(82 82 91);background:rgb(39 39 42)}
+
+/* Grid sizing (controlled via slider, stored in localStorage). */
+:root{--cardSize:220px}
+
+/* Make the item grid auto-fit based on card size */
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cardSize),1fr));}
+
+/* Scale type icon slightly for smaller cards */
+.type-tab{padding:5px 7px}
+.type-tab img{width:16px;height:16px;image-rendering:auto}
