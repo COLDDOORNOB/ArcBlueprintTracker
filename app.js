@@ -676,21 +676,34 @@ function renderGrid() {
 const details = document.createElement("div");
     details.className = "details-overlay hidden";
 
-    const makeRow = (label, value) => {
+    const makeRow = (label, value, dotColor) => {
       if (!value) return null;
       const row = document.createElement("div");
       row.className = "details-row";
       const l = document.createElement("div");
       l.className = "details-label";
       l.textContent = label;
+
       const v = document.createElement("div");
       v.className = "details-value";
-      v.textContent = value;
-      row.appendChild(l); row.appendChild(v);
+
+      if (dotColor) {
+        const dot = document.createElement("span");
+        dot.className = "confidence-dot";
+        dot.style.background = dotColor;
+        v.appendChild(dot);
+      }
+
+      const txt = document.createElement("span");
+      txt.textContent = value;
+      v.appendChild(txt);
+
+      row.appendChild(l);
+      row.appendChild(v);
       return row;
     };
 
-    [makeRow("Map", it.map), makeRow("Location", it.loc), makeRow("Container", it.cont), makeRow("Condition", it.cond)]
+    [makeRow("Map", it.map), makeRow("Location", it.loc), makeRow("Container", it.cont), makeRow("Condition", it.cond), makeRow("Data Confidence", it.conf, CONFIDENCE_COLOR[normalizeConfidence(it.conf)] || null)]
       .filter(Boolean)
       .forEach(r => details.appendChild(r));
 
