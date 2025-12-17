@@ -210,6 +210,15 @@
       </div>
 
       <div class="mt-4">
+        <label class="text-xs text-zinc-400">Collection Status</label>
+        <div class="mt-2 flex gap-2">
+          <button id="collectedAllMobile" class="chip chip-active flex-1">All</button>
+          <button id="collectedYesMobile" class="chip flex-1">Collected</button>
+          <button id="collectedNoMobile" class="chip flex-1">Not Collected</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
         <div class="flex items-center justify-between">
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
@@ -217,7 +226,7 @@
         <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleRarityMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
@@ -231,7 +240,7 @@
         <div id="rarityFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleTypeMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
@@ -245,7 +254,7 @@
         <div id="typeFiltersMobile" class="mt-2 grid grid-cols-3 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleConfMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
@@ -259,7 +268,7 @@
         <div id="confFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleMapMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
@@ -273,7 +282,7 @@
         <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleCondMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>

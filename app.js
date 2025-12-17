@@ -438,9 +438,23 @@ function initUI() {
   const openBtn = document.getElementById("openFiltersBtn");
   const closeBtn = document.getElementById("closeFiltersBtn");
   const backdrop = document.getElementById("drawerBackdrop");
-  function openDrawer() { drawer.classList.remove("hidden"); }
-  function closeDrawer() { drawer.classList.add("hidden"); }
-  function toggleDrawer() { drawer.classList.toggle("hidden"); }
+  function openDrawer() {
+    drawer.classList.remove("hidden");
+    document.body.classList.add("no-scroll");
+  }
+  function closeDrawer() {
+    drawer.classList.add("hidden");
+    document.body.classList.remove("no-scroll");
+  }
+  function toggleDrawer() {
+    const isClosing = !drawer.classList.contains("hidden");
+    drawer.classList.toggle("hidden");
+    if (isClosing) {
+      document.body.classList.remove("no-scroll");
+    } else {
+      document.body.classList.add("no-scroll");
+    }
+  }
   if (openBtn) openBtn.onclick = openDrawer;
   const mobileFilterBtn = document.getElementById("mobileFilterBtn");
   if (mobileFilterBtn) mobileFilterBtn.onclick = toggleDrawer;
@@ -1227,12 +1241,32 @@ function initCollectionFilters() {
   const yesBtnBP = document.getElementById("collectedYesBlueprints");
   const noBtnBP = document.getElementById("collectedNoBlueprints");
 
+  // Mobile filters
+  const allBtnMob = document.getElementById("collectedAllMobile");
+  const yesBtnMob = document.getElementById("collectedYesMobile");
+  const noBtnMob = document.getElementById("collectedNoMobile");
+
   const setFilter = (value, buttons) => {
     state.filters.collected = value;
-    buttons.forEach(btn => btn.classList.remove("chip-active"));
-    if (value === "all") buttons[0].classList.add("chip-active");
-    if (value === "collected") buttons[1].classList.add("chip-active");
-    if (value === "not-collected") buttons[2].classList.add("chip-active");
+
+    // Synchronize all instances of these buttons
+    const allSets = [
+      [allBtn, yesBtn, noBtn],
+      [allBtnBP, yesBtnBP, noBtnBP],
+      [allBtnMob, yesBtnMob, noBtnMob]
+    ];
+
+    allSets.forEach(set => {
+      const [a, y, n] = set;
+      if (!a) return;
+      a.classList.remove("chip-active");
+      y.classList.remove("chip-active");
+      n.classList.remove("chip-active");
+      if (value === "all") a.classList.add("chip-active");
+      if (value === "collected") y.classList.add("chip-active");
+      if (value === "not-collected") n.classList.add("chip-active");
+    });
+
     applyFilters();
   };
 
@@ -1245,6 +1279,11 @@ function initCollectionFilters() {
   if (allBtnBP) allBtnBP.onclick = () => setFilter("all", [allBtnBP, yesBtnBP, noBtnBP]);
   if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected", [allBtnBP, yesBtnBP, noBtnBP]);
   if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected", [allBtnBP, yesBtnBP, noBtnBP]);
+
+  // Mobile drawer
+  if (allBtnMob) allBtnMob.onclick = () => setFilter("all", [allBtnMob, yesBtnMob, noBtnMob]);
+  if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected", [allBtnMob, yesBtnMob, noBtnMob]);
+  if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected", [allBtnMob, yesBtnMob, noBtnMob]);
 }
 
 

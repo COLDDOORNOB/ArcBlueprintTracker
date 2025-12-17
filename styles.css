@@ -305,6 +305,11 @@ input[type=range]::-webkit-slider-runnable-track {
   pointer-events: auto;
 }
 
+.no-scroll {
+  overflow: hidden !important;
+  height: 100vh;
+}
+
 /* Tab Navigation */
 .tab-nav {
   position: sticky;
