@@ -656,9 +656,7 @@ function renderGrid() {
     tabIcon.alt = it.type;
 
     const tabText = document.createElement("span");
-    tabText.style.fontSize = "clamp(12px, calc(var(--cardSize)/16), 15px)";
-    tabText.style.fontWeight = "700";
-    tabText.className = "text-[11px] font-semibold";
+    tabText.className = "";
     tabText.textContent = it.type || "—";
 
     tab.appendChild(tabIcon);
