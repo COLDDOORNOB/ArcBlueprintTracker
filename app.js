@@ -748,3 +748,4 @@ frame.appendChild(imgWrap);
 }
 
 document.addEventListener("DOMContentLoaded", loadData);
+        const colConfidence = findCol(headers, ["Data Confidence","Confidence","DataConfidence"]);
