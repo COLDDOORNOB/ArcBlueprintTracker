@@ -12,11 +12,17 @@
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
+    <button id="tabCollection" class="tab-button">My Collection</button>
+  </div>
+
   <div class="min-h-screen flex">
     <aside class="w-[320px] shrink-0 border-r border-zinc-800 bg-zinc-950/60 backdrop-blur px-4 py-5 hidden md:block">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold tracking-tight">ARC Loot Browser (Dev Mode)</h1>
+          <img src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker" class="h-14" />
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
         <button id="resetBtn"
@@ -24,6 +30,14 @@
       </div>
 
       <div class="mt-4">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-zinc-400">Grid size</label>
+          <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
+        </div>
+        <input id="gridSize" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
+      </div>
+
+      <div class="mt-4 blueprints-only">
         <label class="text-xs text-zinc-400">Search</label>
         <input id="searchInput" placeholder="Name, type, map…"
           class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
@@ -42,14 +56,15 @@
       </div>
 
       <div class="mt-4">
-        <div class="flex items-center justify-between">
-          <label class="text-xs text-zinc-400">Grid size</label>
-          <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
+        <label class="text-xs text-zinc-400">Collection Status</label>
+        <div class="mt-2 flex gap-2">
+          <button id="collectedAllBlueprints" class="chip chip-active flex-1">All</button>
+          <button id="collectedYesBlueprints" class="chip flex-1">Collected</button>
+          <button id="collectedNoBlueprints" class="chip flex-1">Not Collected</button>
         </div>
-        <input id="gridSize" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleRarity" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
@@ -63,7 +78,7 @@
         <div id="rarityFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleType" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
@@ -77,7 +92,7 @@
         <div id="typeFilters" class="mt-2 grid grid-cols-3 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleConf" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
@@ -91,7 +106,7 @@
         <div id="confFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleMap" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
@@ -105,7 +120,7 @@
         <div id="mapFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-6 blueprints-only">
         <div class="flex items-center justify-between">
           <button id="toggleCond" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
@@ -119,7 +134,7 @@
         <div id="condFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-8 text-xs text-zinc-500 leading-relaxed">
+      <div class="mt-8 text-xs text-zinc-500 leading-relaxed blueprints-only">
         Data source: Google Sheets CSV. Images and UI icons from ARC Raiders Wiki.
       </div>
     </aside>
@@ -128,7 +143,7 @@
       class="md:hidden fixed top-0 left-0 right-0 z-30 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-4 py-3">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <div class="text-base font-semibold">ARC Loot Browser</div>
+          <img src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker" class="h-12" />
           <div class="text-xs text-zinc-400" id="metaLineMobile">Loading…</div>
         </div>
         <button id="openFiltersBtn"
@@ -266,7 +281,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js" type="module"></script>
 </body>
 
 </html>

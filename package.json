@@ -3,9 +3,14 @@
     "version": "1.0.0",
     "description": "Local development setup for Arc Blueprint Tracker",
     "scripts": {
-        "start": "serve ."
+        "start": "serve .",
+        "dev": "vite"
     },
     "devDependencies": {
-        "serve": "^14.2.0"
+        "serve": "^14.2.0",
+        "vite": "^5.0.0"
+    },
+    "dependencies": {
+        "motion": "^10.18.0"
     }
 }
