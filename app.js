@@ -390,17 +390,7 @@ function loadData() {
     download: true,
     header: true,
     skipEmptyLines: true,
-    error: (err) => {
-      console.error("CSV fetch/parse error", err);
-      setMetaLine("Error fetching sheet. Check the CSV publish link and CORS.");
-    },
     complete: (res) => {
-      if (res.errors && res.errors.length) {
-        console.error("CSV parse warnings/errors", res.errors);
-        const msg = res.errors[0]?.message || "Unknown CSV parse error";
-        setMetaLine("Error parsing sheet: " + msg);
-        return;
-      }
       const rows = res.data || [];
       const headers = res.meta?.fields || Object.keys(rows[0] || {});
 
@@ -713,7 +703,8 @@ const details = document.createElement("div");
       return row;
     };
 
-    [makeRow("Map", it.map), makeRow("Location", it.loc), makeRow("Container", it.cont), makeRow("Condition", it.cond), makeRow("Data Confidence", it.conf, CONFIDENCE_COLOR[normalizeConfidence(it.conf)] || null)]
+    [makeRow("Map", it.map), makeRow("Location", it.loc), makeRow("Container", it.cont), makeRow("Condition", it.cond),
+        makeRow("Data Confidence", it.conf, CONFIDENCE_COLOR[(it.conf || "").trim()] || null)]
       .filter(Boolean)
       .forEach(r => details.appendChild(r));
 
@@ -758,4 +749,3 @@ frame.appendChild(imgWrap);
 }
 
 document.addEventListener("DOMContentLoaded", loadData);
-        const colConfidence = findCol(headers, ["Data Confidence","Confidence","DataConfidence"]);
