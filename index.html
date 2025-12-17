@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,20 +10,23 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
+
 <body class="bg-zinc-950 text-zinc-100">
   <div class="min-h-screen flex">
     <aside class="w-[320px] shrink-0 border-r border-zinc-800 bg-zinc-950/60 backdrop-blur px-4 py-5 hidden md:block">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold tracking-tight">ARC Loot Browser</h1>
+          <h1 class="text-lg font-semibold tracking-tight">ARC Loot Browser (Dev Mode)</h1>
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
-        <button id="resetBtn" class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
+        <button id="resetBtn"
+          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
       </div>
 
       <div class="mt-4">
         <label class="text-xs text-zinc-400">Search</label>
-        <input id="searchInput" placeholder="Name, type, map…" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
+        <input id="searchInput" placeholder="Name, type, map…"
+          class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
       </div>
 
       <div class="mt-4">
@@ -42,12 +46,18 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
         </div>
-        <input id="gridSize" type="range" min="120" max="220" step="10" value="220" class="mt-2 w-full" />
+        <input id="gridSize" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
       </div>
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Rarity</h2>
+          <button id="toggleRarity" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
+            <svg id="iconRarity" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           <button id="rarityAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
         <div id="rarityFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
@@ -55,7 +65,13 @@
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Item Type</h2>
+          <button id="toggleType" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
+            <svg id="iconType" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           <button id="typeAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
         <div id="typeFilters" class="mt-2 grid grid-cols-3 gap-2"></div>
@@ -63,18 +79,44 @@
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Map</h2>
-          <button id="mapAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
+          <button id="toggleConf" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
+            <svg id="iconConf" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="confAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
-        <div id="mapFilters" class="mt-2 flex flex-wrap gap-2"></div>
+        <div id="confFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Condition</h2>
+          <button id="toggleMap" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
+            <svg id="iconMap" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="mapAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
+        </div>
+        <div id="mapFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
+      </div>
+
+      <div class="mt-6">
+        <div class="flex items-center justify-between">
+          <button id="toggleCond" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
+            <svg id="iconCond" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           <button id="condAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
-        <div id="condFilters" class="mt-2 flex flex-wrap gap-2"></div>
+        <div id="condFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
       <div class="mt-8 text-xs text-zinc-500 leading-relaxed">
@@ -82,16 +124,19 @@
       </div>
     </aside>
 
-    <header class="md:hidden fixed top-0 left-0 right-0 z-30 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-4 py-3">
+    <header
+      class="md:hidden fixed top-0 left-0 right-0 z-30 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-4 py-3">
       <div class="flex items-center justify-between gap-3">
         <div>
           <div class="text-base font-semibold">ARC Loot Browser</div>
           <div class="text-xs text-zinc-400" id="metaLineMobile">Loading…</div>
         </div>
-        <button id="openFiltersBtn" class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Filters</button>
+        <button id="openFiltersBtn"
+          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Filters</button>
       </div>
       <div class="mt-3">
-        <input id="searchInputMobile" placeholder="Search…" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
+        <input id="searchInputMobile" placeholder="Search…"
+          class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
       </div>
     </header>
 
@@ -105,22 +150,27 @@
 
       <div id="emptyState" class="hidden mt-16 text-center text-zinc-400">
         <div class="text-sm">No items match your filters.</div>
-        <button id="resetBtn2" class="mt-3 text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset filters</button>
+        <button id="resetBtn2"
+          class="mt-3 text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
+          filters</button>
       </div>
     </main>
   </div>
 
   <div id="drawer" class="fixed inset-0 z-40 hidden">
     <div id="drawerBackdrop" class="absolute inset-0 bg-black/60"></div>
-    <div class="absolute right-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-l border-zinc-800 p-4 overflow-y-auto">
+    <div
+      class="absolute right-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-l border-zinc-800 p-4 overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="text-sm font-semibold">Filters</div>
-        <button id="closeFiltersBtn" class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Close</button>
+        <button id="closeFiltersBtn"
+          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Close</button>
       </div>
 
       <div class="mt-4">
         <label class="text-xs text-zinc-400">Sort</label>
-        <select id="sortSelectMobile" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
+        <select id="sortSelectMobile"
+          class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
           <option value="rarity_desc">Rarity (High → Low)</option>
           <option value="rarity_asc">Rarity (Low → High)</option>
           <option value="name_asc">Name (A → Z)</option>
@@ -135,12 +185,18 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
         </div>
-        <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="220" class="mt-2 w-full" />
+        <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
       </div>
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Rarity</h2>
+          <button id="toggleRarityMobile" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
+            <svg id="iconRarityMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           <button id="rarityAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
         <div id="rarityFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
@@ -148,7 +204,13 @@
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Item Type</h2>
+          <button id="toggleTypeMobile" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
+            <svg id="iconTypeMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           <button id="typeAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
         <div id="typeFiltersMobile" class="mt-2 grid grid-cols-3 gap-2"></div>
@@ -156,26 +218,55 @@
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Map</h2>
-          <button id="mapAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
+          <button id="toggleConfMobile" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
+            <svg id="iconConfMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="confAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
-        <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2"></div>
+        <div id="confFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
       <div class="mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold">Condition</h2>
-          <button id="condAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
+          <button id="toggleMapMobile" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
+            <svg id="iconMapMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="mapAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
-        <div id="condFiltersMobile" class="mt-2 flex flex-wrap gap-2"></div>
+        <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
       <div class="mt-6">
-        <button id="resetBtnMobile" class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset filters</button>
+        <div class="flex items-center justify-between">
+          <button id="toggleCondMobile" class="flex items-center gap-2 group">
+            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
+            <svg id="iconCondMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="condAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
+        </div>
+        <div id="condFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
+      </div>
+
+      <div class="mt-6">
+        <button id="resetBtnMobile"
+          class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
+          filters</button>
       </div>
     </div>
   </div>
 
   <script src="app.js"></script>
 </body>
+
 </html>

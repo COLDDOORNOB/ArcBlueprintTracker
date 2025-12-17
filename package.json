@@ -1,0 +1,11 @@
+{
+    "name": "arc-blueprint-tracker",
+    "version": "1.0.0",
+    "description": "Local development setup for Arc Blueprint Tracker",
+    "scripts": {
+        "start": "serve ."
+    },
+    "devDependencies": {
+        "serve": "^14.2.0"
+    }
+}

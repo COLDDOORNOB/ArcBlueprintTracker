@@ -70,9 +70,6 @@ input[type=range]::-webkit-slider-runnable-track {
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   opacity: 0.5;
@@ -198,23 +195,4 @@ input[type=range]::-webkit-slider-runnable-track {
   color: #18181b;
   border-color: #fff;
   font-weight: 500;
-}
-
-/* Rarity Corner Visual */
-.rarity-corner {
-  position: absolute;
-  /* -34px is approx 1/5th of 170px. calc(var(--cardSize) * -0.2) scales it. */
-  /* -34px was approx -0.2. Adding -5px. */
-  bottom: calc(var(--cardSize) * -0.2 - 5px);
-  left: calc(var(--cardSize) * -0.2 - 5px);
-  width: 110%;
-  height: 110%;
-  opacity: 0.5;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.type-tab {
-  z-index: 20;
-  /* Ensure pill stays on top of image (z-10) */
 }

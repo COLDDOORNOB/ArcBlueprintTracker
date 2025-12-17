@@ -1,5 +1,6 @@
 
-const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
+// const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
+const CSV_URL_DEFAULT = "./Blueprint Data - Sheet1.csv";
 
 
 // === Local assets ===
@@ -8,7 +9,7 @@ const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNS
 // and type icons in:
 //   arcblueprinttracker/icons/<ItemCategory_*.png>
 const LOCAL_IMAGE_BASE = "./images/";
-const LOCAL_ICON_BASE = "./icons/";
+const LOCAL_ICON_BASE  = "./icons/";
 
 // Build a lookup of base filename -> hashed filename, e.g.
 // "Anvil-Level1" -> "Anvil-Level1_4008ab9b4b.png"
@@ -91,8 +92,8 @@ const LOCAL_IMAGE_MAP = (() => {
 
 function normalizeWikiStem(stem) {
   if (!stem) return "";
-  try { stem = decodeURIComponent(stem); } catch (_e) { }
-  stem = stem.replace(/\.webp$/i, "").replace(/\.png$/i, "");
+  try { stem = decodeURIComponent(stem); } catch (_e) {}
+  stem = stem.replace(/\.webp$/i,"").replace(/\.png$/i,"");
   // Convert common wiki filename quirks into our local naming scheme
   // Combat_Mk._3_(Flanking) -> Combat_Mk._3__Flanking__
   stem = stem.replace(/\(/g, "__").replace(/\)/g, "");
@@ -142,8 +143,8 @@ const GRID = {
   min: 120,
   max: 220,
   step: 10,
-  default: 170,
-  storageKey: "arc_gridSize_v2",
+  default: 220,
+  storageKey: "arc_gridSize",
 };
 
 const RARITY = {
@@ -152,14 +153,6 @@ const RARITY = {
   Rare: { color: "#1ECBFC", rank: 3 },
   Epic: { color: "#D8299B", rank: 4 },
   Legendary: { color: "#FBC700", rank: 5 },
-};
-
-const CONFIDENCE_COLORS = {
-  "Confirmed": RARITY.Legendary.color,
-  "Very High": RARITY.Epic.color,
-  "Confident": RARITY.Rare.color,
-  "Low": RARITY.Uncommon.color,
-  "Not Enough Data": "#E11D48" // Red
 };
 
 // Item Type → local icon filename mapping.
@@ -197,7 +190,7 @@ function setGridSize(px) {
   if (grid) {
     grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${val}px, 1fr))`;
   }
-  try { localStorage.setItem(GRID.storageKey, String(val)); } catch { }
+  try { localStorage.setItem(GRID.storageKey, String(val)); } catch {}
   const l1 = document.getElementById("gridSizeLabel");
   const l2 = document.getElementById("gridSizeLabelMobile");
   if (l1) l1.textContent = `${val}px`;
@@ -281,9 +274,7 @@ const state = {
     rarities: new Set(),
     types: new Set(),
     maps: new Set(),
-
     conds: new Set(),
-    confs: new Set(),
     search: "",
     sort: "rarity_desc",
   },
@@ -291,10 +282,7 @@ const state = {
     rarities: [],
     types: [],
     maps: [],
-    types: [],
-
     conds: [],
-    confs: [],
   },
 };
 
@@ -342,9 +330,7 @@ function initUI() {
     state.filters.rarities.clear();
     state.filters.types.clear();
     state.filters.maps.clear();
-
     state.filters.conds.clear();
-    state.filters.confs.clear();
     state.filters.search = "";
     state.filters.sort = "rarity_desc";
     if (s1) s1.value = "";
@@ -354,7 +340,7 @@ function initUI() {
     applyFilters();
     renderFacets();
   };
-  ["resetBtn", "resetBtn2", "resetBtnMobile"].forEach(id => {
+  ["resetBtn","resetBtn2","resetBtnMobile"].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.onclick = resetAll;
   });
@@ -366,14 +352,11 @@ function initUI() {
   bindAll("rarityAllBtn", state.filters.rarities);
   bindAll("typeAllBtn", state.filters.types);
   bindAll("mapAllBtn", state.filters.maps);
-
   bindAll("condAllBtn", state.filters.conds);
-  bindAll("confAllBtn", state.filters.confs);
   bindAll("rarityAllBtnMobile", state.filters.rarities);
   bindAll("typeAllBtnMobile", state.filters.types);
   bindAll("mapAllBtnMobile", state.filters.maps);
   bindAll("condAllBtnMobile", state.filters.conds);
-  bindAll("confAllBtnMobile", state.filters.confs);
 
   // Grid size slider (desktop + mobile), persisted in localStorage
   const gs1 = document.getElementById("gridSize");
@@ -398,31 +381,6 @@ function initUI() {
       setGridSize(v);
     });
   }
-  // Collapsible sections
-  const setupCollapsible = (toggleId, contentId, iconId) => {
-    const toggle = document.getElementById(toggleId);
-    const content = document.getElementById(contentId);
-    const icon = document.getElementById(iconId);
-    if (toggle && content && icon) {
-      toggle.onclick = () => {
-        content.classList.toggle("hidden");
-        icon.classList.toggle("rotate-180");
-      };
-    }
-  };
-
-  // Desktop
-  setupCollapsible("toggleRarity", "rarityFilters", "iconRarity");
-  setupCollapsible("toggleType", "typeFilters", "iconType");
-  setupCollapsible("toggleMap", "mapFilters", "iconMap");
-  setupCollapsible("toggleCond", "condFilters", "iconCond");
-  setupCollapsible("toggleConf", "confFilters", "iconConf");
-  // Mobile
-  setupCollapsible("toggleRarityMobile", "rarityFiltersMobile", "iconRarityMobile");
-  setupCollapsible("toggleTypeMobile", "typeFiltersMobile", "iconTypeMobile");
-  setupCollapsible("toggleMapMobile", "mapFiltersMobile", "iconMapMobile");
-  setupCollapsible("toggleCondMobile", "condFiltersMobile", "iconCondMobile");
-  setupCollapsible("toggleConfMobile", "confFiltersMobile", "iconConfMobile");
 }
 
 function loadData() {
@@ -437,8 +395,8 @@ function loadData() {
       const rows = res.data || [];
       const headers = res.meta?.fields || Object.keys(rows[0] || {});
 
-      const colName = findHeader(headers, ["Blueprint Name", "Item Name", "Name", "Item"]);
-      const colType = findHeader(headers, ["Item Type", "Type"]);
+      const colName = findHeader(headers, ["Blueprint Name","Item Name","Name","Item"]);
+      const colType = findHeader(headers, ["Item Type","Type"]);
       const colTypeIcon = findHeader(headers, [
         "Item Type Icon",
         "Type Icon",
@@ -447,16 +405,15 @@ function loadData() {
         "Item Type Icon File",
         "Type Icon File",
       ]);
-      const colMap = findHeader(headers, ["Most Likely Map", "Map"]);
-      const colCond = findHeader(headers, ["Most Likely Condition", "Condition"]);
-      const colLoc = findHeader(headers, ["Most Likely Location", "Location"]);
-      const colCont = findHeader(headers, ["Most Likely Container", "Container"]);
-      const colImg = findHeader(headers, ["Image URL", "ImageURL", "Icon URL", "Thumbnail", "Image"]);
-      const colRarity = findHeader(headers, ["Rarity", "Item Rarity"]);
-      const colConf = findHeader(headers, ["Data Confidence", "Confidence"]);
-      const colWiki = findHeader(headers, ["Item URL", "Wiki URL", "URL", "Link"]);
+      const colMap = findHeader(headers, ["Most Likely Map","Map"]);
+      const colCond = findHeader(headers, ["Most Likely Condition","Condition"]);
+      const colLoc = findHeader(headers, ["Most Likely Location","Location"]);
+      const colCont = findHeader(headers, ["Most Likely Container","Container"]);
+      const colImg = findHeader(headers, ["Image URL","ImageURL","Icon URL","Thumbnail","Image"]);
+      const colRarity = findHeader(headers, ["Rarity","Item Rarity"]);
+      const colWiki = findHeader(headers, ["Item URL","Wiki URL","URL","Link"]);
 
-      state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, conf: colConf, wiki: colWiki };
+      state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, wiki: colWiki };
 
       const items = [];
       for (const r of rows) {
@@ -471,12 +428,11 @@ function loadData() {
         const imgRaw = norm(r[colImg]);
         const img = resolveLocalImageUrl(imgRaw, name);
         const rarity = parseRarity(r[colRarity]);
-        const conf = colConf ? norm(r[colConf]) : "";
         const wiki = norm(r[colWiki]);
 
         const iconFromSheet = colTypeIcon ? iconFromCellValue(r[colTypeIcon]) : "";
         const typeIcon = iconFromSheet || detectIconForType(type);
-        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon });
+        items.push({ name, type, map, cond, loc, cont, img, rarity, wiki, typeIcon });
       }
 
       state.all = items;
@@ -495,33 +451,14 @@ function loadData() {
 
 function uniqSorted(values) {
   const set = new Set(values.filter(v => norm(v)));
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
+  return Array.from(set).sort((a,b) => a.localeCompare(b));
 }
 
-// 5) Not Enough Data
-const CONFIDENCE_ORDER = [
-  "Confirmed",
-  "Very High",
-  "Confident",
-  "Low",
-  "Not Enough Data"
-];
-
 function buildFacets() {
-  state.facets.rarities = uniqSorted(state.all.map(i => i.rarity)).sort((a, b) => rarityRank(b) - rarityRank(a));
+  state.facets.rarities = uniqSorted(state.all.map(i => i.rarity)).sort((a,b)=>rarityRank(b)-rarityRank(a));
   state.facets.types = uniqSorted(state.all.map(i => i.type));
   state.facets.maps = uniqSorted(state.all.map(i => i.map));
-
   state.facets.conds = uniqSorted(state.all.map(i => i.cond));
-  // Sort confidence by predefined order
-  state.facets.confs = uniqSorted(state.all.map(i => i.conf))
-    .sort((a, b) => {
-      let ia = CONFIDENCE_ORDER.indexOf(a);
-      let ib = CONFIDENCE_ORDER.indexOf(b);
-      if (ia === -1) ia = 999;
-      if (ib === -1) ib = 999;
-      return ia - ib;
-    });
 }
 
 function toggleInSet(set, val) { set.has(val) ? set.delete(val) : set.add(val); }
@@ -539,9 +476,7 @@ function renderFacets() {
     rarity: [document.getElementById("rarityFilters"), document.getElementById("rarityFiltersMobile")],
     type: [document.getElementById("typeFilters"), document.getElementById("typeFiltersMobile")],
     map: [document.getElementById("mapFilters"), document.getElementById("mapFiltersMobile")],
-
     cond: [document.getElementById("condFilters"), document.getElementById("condFiltersMobile")],
-    conf: [document.getElementById("confFilters"), document.getElementById("confFiltersMobile")],
   };
 
   for (const el of targets.rarity) {
@@ -551,17 +486,16 @@ function renderFacets() {
       const active = state.filters.rarities.has(r);
       const c = rarityColor(r);
       const btn = document.createElement("button");
-      btn.className = "px-3 py-2 rounded-xl border text-xs font-semibold backdrop-blur-md transition-all hover:brightness-125";
-
-      // Glassy style: "22" = ~13% opacity, "66" = ~40% opacity
-      const bg = active ? c + "66" : c + "22";
-
-      btn.style.background = bg;
-      btn.style.borderColor = c;
-      btn.style.color = "#f4f4f5"; // zinc-100
-
+      btn.className = "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs hover:bg-zinc-800";
+      btn.style.borderColor = active ? c : "rgb(39 39 42)";
+      btn.style.background = active ? "rgba(255,255,255,0.04)" : "rgb(24 24 27)";
       btn.onclick = () => { toggleInSet(state.filters.rarities, r); applyFilters(); renderFacets(); };
-      btn.textContent = r;
+      const dot = document.createElement("span");
+      dot.className = "inline-block w-2.5 h-2.5 rounded-full";
+      dot.style.background = c;
+      const label = document.createElement("span");
+      label.textContent = r;
+      btn.appendChild(dot); btn.appendChild(label);
       el.appendChild(btn);
     }
   }
@@ -603,32 +537,6 @@ function renderFacets() {
     }
   }
 
-  for (const el of targets.conf) {
-    if (!el) continue;
-    el.innerHTML = "";
-    for (const c of state.facets.confs) {
-      if (!c) continue;
-      const active = state.filters.confs.has(c);
-      const color = CONFIDENCE_COLORS[c] || "#71717a";
-
-      const btn = document.createElement("button");
-      btn.className = "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs hover:bg-zinc-800";
-      btn.style.borderColor = active ? color : "rgb(39 39 42)";
-      btn.style.background = active ? "rgba(255,255,255,0.04)" : "rgb(24 24 27)";
-      btn.onclick = () => { toggleInSet(state.filters.confs, c); applyFilters(); renderFacets(); };
-
-      const dot = document.createElement("span");
-      dot.className = "confidence-dot";
-      dot.style.background = color;
-
-      const label = document.createElement("span");
-      label.textContent = c;
-
-      btn.appendChild(dot); btn.appendChild(label);
-      el.appendChild(btn);
-    }
-  }
-
   renderActiveChips();
 }
 
@@ -648,9 +556,7 @@ function renderActiveChips() {
   if (state.filters.rarities.size) push(`Rarity: ${Array.from(state.filters.rarities).join(", ")}`, () => { state.filters.rarities.clear(); applyFilters(); renderFacets(); });
   if (state.filters.types.size) push(`Type: ${state.filters.types.size}`, () => { state.filters.types.clear(); applyFilters(); renderFacets(); });
   if (state.filters.maps.size) push(`Map: ${Array.from(state.filters.maps).join(", ")}`, () => { state.filters.maps.clear(); applyFilters(); renderFacets(); });
-
   if (state.filters.conds.size) push(`Condition: ${Array.from(state.filters.conds).join(", ")}`, () => { state.filters.conds.clear(); applyFilters(); renderFacets(); });
-  if (state.filters.confs.size) push(`Confidence: ${Array.from(state.filters.confs).join(", ")}`, () => { state.filters.confs.clear(); applyFilters(); renderFacets(); });
   if (state.filters.search.trim()) push(`Search: ${state.filters.search.trim()}`, () => {
     state.filters.search = "";
     const s1 = document.getElementById("searchInput");
@@ -666,16 +572,13 @@ function applyFilters() {
   const hasR = state.filters.rarities.size > 0;
   const hasT = state.filters.types.size > 0;
   const hasM = state.filters.maps.size > 0;
-
   const hasC = state.filters.conds.size > 0;
-  const hasConf = state.filters.confs.size > 0;
 
   let out = state.all.filter(it => {
     if (hasR && !state.filters.rarities.has(it.rarity)) return false;
     if (hasT && !state.filters.types.has(it.type)) return false;
     if (hasM && !state.filters.maps.has(it.map)) return false;
     if (hasC && !state.filters.conds.has(it.cond)) return false;
-    if (hasConf && !state.filters.confs.has(it.conf)) return false;
     if (q) {
       const blob = (it.name + " " + it.type + " " + it.map + " " + it.cond + " " + it.loc + " " + it.cont).toLowerCase();
       if (!blob.includes(q)) return false;
@@ -684,13 +587,13 @@ function applyFilters() {
   });
 
   const sort = state.filters.sort;
-  out.sort((a, b) => {
+  out.sort((a,b) => {
     if (sort === "name_asc") return a.name.localeCompare(b.name);
     if (sort === "name_desc") return b.name.localeCompare(a.name);
-    if (sort === "type_asc") return (a.type || "").localeCompare(b.type || "");
-    if (sort === "map_asc") return (a.map || "").localeCompare(b.map || "");
-    if (sort === "rarity_desc") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
-    if (sort === "rarity_asc") return rarityRank(a.rarity) - rarityRank(b.rarity) || a.name.localeCompare(b.name);
+    if (sort === "type_asc") return (a.type||"").localeCompare(b.type||"");
+    if (sort === "map_asc") return (a.map||"").localeCompare(b.map||"");
+    if (sort === "rarity_desc") return rarityRank(b.rarity)-rarityRank(a.rarity) || a.name.localeCompare(b.name);
+    if (sort === "rarity_asc") return rarityRank(a.rarity)-rarityRank(b.rarity) || a.name.localeCompare(b.name);
     return a.name.localeCompare(b.name);
   });
 
@@ -729,9 +632,7 @@ function renderGrid() {
     frame.style.borderColor = rarityColor(it.rarity);
 
     const imgWrap = document.createElement("div");
-    imgWrap.className = "relative aspect-square rounded-[16px] flex items-center justify-center overflow-hidden";
-    // Background: Rarity gradient fades (0% -> 75%) into dark grey - middle ground
-    imgWrap.style.background = `linear-gradient(to top right, ${rarityColor(it.rarity)}44 0%, rgba(24,24,27,0.5) 75%)`;
+    imgWrap.className = "relative aspect-square bg-zinc-900/50 rounded-[16px] flex items-center justify-center overflow-hidden";
     // Inline fallbacks in case a utility class doesn't load.
     imgWrap.style.aspectRatio = "1 / 1";
     imgWrap.style.width = "100%";
@@ -739,17 +640,12 @@ function renderGrid() {
     const img = document.createElement("img");
     img.src = it.img || "";
     img.alt = it.name;
-    img.className = "w-full h-full object-contain p-2 relative z-10";
+    img.className = "w-full h-full object-contain p-2";
     img.style.width = "100%";
     img.style.height = "100%";
     img.style.objectFit = "contain";
     img.style.padding = "8px";
     img.loading = "lazy";
-
-    const corner = document.createElement("div");
-    corner.className = "rarity-corner";
-    // Concave ramp: Center shifted out, hard stop for sharpness (60% -> 60%)
-    corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${rarityColor(it.rarity)}66 60%, ${rarityColor(it.rarity)}cc 100%)`;
 
     const tab = document.createElement("div");
     tab.className = "type-tab";
@@ -768,7 +664,6 @@ function renderGrid() {
     tab.appendChild(tabText);
 
     imgWrap.appendChild(img);
-    imgWrap.appendChild(corner);
     imgWrap.appendChild(tab);
 
     const title = document.createElement("div");
@@ -779,7 +674,7 @@ function renderGrid() {
     name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
     name.textContent = it.name;
     title.appendChild(name);
-    const details = document.createElement("div");
+const details = document.createElement("div");
     details.className = "details-overlay hidden";
 
     const makeRow = (label, value) => {
@@ -800,32 +695,6 @@ function renderGrid() {
       .filter(Boolean)
       .forEach(r => details.appendChild(r));
 
-    if (it.conf) {
-      const row = document.createElement("div");
-      row.className = "details-row";
-
-      const label = document.createElement("div");
-      label.className = "details-label";
-      label.textContent = "Data Confidence";
-
-      const val = document.createElement("div");
-      val.className = "details-value details-confidence";
-
-      const dot = document.createElement("span");
-      dot.className = "confidence-dot";
-      dot.style.background = CONFIDENCE_COLORS[it.conf] || "#71717a";
-
-      const text = document.createElement("span");
-      text.textContent = it.conf;
-
-      val.appendChild(dot);
-      val.appendChild(text);
-
-      row.appendChild(label);
-      row.appendChild(val);
-      details.appendChild(row);
-    }
-
     if (it.wiki) {
       const a = document.createElement("a");
       a.href = it.wiki;
@@ -837,17 +706,13 @@ function renderGrid() {
     }
 
     frame.style.cursor = "pointer";
-    frame.onclick = (e) => {
-      // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
-      e.stopPropagation();
-
+        frame.onclick = () => {
       const isOpen = !details.classList.contains("hidden");
 
       // close any other open overlays
       document.querySelectorAll(".details-overlay").forEach(d => {
         if (d !== details) {
           d.classList.add("hidden");
-          d.style.transform = ""; // reset shift
           const parent = d.closest(".card-compact");
           if (parent) parent.classList.remove("card-open");
         }
@@ -855,32 +720,13 @@ function renderGrid() {
 
       if (isOpen) {
         details.classList.add("hidden");
-        details.style.transform = "";
         card.classList.remove("card-open");
       } else {
         details.classList.remove("hidden");
         card.classList.add("card-open");
-
-        // Overflow check
-        requestAnimationFrame(() => {
-          const rect = details.getBoundingClientRect();
-          const margin = 12; // padding from screen edge
-
-          let shiftX = 0;
-          if (rect.left < margin) {
-            shiftX = (margin - rect.left);
-          } else if (rect.right > window.innerWidth - margin) {
-            shiftX = (window.innerWidth - margin - rect.right);
-          }
-
-          if (shiftX !== 0) {
-            // Apply shift on top of the existing centering (-50%)
-            details.style.transform = `translateX(calc(-50% + ${shiftX}px))`;
-          }
-        });
       }
     };
-    frame.appendChild(imgWrap);
+frame.appendChild(imgWrap);
 
     card.appendChild(frame);
     card.appendChild(title);
