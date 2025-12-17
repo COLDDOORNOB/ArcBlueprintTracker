@@ -1,4 +1,7 @@
 import { animate, stagger } from "motion";
+import { auth, db, googleProvider } from "./firebase-config.js";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
 
@@ -13,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCollectionState();
   initTabNavigation();
   initCollectionFilters();
+  initAuth(); // Initialize Firebase Auth
   loadData();
 });
 
@@ -158,8 +162,90 @@ function toggleCollected(itemName) {
     state.collectedItems.add(itemName);
   }
   saveCollectionState();
+  syncToCloud(); // Sync to Firebase if logged in
   // Don't re-render entire grid - just update the specific card
   // The card will be updated on next filter/sort action
+}
+
+// === Firebase Cloud Sync ===
+async function syncToCloud() {
+  if (!auth.currentUser) return;
+  try {
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await setDoc(userRef, {
+      collectedItems: Array.from(state.collectedItems),
+      lastSync: new Date().toISOString()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Cloud sync failed:", e);
+  }
+}
+
+async function loadFromCloud(user) {
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const docSnap = await getDoc(userRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.collectedItems) {
+        // Merge with local state (or override - usually cloud is truth)
+        state.collectedItems = new Set(data.collectedItems);
+        saveCollectionState(); // Sync back to local storage
+        applyFilters(); // Refresh UI
+      }
+    }
+  } catch (e) {
+    console.error("Loading from cloud failed:", e);
+  }
+}
+
+function initAuth() {
+  const loginBtn = document.getElementById("loginBtn");
+  const loginBtnMob = document.getElementById("loginBtnMobile");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const logoutBtnMob = document.getElementById("logoutBtnMobile");
+
+  const login = () => signInWithPopup(auth, googleProvider).catch(console.error);
+  const logout = () => signOut(auth).catch(console.error);
+
+  if (loginBtn) loginBtn.onclick = login;
+  if (loginBtnMob) loginBtnMob.onclick = login;
+  if (logoutBtn) logoutBtn.onclick = logout;
+  if (logoutBtnMob) logoutBtnMob.onclick = logout;
+
+  onAuthStateChanged(auth, (user) => {
+    const authSection = document.getElementById("authSection");
+    const userProfile = document.getElementById("userProfile");
+    const authSectionMob = document.getElementById("authSectionMobile");
+    const userProfileMob = document.getElementById("userProfileMobile");
+
+    if (user) {
+      // Logged in
+      if (loginBtn) loginBtn.classList.add("hidden");
+      if (loginBtnMob) loginBtnMob.classList.add("hidden");
+      if (userProfile) userProfile.classList.remove("hidden");
+      if (userProfileMob) userProfileMob.classList.remove("hidden");
+
+      // Update profile info
+      const photo = document.getElementById("userPhoto");
+      const name = document.getElementById("userName");
+      const photoMob = document.getElementById("userPhotoMobile");
+      const nameMob = document.getElementById("userNameMobile");
+
+      if (photo) photo.src = user.photoURL || "";
+      if (name) name.textContent = user.displayName || "Explorer";
+      if (photoMob) photoMob.src = user.photoURL || "";
+      if (nameMob) nameMob.textContent = user.displayName || "Explorer";
+
+      loadFromCloud(user);
+    } else {
+      // Logged out
+      if (loginBtn) loginBtn.classList.remove("hidden");
+      if (loginBtnMob) loginBtnMob.classList.remove("hidden");
+      if (userProfile) userProfile.classList.add("hidden");
+      if (userProfileMob) userProfileMob.classList.add("hidden");
+    }
+  });
 }
 
 function switchTab(tabName) {
