@@ -440,7 +440,10 @@ function initUI() {
   const backdrop = document.getElementById("drawerBackdrop");
   function openDrawer() { drawer.classList.remove("hidden"); }
   function closeDrawer() { drawer.classList.add("hidden"); }
+  function toggleDrawer() { drawer.classList.toggle("hidden"); }
   if (openBtn) openBtn.onclick = openDrawer;
+  const mobileFilterBtn = document.getElementById("mobileFilterBtn");
+  if (mobileFilterBtn) mobileFilterBtn.onclick = toggleDrawer;
   if (closeBtn) closeBtn.onclick = closeDrawer;
   if (backdrop) backdrop.onclick = closeDrawer;
 

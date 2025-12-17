@@ -19,6 +19,13 @@
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
+  <button id="mobileFilterBtn" class="mobile-filter-btn md:hidden" aria-label="Open filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="4" y1="6" x2="20" y2="6"></line>
+      <line x1="7" y1="12" x2="17" y2="12"></line>
+      <line x1="10" y1="18" x2="14" y2="18"></line>
+    </svg>
+  </button>
   <!-- Tab Navigation -->
   <div class="tab-nav">
     <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
@@ -179,10 +186,10 @@
     </main>
   </div>
 
-  <div id="drawer" class="fixed inset-0 z-40 hidden">
+  <div id="drawer" class="fixed inset-0 z-[200] hidden">
     <div id="drawerBackdrop" class="absolute inset-0 bg-black/60"></div>
     <div
-      class="absolute right-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-l border-zinc-800 p-4 overflow-y-auto">
+      class="absolute left-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-r border-zinc-800 p-4 pt-16 overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="text-sm font-semibold">Filters</div>
         <button id="closeFiltersBtn"
