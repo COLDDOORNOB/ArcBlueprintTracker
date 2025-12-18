@@ -205,7 +205,24 @@ function initAuth() {
   const logoutBtn = document.getElementById("logoutBtn");
   const logoutBtnMob = document.getElementById("logoutBtnMobile");
 
-  const login = () => signInWithPopup(auth, googleProvider).catch(console.error);
+  const login = async () => {
+    try {
+      console.log("Attempting Google Sign-in...");
+      await signInWithPopup(auth, googleProvider);
+      console.log("Sign-in successful!");
+    } catch (error) {
+      console.error("Firebase Auth Error:", error.code, error.message);
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.warn("Popup was closed before finishing.");
+      } else if (error.code === 'auth/operation-not-allowed') {
+        alert("Google Sign-in is not enabled in the Firebase Console.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        alert("This domain is not authorized for Firebase Auth. Check your Firebase Console settings.");
+      } else {
+        alert("Sign-in failed: " + error.message);
+      }
+    }
+  };
   const logout = () => signOut(auth).catch(console.error);
 
   if (loginBtn) loginBtn.onclick = login;
