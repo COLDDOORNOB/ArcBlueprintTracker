@@ -368,7 +368,6 @@ input[type=range]::-webkit-slider-runnable-track {
   justify-content: center;
   background: rgba(0, 0, 0, 0.3);
   /* Dimmed background */
-  backdrop-filter: blur(2px);
   z-index: 50;
   opacity: 0;
   /* Default invisible */
