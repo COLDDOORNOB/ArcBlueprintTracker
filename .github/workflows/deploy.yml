@@ -1,0 +1,29 @@
+# This file handles dual deployment to Firebase Hosting and GitHub Pages
+# on every push to the main branch.
+
+name: Dual Deploy (Firebase & GitHub Pages)
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and Build
+        run: npm ci && npm run build
+      
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ARCBLUEPRINTTRACKER }}
+          channelId: live
+          projectId: arcblueprinttracker

@@ -5,6 +5,15 @@
 body {
   overflow-y: scroll;
   /* Always show scrollbar to prevent layout shift */
+  background-image: url("Background/stripes.png");
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: auto 100vh;
+  background-attachment: fixed;
+  /* Performance optimizations */
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 /* Custom Scrollbar */
@@ -217,4 +226,181 @@ input[type=range]::-webkit-slider-runnable-track {
 .type-tab {
   z-index: 20;
   /* Ensure pill stays on top of image (z-10) */
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .type-tab {
+    /* Reduce pill size by 30% on mobile */
+    padding: clamp(4px, calc(var(--cardSize)/37), 8px) clamp(6px, calc(var(--cardSize)/28), 10px);
+    gap: clamp(4px, calc(var(--cardSize)/42), 7px);
+    max-width: calc(var(--cardSize) - 17px);
+  }
+
+  .type-tab img {
+    width: clamp(11px, calc(var(--cardSize)/26), 17px);
+    height: clamp(11px, calc(var(--cardSize)/26), 17px);
+  }
+
+  .type-tab span {
+    font-size: clamp(8px, calc(var(--cardSize)/26), 9px);
+  }
+}
+
+/* Floating Mobile Filter Button */
+.mobile-filter-btn {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-filter-btn:active {
+  transform: scale(0.9);
+}
+
+.mobile-filter-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+#drawer {
+  transition: opacity 0.3s ease;
+}
+
+#drawer>div:last-child {
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#drawer:not(.hidden)>div:last-child {
+  transform: translateX(0);
+}
+
+#drawer.hidden {
+  display: block !important;
+  pointer-events: none;
+  opacity: 0;
+}
+
+#drawer.hidden>div:last-child {
+  transform: translateX(-100%);
+}
+
+#drawer:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.no-scroll {
+  overflow: hidden !important;
+  height: 100vh;
+}
+
+/* Tab Navigation */
+.tab-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  background: rgba(9, 9, 11, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  justify-content: center;
+}
+
+.tab-button {
+  padding: 12px 32px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(39, 39, 42, 0.4);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.tab-button:hover {
+  background: rgba(63, 63, 70, 0.5);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tab-button-active {
+  background: rgba(250, 250, 250, 0.15);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Collection Item States */
+.collected-item {
+  opacity: 1;
+  position: relative;
+}
+
+.collected-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 197, 94, 0.2);
+  border-radius: 18px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.collected-checkmark {
+  width: 48px;
+  height: 48px;
+  background: #22c55e;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.collected-checkmark svg {
+  width: 28px;
+  height: 28px;
+  stroke: white;
+  stroke-width: 3;
+  fill: none;
+}
+
+.collected-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+  text-shadow: 0 0 0 currentColor;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Hide details overlay in collection view */
+.collection-mode .details-overlay {
+  display: none !important;
+}
+
+/* Hide complex filters in collection mode */
+.collection-mode .blueprints-only {
+  display: none !important;
 }

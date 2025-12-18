@@ -118,3 +118,20 @@ Users can resize the grid from **120px** to **220px**.
 - **Read-only**: No write-back to Google Sheets.
 - **No Auth**: Public data only.
 - **Manual Image Sync**: Local images must be added manually to `/images` to take advantage of caching/independence.
+
+## Local Development Setup
+
+To run this project locally with live reloading:
+
+1.  **Install Prerequisites**: Ensure you have [Node.js](https://nodejs.org/) and [Git](https://git-scm.com/) installed.
+2.  **Install Dependencies**: Open a terminal in this folder and run:
+    ```bash
+    npm install
+    ```
+3.  **Start the Server**:
+    ```bash
+    npm run dev
+    ```
+4.  **View App**: The terminal will show a local URL (e.g., `http://localhost:5173`). Open this in your browser.
+
+Existing `npm start` is also available if you prefer `serve`.
