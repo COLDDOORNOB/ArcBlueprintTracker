@@ -174,8 +174,10 @@ async function syncToCloud() {
     const userRef = doc(db, "users", auth.currentUser.uid);
     await setDoc(userRef, {
       collectedItems: Array.from(state.collectedItems),
-      lastSync: new Date().toISOString()
+      lastSync: new Date().toISOString(),
+      updatedAt: new Date()
     }, { merge: true });
+    console.log("Cloud sync successful.");
   } catch (e) {
     console.error("Cloud sync failed:", e);
   }
@@ -183,16 +185,32 @@ async function syncToCloud() {
 
 async function loadFromCloud(user) {
   try {
+    console.log("Loading collection from cloud...");
     const userRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(userRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
       if (data.collectedItems) {
-        // Merge with local state (or override - usually cloud is truth)
-        state.collectedItems = new Set(data.collectedItems);
+        // MERGE: Combine local progress with cloud progress so nothing is lost
+        const cloudItems = new Set(data.collectedItems);
+        const mergedSize = state.collectedItems.size;
+
+        // Add cloud items to our current local set
+        cloudItems.forEach(item => state.collectedItems.add(item));
+
+        console.log(`Cloud sync: merged ${state.collectedItems.size - mergedSize} new items from cloud.`);
+
         saveCollectionState(); // Sync back to local storage
         applyFilters(); // Refresh UI
+
+        // If we added new local items during merge, sync them back up to cloud
+        if (state.collectedItems.size > cloudItems.size) {
+          syncToCloud();
+        }
       }
+    } else {
+      console.log("No cloud data found for user. Creating initial sync...");
+      syncToCloud(); // First time login, save local progress to cloud
     }
   } catch (e) {
     console.error("Loading from cloud failed:", e);
