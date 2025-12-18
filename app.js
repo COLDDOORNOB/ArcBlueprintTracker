@@ -1,5 +1,24 @@
+import { animate, stagger } from "motion";
+import { auth, db, googleProvider } from "./firebase-config.js";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
+
+// Since we are now a module, we must attach global initialization to window if it's called from HTML
+// However, existing onclicks in HTML might break if functions aren't on window.
+// We should attach key functions to window.
+window.initUI = initUI;
+window.setGridSize = setGridSize;
+
+// We will kick off loadData when the DOM is ready.
+document.addEventListener("DOMContentLoaded", () => {
+  loadCollectionState();
+  initTabNavigation();
+  initCollectionFilters();
+  initAuth(); // Initialize Firebase Auth
+  loadData();
+});
 
 
 // === Local assets ===
@@ -93,15 +112,187 @@ function normalizeWikiStem(stem) {
   if (!stem) return "";
   try { stem = decodeURIComponent(stem); } catch (_e) { }
   stem = stem.replace(/\.webp$/i, "").replace(/\.png$/i, "");
+  // Magazine -> Mag
+  stem = stem.replace(/Magazine/g, "Mag");
   // Convert common wiki filename quirks into our local naming scheme
   // Combat_Mk._3_(Flanking) -> Combat_Mk._3__Flanking__
-  stem = stem.replace(/\(/g, "__").replace(/\)/g, "");
+  // We match optional space before ( so we don't get triple underscores like ___Flanking__
+  stem = stem.replace(/\s*\(/g, "__").replace(/\)/g, "__");
   // Trigger_'Nade -> Trigger_Nade
   stem = stem.replace(/['’]/g, "");
   // Spaces -> underscores
   stem = stem.replace(/\s+/g, "_");
+  // Clean up trailing underscores if any (optional, but good for consistency)
+  stem = stem.replace(/_+$/, "");
   return stem;
 }
+
+const MANUAL_IMAGE_MAPPINGS = {
+  "Light_Stick__Any_Color": "Blue_Light_Stick"
+};
+
+// === Collection Management ===
+const COLLECTION_STORAGE_KEY = "arc_collection_v1";
+
+function loadCollectionState() {
+  try {
+    const data = localStorage.getItem(COLLECTION_STORAGE_KEY);
+    if (data) {
+      const items = JSON.parse(data);
+      state.collectedItems = new Set(items);
+    }
+  } catch (e) {
+    console.error("Failed to load collection state:", e);
+  }
+}
+
+function saveCollectionState() {
+  try {
+    const items = Array.from(state.collectedItems);
+    localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.error("Failed to save collection state:", e);
+  }
+}
+
+function toggleCollected(itemName) {
+  if (state.collectedItems.has(itemName)) {
+    state.collectedItems.delete(itemName);
+  } else {
+    state.collectedItems.add(itemName);
+  }
+  saveCollectionState();
+  syncToCloud(); // Sync to Firebase if logged in
+  // Don't re-render entire grid - just update the specific card
+  // The card will be updated on next filter/sort action
+}
+
+// === Firebase Cloud Sync ===
+async function syncToCloud() {
+  if (!auth.currentUser) return;
+  try {
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await setDoc(userRef, {
+      collectedItems: Array.from(state.collectedItems),
+      lastSync: new Date().toISOString()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Cloud sync failed:", e);
+  }
+}
+
+async function loadFromCloud(user) {
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const docSnap = await getDoc(userRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.collectedItems) {
+        // Merge with local state (or override - usually cloud is truth)
+        state.collectedItems = new Set(data.collectedItems);
+        saveCollectionState(); // Sync back to local storage
+        applyFilters(); // Refresh UI
+      }
+    }
+  } catch (e) {
+    console.error("Loading from cloud failed:", e);
+  }
+}
+
+function initAuth() {
+  const loginBtn = document.getElementById("loginBtn");
+  const loginBtnMob = document.getElementById("loginBtnMobile");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const logoutBtnMob = document.getElementById("logoutBtnMobile");
+
+  const login = () => signInWithPopup(auth, googleProvider).catch(console.error);
+  const logout = () => signOut(auth).catch(console.error);
+
+  if (loginBtn) loginBtn.onclick = login;
+  if (loginBtnMob) loginBtnMob.onclick = login;
+  if (logoutBtn) logoutBtn.onclick = logout;
+  if (logoutBtnMob) logoutBtnMob.onclick = logout;
+
+  onAuthStateChanged(auth, (user) => {
+    const authSection = document.getElementById("authSection");
+    const userProfile = document.getElementById("userProfile");
+    const authSectionMob = document.getElementById("authSectionMobile");
+    const userProfileMob = document.getElementById("userProfileMobile");
+
+    if (user) {
+      // Logged in
+      if (loginBtn) loginBtn.classList.add("hidden");
+      if (loginBtnMob) loginBtnMob.classList.add("hidden");
+      if (userProfile) userProfile.classList.remove("hidden");
+      if (userProfileMob) userProfileMob.classList.remove("hidden");
+
+      // Update profile info
+      const photo = document.getElementById("userPhoto");
+      const name = document.getElementById("userName");
+      const photoMob = document.getElementById("userPhotoMobile");
+      const nameMob = document.getElementById("userNameMobile");
+
+      if (photo) photo.src = user.photoURL || "";
+      if (name) name.textContent = user.displayName || "Explorer";
+      if (photoMob) photoMob.src = user.photoURL || "";
+      if (nameMob) nameMob.textContent = user.displayName || "Explorer";
+
+      loadFromCloud(user);
+    } else {
+      // Logged out
+      if (loginBtn) loginBtn.classList.remove("hidden");
+      if (loginBtnMob) loginBtnMob.classList.remove("hidden");
+      if (userProfile) userProfile.classList.add("hidden");
+      if (userProfileMob) userProfileMob.classList.add("hidden");
+    }
+  });
+}
+
+function switchTab(tabName) {
+  state.currentTab = tabName;
+
+  // Update tab button states
+  const blueprintsBtn = document.getElementById("tabBlueprints");
+  const collectionBtn = document.getElementById("tabCollection");
+  const collectionFilter = document.querySelector(".collection-only");
+
+  if (tabName === "blueprints") {
+    blueprintsBtn.classList.add("tab-button-active");
+    collectionBtn.classList.remove("tab-button-active");
+    document.body.classList.remove("collection-mode");
+    if (collectionFilter) collectionFilter.style.display = "none";
+
+    // Default to "Not Collected" filter for blueprints tab
+    state.filters.collected = "not-collected";
+    const allBtn = document.getElementById("collectedAllBlueprints");
+    const yesBtn = document.getElementById("collectedYesBlueprints");
+    const noBtn = document.getElementById("collectedNoBlueprints");
+    if (allBtn) allBtn.classList.remove("chip-active");
+    if (yesBtn) yesBtn.classList.remove("chip-active");
+    if (noBtn) noBtn.classList.add("chip-active");
+  } else {
+    blueprintsBtn.classList.remove("tab-button-active");
+    collectionBtn.classList.add("tab-button-active");
+    document.body.classList.add("collection-mode");
+    if (collectionFilter) collectionFilter.style.display = "block";
+  }
+
+  applyFilters();
+}
+
+// Initialize tab navigation
+function initTabNavigation() {
+  const blueprintsBtn = document.getElementById("tabBlueprints");
+  const collectionBtn = document.getElementById("tabCollection");
+
+  if (blueprintsBtn) {
+    blueprintsBtn.onclick = () => switchTab("blueprints");
+  }
+  if (collectionBtn) {
+    collectionBtn.onclick = () => switchTab("collection");
+  }
+}
+
 
 function resolveLocalImageUrl(imgUrl, itemName) {
   // 1) If sheet already points to a local image path, keep it.
@@ -119,6 +310,16 @@ function resolveLocalImageUrl(imgUrl, itemName) {
   // 3) Fallback: derive from item name (spaces -> underscores)
   const fromName = normalizeWikiStem((itemName || "").trim());
 
+  // 2.5) Check manual mappings
+  if (MANUAL_IMAGE_MAPPINGS[fromName]) {
+    const mapped = MANUAL_IMAGE_MAPPINGS[fromName];
+    // Try exact or prefix match for the mapped name
+    if (LOCAL_IMAGE_MAP.has(mapped)) return LOCAL_IMAGE_BASE + LOCAL_IMAGE_MAP.get(mapped);
+    for (const [base, filename] of LOCAL_IMAGE_MAP.entries()) {
+      if (base.startsWith(mapped)) return LOCAL_IMAGE_BASE + filename;
+    }
+  }
+
   // Try exact matches in map
   const candidates = [stem, fromName];
   for (const c of candidates) {
@@ -135,8 +336,8 @@ function resolveLocalImageUrl(imgUrl, itemName) {
     }
   }
 
-  // Give up: return original (might still work)
-  return imgUrl || "";
+  // Give up: return empty string (don't use the CSV URL as it might be a Wiki link)
+  return "";
 }
 const GRID = {
   min: 120,
@@ -207,9 +408,14 @@ function setGridSize(px) {
 function loadGridSize() {
   try {
     const v = localStorage.getItem(GRID.storageKey);
-    return v ? Number(v) : GRID.default;
+    if (v) return Number(v);
+
+    // Mobile detection: set smaller default grid size
+    const isMobile = window.innerWidth <= 768;
+    return isMobile ? 120 : GRID.default;
   } catch {
-    return GRID.default;
+    const isMobile = window.innerWidth <= 768;
+    return isMobile ? 120 : GRID.default;
   }
 }
 
@@ -277,6 +483,8 @@ const state = {
   all: [],
   filtered: [],
   columns: {},
+  currentTab: "blueprints", // "blueprints" or "collection"
+  collectedItems: new Set(), // Set of collected item names
   filters: {
     rarities: new Set(),
     types: new Set(),
@@ -286,6 +494,7 @@ const state = {
     confs: new Set(),
     search: "",
     sort: "rarity_desc",
+    collected: "all", // "all", "collected", "not-collected"
   },
   facets: {
     rarities: [],
@@ -315,9 +524,26 @@ function initUI() {
   const openBtn = document.getElementById("openFiltersBtn");
   const closeBtn = document.getElementById("closeFiltersBtn");
   const backdrop = document.getElementById("drawerBackdrop");
-  function openDrawer() { drawer.classList.remove("hidden"); }
-  function closeDrawer() { drawer.classList.add("hidden"); }
+  function openDrawer() {
+    drawer.classList.remove("hidden");
+    document.body.classList.add("no-scroll");
+  }
+  function closeDrawer() {
+    drawer.classList.add("hidden");
+    document.body.classList.remove("no-scroll");
+  }
+  function toggleDrawer() {
+    const isClosing = !drawer.classList.contains("hidden");
+    drawer.classList.toggle("hidden");
+    if (isClosing) {
+      document.body.classList.remove("no-scroll");
+    } else {
+      document.body.classList.add("no-scroll");
+    }
+  }
   if (openBtn) openBtn.onclick = openDrawer;
+  const mobileFilterBtn = document.getElementById("mobileFilterBtn");
+  if (mobileFilterBtn) mobileFilterBtn.onclick = toggleDrawer;
   if (closeBtn) closeBtn.onclick = closeDrawer;
   if (backdrop) backdrop.onclick = closeDrawer;
 
@@ -426,7 +652,7 @@ function initUI() {
 }
 
 function loadData() {
-  setMetaLine("Fetching sheet…");
+  setMetaLine("Fetching sheet...");
   const url = getCsvUrl();
 
   Papa.parse(url, {
@@ -507,9 +733,25 @@ const CONFIDENCE_ORDER = [
   "Not Enough Data"
 ];
 
+const TYPE_ORDER = [
+  "Augment",
+  "Weapon",
+  "Quick Use",
+  "Grenade",
+  "Mod",
+  "Material"
+];
+
 function buildFacets() {
   state.facets.rarities = uniqSorted(state.all.map(i => i.rarity)).sort((a, b) => rarityRank(b) - rarityRank(a));
-  state.facets.types = uniqSorted(state.all.map(i => i.type));
+  state.facets.types = uniqSorted(state.all.map(i => i.type))
+    .sort((a, b) => {
+      let ia = TYPE_ORDER.indexOf(a);
+      let ib = TYPE_ORDER.indexOf(b);
+      if (ia === -1) ia = 999;
+      if (ib === -1) ib = 999;
+      return ia - ib || a.localeCompare(b);
+    });
   state.facets.maps = uniqSorted(state.all.map(i => i.map));
 
   state.facets.conds = uniqSorted(state.all.map(i => i.cond));
@@ -646,7 +888,7 @@ function renderActiveChips() {
   };
 
   if (state.filters.rarities.size) push(`Rarity: ${Array.from(state.filters.rarities).join(", ")}`, () => { state.filters.rarities.clear(); applyFilters(); renderFacets(); });
-  if (state.filters.types.size) push(`Type: ${state.filters.types.size}`, () => { state.filters.types.clear(); applyFilters(); renderFacets(); });
+  if (state.filters.types.size) push(`Type: ${Array.from(state.filters.types).join(", ")}`, () => { state.filters.types.clear(); applyFilters(); renderFacets(); });
   if (state.filters.maps.size) push(`Map: ${Array.from(state.filters.maps).join(", ")}`, () => { state.filters.maps.clear(); applyFilters(); renderFacets(); });
 
   if (state.filters.conds.size) push(`Condition: ${Array.from(state.filters.conds).join(", ")}`, () => { state.filters.conds.clear(); applyFilters(); renderFacets(); });
@@ -670,12 +912,19 @@ function applyFilters() {
   const hasC = state.filters.conds.size > 0;
   const hasConf = state.filters.confs.size > 0;
 
+
   let out = state.all.filter(it => {
     if (hasR && !state.filters.rarities.has(it.rarity)) return false;
     if (hasT && !state.filters.types.has(it.type)) return false;
     if (hasM && !state.filters.maps.has(it.map)) return false;
     if (hasC && !state.filters.conds.has(it.cond)) return false;
     if (hasConf && !state.filters.confs.has(it.conf)) return false;
+
+    // Collection filter (works in both tabs)
+    const isCollected = state.collectedItems.has(it.name);
+    if (state.filters.collected === "collected" && !isCollected) return false;
+    if (state.filters.collected === "not-collected" && isCollected) return false;
+
     if (q) {
       const blob = (it.name + " " + it.type + " " + it.map + " " + it.cond + " " + it.loc + " " + it.cont).toLowerCase();
       if (!blob.includes(q)) return false;
@@ -716,13 +965,15 @@ function renderGrid() {
     if (empty) empty.classList.add("hidden");
   }
 
+
+  const cards = [];
+
   for (const it of state.filtered) {
     const card = document.createElement("div");
-    card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2";
+    card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2 opacity-0"; // Start invisible
     card.style.position = "relative";
     card.style.overflow = "visible";
-    card.style.position = "relative";
-    card.style.overflow = "visible";
+    // Reuse style settings
 
     const frame = document.createElement("div");
     frame.className = "rarity-frame rarity-glow relative overflow-hidden";
@@ -745,6 +996,11 @@ function renderGrid() {
     img.style.objectFit = "contain";
     img.style.padding = "8px";
     img.loading = "lazy";
+
+    // Hover effect: Expand image slightly when card is hovered
+    card.style.transition = "transform 0.2s"; // Ensure smooth scaling if using CSS, but here we use motion animate
+    card.addEventListener("mouseenter", () => animate(img, { scale: 1.1 }));
+    card.addEventListener("mouseleave", () => animate(img, { scale: 1 }));
 
     const corner = document.createElement("div");
     corner.className = "rarity-corner";
@@ -783,7 +1039,8 @@ function renderGrid() {
     details.className = "details-overlay hidden";
 
     const makeRow = (label, value) => {
-      if (!value) return null;
+      // Hide if value is empty or exactly "N/A"
+      if (!value || value === "N/A") return null;
       const row = document.createElement("div");
       row.className = "details-row";
       const l = document.createElement("div");
@@ -849,7 +1106,10 @@ function renderGrid() {
           d.classList.add("hidden");
           d.style.transform = ""; // reset shift
           const parent = d.closest(".card-compact");
-          if (parent) parent.classList.remove("card-open");
+          if (parent) {
+            parent.classList.remove("card-open");
+            parent.style.zIndex = ""; // Reset z-index
+          }
         }
       });
 
@@ -857,9 +1117,11 @@ function renderGrid() {
         details.classList.add("hidden");
         details.style.transform = "";
         card.classList.remove("card-open");
+        card.style.zIndex = "";
       } else {
         details.classList.remove("hidden");
         card.classList.add("card-open");
+        card.style.zIndex = "50"; // Bring to front
 
         // Overflow check
         requestAnimationFrame(() => {
@@ -882,11 +1144,238 @@ function renderGrid() {
     };
     frame.appendChild(imgWrap);
 
+    // Collection mode: Add checkmark overlay if collected
+    const isCollected = state.collectedItems.has(it.name);
+    if (state.currentTab === "collection" && isCollected) {
+      card.classList.add("collected-item");
+
+      const overlay = document.createElement("div");
+      overlay.className = "collected-overlay";
+
+      const checkmark = document.createElement("div");
+      checkmark.className = "collected-checkmark";
+      checkmark.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+      const text = document.createElement("div");
+      text.className = "collected-text";
+      text.textContent = "Collected";
+
+      overlay.appendChild(checkmark);
+      overlay.appendChild(text);
+      frame.appendChild(overlay);
+    }
+
+    // Different click behavior based on tab
+    if (state.currentTab === "collection") {
+      // Collection mode: Click entire card to toggle collected state
+      frame.style.cursor = "pointer";
+      frame.onclick = (e) => {
+        e.stopPropagation();
+        toggleCollected(it.name);
+
+        // Manually toggle the visual state without re-rendering entire grid
+        const isNowCollected = state.collectedItems.has(it.name);
+        if (isNowCollected) {
+          card.classList.add("collected-item");
+          // Add overlay if not present
+          if (!frame.querySelector(".collected-overlay")) {
+            const overlay = document.createElement("div");
+            overlay.className = "collected-overlay";
+            const checkmark = document.createElement("div");
+            checkmark.className = "collected-checkmark";
+            checkmark.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+            const text = document.createElement("div");
+            text.className = "collected-text";
+            text.textContent = "Collected";
+            overlay.appendChild(checkmark);
+            overlay.appendChild(text);
+            frame.appendChild(overlay);
+          }
+        } else {
+          card.classList.remove("collected-item");
+          const overlay = frame.querySelector(".collected-overlay");
+          if (overlay) overlay.remove();
+        }
+      };
+    } else {
+      // Blueprint mode: Click to show details
+      frame.style.cursor = "pointer";
+      frame.onclick = (e) => {
+        // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
+        e.stopPropagation();
+
+        const isOpen = !details.classList.contains("hidden");
+
+        // close any other open overlays
+        document.querySelectorAll(".details-overlay").forEach(d => {
+          if (d !== details) {
+            d.classList.add("hidden");
+            d.style.transform = ""; // reset shift
+            const parent = d.closest(".card-compact");
+            if (parent) {
+              parent.classList.remove("card-open");
+              parent.style.zIndex = ""; // Reset z-index
+            }
+          }
+        });
+
+        if (isOpen) {
+          details.classList.add("hidden");
+          details.style.transform = "";
+          card.classList.remove("card-open");
+          card.style.zIndex = "";
+        } else {
+          details.classList.remove("hidden");
+          card.classList.add("card-open");
+          card.style.zIndex = "50"; // Bring to front
+
+          // Overflow check
+          requestAnimationFrame(() => {
+            const rect = details.getBoundingClientRect();
+            const margin = 12; // padding from screen edge
+
+            let shiftX = 0;
+            if (rect.left < margin) {
+              shiftX = (margin - rect.left);
+            } else if (rect.right > window.innerWidth - margin) {
+              shiftX = (window.innerWidth - margin - rect.right);
+            }
+
+            if (shiftX !== 0) {
+              // Apply shift on top of the existing centering (-50%)
+              details.style.transform = `translateX(calc(-50% + ${shiftX}px))`;
+            }
+          });
+        }
+      };
+    }
+
     card.appendChild(frame);
     card.appendChild(title);
     card.appendChild(details);
     grid.appendChild(card);
+    cards.push(card);
+  }
+
+  // Animate cards entrance
+  if (cards.length > 0) {
+    animate(
+      cards,
+      { opacity: [0, 1], y: [20, 0] },
+      { delay: stagger(0.015) }
+    );
   }
 }
 
-document.addEventListener("DOMContentLoaded", loadData);
+// document.addEventListener("DOMContentLoaded", loadData); // Moved to top
+
+
+
+// Initialize collection filter buttons
+function initCollectionFilter() {
+  const allBtn = document.getElementById("collectedAll");
+  const yesBtn = document.getElementById("collectedYes");
+  const noBtn = document.getElementById("collectedNo");
+
+  if (allBtn) {
+    allBtn.onclick = () => {
+      state.filters.collected = "all";
+      allBtn.classList.add("chip-active");
+      yesBtn.classList.remove("chip-active");
+      noBtn.classList.remove("chip-active");
+      applyFilters();
+    };
+  }
+
+  if (yesBtn) {
+    yesBtn.onclick = () => {
+      state.filters.collected = "collected";
+      allBtn.classList.remove("chip-active");
+      yesBtn.classList.add("chip-active");
+      noBtn.classList.remove("chip-active");
+      applyFilters();
+    };
+  }
+
+  if (noBtn) {
+    noBtn.onclick = () => {
+      state.filters.collected = "not-collected";
+      allBtn.classList.remove("chip-active");
+      yesBtn.classList.remove("chip-active");
+      noBtn.classList.add("chip-active");
+      applyFilters();
+    };
+  }
+}
+
+
+
+
+
+
+
+
+// Update initCollectionFilters to handle both tabs
+function initCollectionFilters() {
+  // Collection tab filters
+  const allBtn = document.getElementById("collectedAll");
+  const yesBtn = document.getElementById("collectedYes");
+  const noBtn = document.getElementById("collectedNo");
+
+  // Blueprints tab filters
+  const allBtnBP = document.getElementById("collectedAllBlueprints");
+  const yesBtnBP = document.getElementById("collectedYesBlueprints");
+  const noBtnBP = document.getElementById("collectedNoBlueprints");
+
+  // Mobile filters
+  const allBtnMob = document.getElementById("collectedAllMobile");
+  const yesBtnMob = document.getElementById("collectedYesMobile");
+  const noBtnMob = document.getElementById("collectedNoMobile");
+
+  const setFilter = (value, buttons) => {
+    state.filters.collected = value;
+
+    // Synchronize all instances of these buttons
+    const allSets = [
+      [allBtn, yesBtn, noBtn],
+      [allBtnBP, yesBtnBP, noBtnBP],
+      [allBtnMob, yesBtnMob, noBtnMob]
+    ];
+
+    allSets.forEach(set => {
+      const [a, y, n] = set;
+      if (!a) return;
+      a.classList.remove("chip-active");
+      y.classList.remove("chip-active");
+      n.classList.remove("chip-active");
+      if (value === "all") a.classList.add("chip-active");
+      if (value === "collected") y.classList.add("chip-active");
+      if (value === "not-collected") n.classList.add("chip-active");
+    });
+
+    applyFilters();
+  };
+
+  // Collection tab
+  if (allBtn) allBtn.onclick = () => setFilter("all", [allBtn, yesBtn, noBtn]);
+  if (yesBtn) yesBtn.onclick = () => setFilter("collected", [allBtn, yesBtn, noBtn]);
+  if (noBtn) noBtn.onclick = () => setFilter("not-collected", [allBtn, yesBtn, noBtn]);
+
+  // Blueprints tab
+  if (allBtnBP) allBtnBP.onclick = () => setFilter("all", [allBtnBP, yesBtnBP, noBtnBP]);
+  if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected", [allBtnBP, yesBtnBP, noBtnBP]);
+  if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected", [allBtnBP, yesBtnBP, noBtnBP]);
+
+  // Mobile drawer
+  if (allBtnMob) allBtnMob.onclick = () => setFilter("all", [allBtnMob, yesBtnMob, noBtnMob]);
+  if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected", [allBtnMob, yesBtnMob, noBtnMob]);
+  if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected", [allBtnMob, yesBtnMob, noBtnMob]);
+}
+
+
+
+
+
+
+
+
