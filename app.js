@@ -3,7 +3,7 @@ import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-const CSV_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR67yD6RVyG3ypoeWJaJG9eBZ-f_cw7kOu4ZFSIBSHP4geWdtfQ_8zRzZTTi5h5Cw2d/pub?gid=1016263653&single=true&output=csv";
+const CSV_URL_DEFAULT = "./data.csv";
 
 // Since we are now a module, we must attach global initialization to window if it's called from HTML
 // However, existing onclicks in HTML might break if functions aren't on window.
@@ -282,7 +282,7 @@ function cycleItemStatus(itemName, frame) {
   }
 
   saveCollectionState();
-  syncToCloud(); // Sync to Firebase if logged in
+  debouncedSyncToCloud(); // Debounced sync to Firebase if logged in
 
   // Directly update the card UI without full re-render
   // This is an optimization. But given we need to change badge styles, 
@@ -601,6 +601,18 @@ const GRID = {
   default: 120,
   storageKey: "arc_gridSize_v2",
 };
+
+// --- Utilities ---
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
+}
+
+const debouncedSyncToCloud = debounce(syncToCloud, 2000); // Wait 2s before syncing
 
 const RARITY = {
   Common: { color: "#717471", rank: 1 },

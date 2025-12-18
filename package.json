@@ -6,7 +6,8 @@
         "start": "serve .",
         "dev": "vite",
         "build": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "update-data": "node scripts/update-data.js"
     },
     "devDependencies": {
         "firebase-tools": "^15.0.0",
