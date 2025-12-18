@@ -1222,7 +1222,6 @@ function applyFilters() {
     if (sort === "name_asc") return a.name.localeCompare(b.name);
     if (sort === "name_desc") return b.name.localeCompare(a.name);
     if (sort === "type_asc") return (a.type || "").localeCompare(b.type || "");
-    if (sort === "map_asc") return (a.map || "").localeCompare(b.map || "");
     if (sort === "rarity_desc") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
     if (sort === "rarity_asc") return rarityRank(a.rarity) - rarityRank(b.rarity) || a.name.localeCompare(b.name);
     return a.name.localeCompare(b.name);
