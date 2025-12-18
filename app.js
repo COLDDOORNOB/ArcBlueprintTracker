@@ -1374,10 +1374,10 @@ function initCollectionFilters() {
   if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected", [allBtnBP, yesBtnBP, noBtnBP]);
   if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected", [allBtnBP, yesBtnBP, noBtnBP]);
 
-  // Mobile drawer
-  if (allBtnMob) allBtnMob.onclick = () => setFilter("all", [allBtnMob, yesBtnMob, noBtnMob]);
-  if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected", [allBtnMob, yesBtnMob, noBtnMob]);
   if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected", [allBtnMob, yesBtnMob, noBtnMob]);
+
+  // Initial sync on load
+  setFilter(state.filters.collected);
 }
 
 
