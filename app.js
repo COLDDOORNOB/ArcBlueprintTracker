@@ -296,12 +296,12 @@ function switchTab(tabName) {
     blueprintsBtn.classList.add("tab-button-active");
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
-    collectionOnlyElements.forEach(el => el.style.display = "none");
+    collectionOnlyElements.forEach(el => el.classList.add("hidden"));
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
     document.body.classList.add("collection-mode");
-    collectionOnlyElements.forEach(el => el.style.display = "block");
+    collectionOnlyElements.forEach(el => el.classList.remove("hidden"));
   }
 
   applyFilters();
