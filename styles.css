@@ -354,6 +354,45 @@ input[type=range]::-webkit-slider-runnable-track {
   position: relative;
 }
 
+.collection-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 18px;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.card-compact:hover .collection-hint {
+  opacity: 1;
+}
+
+.collection-hint-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+.collection-hint-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .collected-overlay {
   position: absolute;
   inset: 0;

@@ -15,6 +15,7 @@ window.setGridSize = setGridSize;
 document.addEventListener("DOMContentLoaded", () => {
   loadCollectionState();
   initTabNavigation();
+  switchTab(state.currentTab); // Ensure initial UI reflects the current tab
   initCollectionFilters();
   initAuth(); // Initialize Firebase Auth
   loadData();
@@ -289,18 +290,18 @@ function switchTab(tabName) {
   // Update tab button states
   const blueprintsBtn = document.getElementById("tabBlueprints");
   const collectionBtn = document.getElementById("tabCollection");
-  const collectionFilter = document.querySelector(".collection-only");
+  const collectionOnlyElements = document.querySelectorAll(".collection-only");
 
   if (tabName === "blueprints") {
     blueprintsBtn.classList.add("tab-button-active");
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
-    if (collectionFilter) collectionFilter.style.display = "none";
+    collectionOnlyElements.forEach(el => el.style.display = "none");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
     document.body.classList.add("collection-mode");
-    if (collectionFilter) collectionFilter.style.display = "block";
+    collectionOnlyElements.forEach(el => el.style.display = "block");
   }
 
   applyFilters();
@@ -1170,25 +1171,34 @@ function renderGrid() {
     };
     frame.appendChild(imgWrap);
 
-    // Collection mode: Add checkmark overlay if collected
+    // Collection mode features
     const isCollected = state.collectedItems.has(it.name);
-    if (state.currentTab === "collection" && isCollected) {
-      card.classList.add("collected-item");
-
-      const overlay = document.createElement("div");
-      overlay.className = "collected-overlay";
-
-      const checkmark = document.createElement("div");
-      checkmark.className = "collected-checkmark";
-      checkmark.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-
-      const text = document.createElement("div");
-      text.className = "collected-text";
-      text.textContent = "Collected";
-
-      overlay.appendChild(checkmark);
-      overlay.appendChild(text);
-      frame.appendChild(overlay);
+    if (state.currentTab === "collection") {
+      if (isCollected) {
+        card.classList.add("collected-item");
+        const overlay = document.createElement("div");
+        overlay.className = "collected-overlay";
+        const checkmark = document.createElement("div");
+        checkmark.className = "collected-checkmark";
+        checkmark.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        const text = document.createElement("div");
+        text.className = "collected-text";
+        text.textContent = "Collected";
+        overlay.appendChild(checkmark);
+        overlay.appendChild(text);
+        frame.appendChild(overlay);
+      } else {
+        // Uncollected: Add hint
+        const hint = document.createElement("div");
+        hint.className = "collection-hint";
+        hint.innerHTML = `
+          <div class="collection-hint-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="white" stroke-width="2" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+          </div>
+          <div class="collection-hint-text">Click to Collect</div>
+        `;
+        frame.appendChild(hint);
+      }
     }
 
     // Different click behavior based on tab
@@ -1203,6 +1213,11 @@ function renderGrid() {
         const isNowCollected = state.collectedItems.has(it.name);
         if (isNowCollected) {
           card.classList.add("collected-item");
+
+          // Remove hint
+          const hint = frame.querySelector(".collection-hint");
+          if (hint) hint.remove();
+
           // Add overlay if not present
           if (!frame.querySelector(".collected-overlay")) {
             const overlay = document.createElement("div");
@@ -1219,8 +1234,22 @@ function renderGrid() {
           }
         } else {
           card.classList.remove("collected-item");
+
           const overlay = frame.querySelector(".collected-overlay");
           if (overlay) overlay.remove();
+
+          // Add hint back
+          if (!frame.querySelector(".collection-hint")) {
+            const hint = document.createElement("div");
+            hint.className = "collection-hint";
+            hint.innerHTML = `
+               <div class="collection-hint-icon">
+                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="white" stroke-width="2" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+               </div>
+               <div class="collection-hint-text">Click to Collect</div>
+             `;
+            frame.appendChild(hint);
+          }
         }
       };
     } else {
