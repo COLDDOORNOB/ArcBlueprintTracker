@@ -81,7 +81,7 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
         </div>
-        <input id="gridSize" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
+        <input id="gridSize" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
       <div class="mt-4 blueprints-only">
@@ -107,6 +107,7 @@
         <div class="mt-2 flex gap-2">
           <button id="collectedAllBlueprints" class="chip chip-active flex-1">All</button>
           <button id="collectedYesBlueprints" class="chip flex-1">Collected</button>
+          <button id="collectedWishBlueprints" class="chip flex-1">Wishlist</button>
           <button id="collectedNoBlueprints" class="chip flex-1">Not Collected</button>
         </div>
       </div>
@@ -203,6 +204,26 @@
     </header>
 
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 md:pt-6 pt-[120px] md:pt-6">
+      <!-- Progress Bar Section (Collection Only) -->
+      <div id="collectionProgressContainer" class="collection-only mb-8 hidden">
+        <div class="flex items-end justify-between mb-2">
+          <div class="flex flex-col">
+            <span class="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Total Progress</span>
+            <span class="text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent"
+              id="progressPercent">0%</span>
+          </div>
+          <div class="text-right">
+            <span class="text-sm text-zinc-400 font-medium" id="progressCount">0 / 0</span>
+          </div>
+        </div>
+        <div class="h-2 w-full bg-zinc-800 rounded-full overflow-hidden relative">
+          <div class="absolute inset-0 bg-zinc-800/50"></div>
+          <div id="progressBar" class="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full relative"
+            style="width: 0%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);">
+            <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+          </div>
+        </div>
+      </div>
       <div class="flex items-center justify-between gap-3 mb-6 min-h-[32px]">
         <div class="flex items-center gap-2 flex-wrap" id="activeChips"></div>
 
@@ -214,8 +235,8 @@
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <span class="text-[11px] text-zinc-400 font-medium whitespace-nowrap leading-none">Click any blueprint to mark
-            as collected.</span>
+          <span class="text-[11px] text-zinc-400 font-medium whitespace-nowrap leading-none">Click once to mark an item
+            as Collected and again to Wishlist it.</span>
         </div>
 
         <div class="text-xs text-zinc-400 whitespace-nowrap" id="resultCount"></div>
@@ -279,6 +300,7 @@
         <div class="mt-2 flex gap-2">
           <button id="collectedAllMobile" class="chip chip-active flex-1">All</button>
           <button id="collectedYesMobile" class="chip flex-1">Collected</button>
+          <button id="collectedWishMobile" class="chip flex-1">Wishlist</button>
           <button id="collectedNoMobile" class="chip flex-1">Not Collected</button>
         </div>
       </div>
@@ -288,7 +310,7 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
         </div>
-        <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
+        <input id="gridSizeMobile" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
       <div class="mt-6 blueprints-only">
