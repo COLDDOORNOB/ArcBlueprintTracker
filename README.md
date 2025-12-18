@@ -124,6 +124,7 @@ Users can resize the grid from **120px** to **220px**.
 *(Placeholder for future tasks or bugs. Remind the user about this section next time you read this file.)*
 
 - [ ] URLs Removed from item descriptions
+- [ ] Scaling options on mobile that go lower than 120px. so more items can fit on screen
 
 ## Local Development Setup
 
