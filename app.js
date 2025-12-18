@@ -926,7 +926,9 @@ function initUI() {
 
 function loadData() {
   setMetaLine("Fetching sheet...");
-  const url = getCsvUrl() + "&t=" + Date.now();
+  let url = getCsvUrl();
+  // Append cache-buster correctly
+  url += (url.includes("?") ? "&" : "?") + "t=" + Date.now();
 
   Papa.parse(url, {
     download: true,
