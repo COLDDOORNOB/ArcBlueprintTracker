@@ -10,10 +10,7 @@ body {
   background-position: left top;
   background-size: auto 100vh;
   background-attachment: fixed;
-  /* Performance optimizations */
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  background-attachment: fixed;
 }
 
 /* Custom Scrollbar */

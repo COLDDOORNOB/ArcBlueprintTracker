@@ -805,9 +805,26 @@ function initUI() {
 
   const s1 = document.getElementById("searchInput");
   const s2 = document.getElementById("searchInputMobile");
-  const onSearch = (v) => { state.filters.search = v; applyFilters(); };
+
+  // Debounce helper
+  const debounce = (fn, delay) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn(...args), delay);
+    };
+  };
+
+  const onSearch = debounce((v) => {
+    state.filters.search = v;
+    applyFilters();
+  }, 300);
+
   if (s1) s1.addEventListener("input", (e) => onSearch(e.target.value));
-  if (s2) s2.addEventListener("input", (e) => { onSearch(e.target.value); if (s1) s1.value = e.target.value; });
+  if (s2) s2.addEventListener("input", (e) => {
+    onSearch(e.target.value);
+    if (s1) s1.value = e.target.value;
+  });
 
   const sort1 = document.getElementById("sortSelect");
   const sort2 = document.getElementById("sortSelectMobile");
@@ -1252,6 +1269,7 @@ function renderGrid() {
 
 
   const cards = [];
+  const fragment = document.createDocumentFragment();
 
   for (const it of state.filtered) {
     const card = document.createElement("div");
@@ -1497,9 +1515,11 @@ function renderGrid() {
     card.appendChild(frame);
     card.appendChild(title);
     card.appendChild(details);
-    grid.appendChild(card);
+    fragment.appendChild(card); // Append to fragment
     cards.push(card);
   }
+
+  grid.appendChild(fragment); // Batch append to DOM
 
   // Animate cards entrance
   if (cards.length > 0) {
@@ -1516,41 +1536,7 @@ function renderGrid() {
 
 
 // Initialize collection filter buttons
-function initCollectionFilter() {
-  const allBtn = document.getElementById("collectedAll");
-  const yesBtn = document.getElementById("collectedYes");
-  const noBtn = document.getElementById("collectedNo");
 
-  if (allBtn) {
-    allBtn.onclick = () => {
-      state.filters.collected = "all";
-      allBtn.classList.add("chip-active");
-      yesBtn.classList.remove("chip-active");
-      noBtn.classList.remove("chip-active");
-      applyFilters();
-    };
-  }
-
-  if (yesBtn) {
-    yesBtn.onclick = () => {
-      state.filters.collected = "collected";
-      allBtn.classList.remove("chip-active");
-      yesBtn.classList.add("chip-active");
-      noBtn.classList.remove("chip-active");
-      applyFilters();
-    };
-  }
-
-  if (noBtn) {
-    noBtn.onclick = () => {
-      state.filters.collected = "not-collected";
-      allBtn.classList.remove("chip-active");
-      yesBtn.classList.remove("chip-active");
-      noBtn.classList.add("chip-active");
-      applyFilters();
-    };
-  }
-}
 
 
 
