@@ -119,6 +119,12 @@ Users can resize the grid from **120px** to **220px**.
 - **No Auth**: Public data only.
 - **Manual Image Sync**: Local images must be added manually to `/images` to take advantage of caching/independence.
 
+## Needs Fixing
+
+*(Placeholder for future tasks or bugs. Remind the user about this section next time you read this file.)*
+
+- [ ] URLs Removed from item descriptions
+
 ## Local Development Setup
 
 To run this project locally with live reloading:
