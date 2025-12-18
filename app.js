@@ -278,15 +278,6 @@ function switchTab(tabName) {
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
     if (collectionFilter) collectionFilter.style.display = "none";
-
-    // Default to "Not Collected" filter for blueprints tab
-    state.filters.collected = "not-collected";
-    const allBtn = document.getElementById("collectedAllBlueprints");
-    const yesBtn = document.getElementById("collectedYesBlueprints");
-    const noBtn = document.getElementById("collectedNoBlueprints");
-    if (allBtn) allBtn.classList.remove("chip-active");
-    if (yesBtn) yesBtn.classList.remove("chip-active");
-    if (noBtn) noBtn.classList.add("chip-active");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
@@ -511,7 +502,7 @@ const state = {
     confs: new Set(),
     search: "",
     sort: "rarity_desc",
-    collected: "all", // "all", "collected", "not-collected"
+    collected: "not-collected", // "all", "collected", "not-collected"
   },
   facets: {
     rarities: [],
