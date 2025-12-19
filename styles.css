@@ -249,6 +249,46 @@ input[type=range]::-webkit-slider-runnable-track {
   .type-tab span {
     font-size: clamp(8px, 6cqi, 9px);
   }
+
+  /* Collection Progress Fixes */
+  #collectionProgressContainer {
+    margin-bottom: 1.5rem;
+  }
+
+  #progressPercent {
+    font-size: 2.25rem;
+  }
+
+  #collectionHelp {
+    max-width: 100%;
+    order: 2;
+  }
+
+  #activeChips {
+    order: 1;
+    width: 100%;
+  }
+
+  #resultCount {
+    order: 3;
+    margin-top: 0.5rem;
+  }
+}
+
+@media (max-width: 380px) {
+  #collectionHelp {
+    padding: 4px 10px 4px 4px;
+    gap: 1.5;
+  }
+
+  #collectionHelp .w-7 {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  #collectionHelp span {
+    font-size: 10px;
+  }
 }
 
 /* Floating Mobile Filter Button */
