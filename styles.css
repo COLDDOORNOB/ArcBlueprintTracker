@@ -543,6 +543,20 @@ input[type=range]::-webkit-slider-runnable-track {
   animation: toastProgressShrink 10s linear forwards;
 }
 
+/* Success Toast Notification */
+#successToast {
+  position: fixed !important;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: toastSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#successToastProgress.animate {
+  animation: toastProgressShrink 5s linear forwards;
+}
+
 /* Submit Modal */
 #submitModal {
   position: fixed !important;

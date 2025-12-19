@@ -670,12 +670,30 @@ async function submitBlueprintLocation() {
     });
 
     closeSubmissionModal();
-    // Show a quick success message (optional: could use a toast)
-    console.log("Blueprint location submitted successfully!");
+    showSuccessToast();
   } catch (error) {
     console.error("Error submitting blueprint location:", error);
     alert("Failed to submit. Please try again.");
   }
+}
+
+function showSuccessToast() {
+  const toast = document.getElementById("successToast");
+  const progress = document.getElementById("successToastProgress");
+
+  if (!toast || !progress) return;
+
+  // Reset and show
+  progress.classList.remove("animate");
+  void progress.offsetWidth; // Force reflow
+  progress.classList.add("animate");
+
+  toast.classList.remove("hidden");
+
+  // Hide after 5 seconds
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 5000);
 }
 
 function resolveLocalImageUrl(imgUrl, itemName) {
