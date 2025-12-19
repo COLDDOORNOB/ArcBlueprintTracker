@@ -463,7 +463,7 @@ function switchTab(tabName) {
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.add("hidden"));
-    if (!eventBannerDismissed && eventBanner) eventBanner.classList.remove("hidden");
+    if (ENABLE_EVENT_BANNER && !eventBannerDismissed && eventBanner) eventBanner.classList.remove("hidden");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
@@ -491,9 +491,15 @@ function initTabNavigation() {
 }
 
 // Event Banner Management
+// NOTE: Keep this code - it's reusable for future announcements!
+// To re-enable, set ENABLE_EVENT_BANNER to true and update the banner content in index.html
+const ENABLE_EVENT_BANNER = false;
 let eventBannerDismissed = false; // Temporary state, clears on refresh
 
 function initEventBanner() {
+  // Banner disabled - set ENABLE_EVENT_BANNER to true to re-enable
+  if (!ENABLE_EVENT_BANNER) return;
+
   const banner = document.getElementById("eventBanner");
   const closeBtn = document.getElementById("closeEventBanner");
 
