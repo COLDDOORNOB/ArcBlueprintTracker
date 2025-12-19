@@ -304,12 +304,10 @@ input[type=range]::-webkit-slider-runnable-track {
 
 /* Floating Mobile Filter Button */
 .mobile-filter-btn {
-  position: absolute;
-  top: 16px;
-  left: 16px;
+  position: static;
   z-index: 1000;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(24, 24, 27, 0.8);
   backdrop-filter: blur(12px);
@@ -321,6 +319,7 @@ input[type=range]::-webkit-slider-runnable-track {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
 }
 
 .mobile-filter-btn:active {
@@ -377,14 +376,6 @@ input[type=range]::-webkit-slider-runnable-track {
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   justify-content: center;
-}
-
-/* On mobile, make tabs scroll with page instead of sticky */
-@media (max-width: 768px) {
-  .tab-nav {
-    position: relative;
-    top: auto;
-  }
 }
 
 .tab-button {
