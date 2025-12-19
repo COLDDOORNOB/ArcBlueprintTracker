@@ -1280,7 +1280,15 @@ function renderGrid() {
     const imgWrap = document.createElement("div");
     imgWrap.className = "relative aspect-square rounded-[16px] flex items-center justify-center overflow-hidden";
     // Background: Rarity gradient fades (0% -> 75%) into dark grey - middle ground
-    imgWrap.style.background = `linear-gradient(to top right, ${rarityColor(it.rarity)}44 0%, rgba(24,24,27,0.5) 75%)`;
+    // Pattern image with a 75% black overlay behind the rarity gradient
+    imgWrap.style.background = `
+      linear-gradient(to top right, ${rarityColor(it.rarity)}44 0%, rgba(24,24,27,0.5) 75%),
+      linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
+      url('Background/Arc BP Image Background.webp')
+    `;
+    imgWrap.style.backgroundSize = "cover, cover, cover";
+    imgWrap.style.backgroundPosition = "center, center, center";
+    imgWrap.style.backgroundBlendMode = "normal, normal, normal";
     // Inline fallbacks in case a utility class doesn't load.
     imgWrap.style.aspectRatio = "1 / 1";
     imgWrap.style.width = "100%";
