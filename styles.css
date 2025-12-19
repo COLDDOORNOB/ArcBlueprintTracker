@@ -428,9 +428,11 @@ input[type=range]::-webkit-slider-runnable-track {
   /* Let clicks pass through to card */
 }
 
-/* Show hint on hover */
-.card-compact:hover .collection-hint {
-  opacity: 1;
+/* Show hint on hover - ONLY on devices that support true hover */
+@media (hover: hover) {
+  .card-compact:hover .collection-hint {
+    opacity: 1;
+  }
 }
 
 .collection-hint-icon {
