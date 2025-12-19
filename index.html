@@ -24,8 +24,8 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="/assets/index-ul-e_ytU.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CAQi6dqB.css">
+  <script type="module" crossorigin src="/assets/index-BUw_Z76e.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BIZHlgjm.css">
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
@@ -214,6 +214,30 @@
     </header>
 
     <main class="flex-1 px-4 md:px-6 py-5 md:py-6 md:pt-6 pt-[120px] md:pt-6">
+      <!-- Special Event Banner -->
+      <div id="eventBanner" class="blueprints-only hidden mb-6 px-1">
+        <div
+          class="banner-pill flex items-center justify-between gap-4 px-6 py-3 rounded-full border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+              <svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-white/90">
+              5X Event Currently Active for Blueprints | <span class="text-amber-400">Go get your Blueprints
+                Raiders!</span>
+            </p>
+          </div>
+          <button id="closeEventBanner" class="text-white/40 hover:text-white transition-colors p-1"
+            aria-label="Dismiss banner">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
       <!-- Progress Bar Section (Collection Only) -->
       <div id="collectionProgressContainer" class="collection-only mb-6 hidden px-1">
         <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
@@ -401,6 +425,117 @@
           class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
           filters</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
+  <button id="submitLocationFab"
+    class="collection-only hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
+    aria-label="Submit Blueprint Location">
+    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+      </svg>
+    </div>
+    <div class="text-left leading-tight">
+      <div class="text-xs font-semibold">Submit Blueprint</div>
+      <div class="text-xs font-semibold">Location</div>
+    </div>
+  </button>
+
+  <!-- Timed Toast Notification (My Collection Only) -->
+  <div id="collectToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden">
+    <div
+      class="relative px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors">
+      <p id="collectToastText" class="text-sm font-medium text-white"></p>
+      <div id="collectToastProgress" class="absolute bottom-0 left-0 h-1 bg-white/40 rounded-b-xl transition-all"
+        style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Blueprint Submission Modal -->
+  <div id="submitModal"
+    class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div
+      class="relative w-full max-w-lg bg-zinc-900/95 backdrop-blur-xl rounded-2xl border border-zinc-700 shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-5 border-b border-zinc-800">
+        <h2 class="text-lg font-semibold text-white">Submit Blueprint Location</h2>
+        <button id="closeSubmitModal" class="text-zinc-500 hover:text-white transition-colors p-1" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <!-- Modal Body -->
+      <form id="submitLocationForm" class="p-5 space-y-4">
+        <!-- Blueprint Name (can be pre-filled or picklist) -->
+        <div>
+          <label for="submitBlueprintName" class="block text-sm font-medium text-zinc-400 mb-1.5">What Blueprint did
+            you collect?</label>
+          <select id="submitBlueprintName"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Blueprint...</option>
+          </select>
+        </div>
+        <!-- Map -->
+        <div>
+          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
+          <select id="submitMap"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Map...</option>
+            <option value="Dam Battlegrounds">Dam Battlegrounds</option>
+            <option value="Blue Gate">Blue Gate</option>
+            <option value="Spaceport">Spaceport</option>
+            <option value="Buried City">Buried City</option>
+            <option value="Stella Montis">Stella Montis</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <!-- Condition -->
+        <div>
+          <label for="submitCondition" class="block text-sm font-medium text-zinc-400 mb-1.5">What Condition was it
+            on?</label>
+          <select id="submitCondition"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Condition...</option>
+            <option value="Day">Day</option>
+            <option value="Night">Night</option>
+            <option value="Storm">Storm</option>
+            <option value="Cold Snap">Cold Snap</option>
+            <option value="Harvester">Harvester</option>
+            <option value="Matriarch">Matriarch</option>
+            <option value="Hidden Bunker">Hidden Bunker</option>
+            <option value="Husk Graveyard">Husk Graveyard</option>
+            <option value="Launch Tower Loot">Launch Tower Loot</option>
+            <option value="Locked Gate">Locked Gate</option>
+            <option value="Prospecting Probes">Prospecting Probes</option>
+            <option value="Lush Blooms">Lush Blooms</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <!-- Location -->
+        <div>
+          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What location on the map?
+            (e.g., Security Wing, Village)</label>
+          <input type="text" id="submitLocation"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            placeholder="Enter location...">
+        </div>
+        <!-- Container -->
+        <div>
+          <label for="submitContainer" class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?
+            (e.g., Breachable Rusty Metal Box)</label>
+          <input type="text" id="submitContainer"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            placeholder="Enter container type...">
+        </div>
+        <!-- Submit Button -->
+        <button type="submit" id="submitLocationBtn"
+          class="w-full mt-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Submit Location Data
+        </button>
+      </form>
     </div>
   </div>
 
