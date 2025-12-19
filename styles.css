@@ -304,7 +304,7 @@ input[type=range]::-webkit-slider-runnable-track {
 
 /* Floating Mobile Filter Button */
 .mobile-filter-btn {
-  position: fixed;
+  position: absolute;
   top: 16px;
   left: 16px;
   z-index: 1000;
@@ -377,6 +377,14 @@ input[type=range]::-webkit-slider-runnable-track {
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   justify-content: center;
+}
+
+/* On mobile, make tabs scroll with page instead of sticky */
+@media (max-width: 768px) {
+  .tab-nav {
+    position: relative;
+    top: auto;
+  }
 }
 
 .tab-button {

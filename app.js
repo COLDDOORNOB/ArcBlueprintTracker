@@ -447,8 +447,8 @@ function initAuth() {
 function switchTab(tabName) {
   state.currentTab = tabName;
 
-  // Scroll to top when switching tabs
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Scroll to top when switching tabs (instant for mobile compatibility)
+  window.scrollTo(0, 0);
 
   // Update tab button states
   const blueprintsBtn = document.getElementById("tabBlueprints");
