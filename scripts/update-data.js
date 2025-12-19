@@ -7,12 +7,27 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUbvNSaRrEWnR6
 
 // Output path in public directory
 const OUTPUT_PATH = path.join(__dirname, '..', 'public', 'data.csv');
+const IMAGES_DIR = path.join(__dirname, '..', 'public', 'images');
+const MANIFEST_PATH = path.join(__dirname, '..', 'public', 'image-manifest.json');
+
+function generateImageManifest() {
+    console.log(`Scanning images in: ${IMAGES_DIR}`);
+    try {
+        const files = fs.readdirSync(IMAGES_DIR).filter(f => {
+            const ext = path.extname(f).toLowerCase();
+            return ['.png', '.webp', '.jpg', '.jpeg'].includes(ext);
+        });
+        fs.writeFileSync(MANIFEST_PATH, JSON.stringify(files, null, 2));
+        console.log(`Successfully saved image manifest to: ${MANIFEST_PATH} (${files.length} images)`);
+    } catch (err) {
+        console.error('Error generating image manifest:', err);
+    }
+}
 
 function download(url, dest) {
     console.log(`Downloading CSV from: ${url}`);
 
     https.get(url, (res) => {
-        // Handle Redirects (301, 302, 303, 307)
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             console.log(`Following redirect to: ${res.headers.location}`);
             download(res.headers.location, dest);
@@ -30,6 +45,7 @@ function download(url, dest) {
         file.on('finish', () => {
             file.close();
             console.log(`Successfully saved CSV to: ${dest}`);
+            generateImageManifest(); // Generate manifest after CSV download
         });
     }).on('error', (err) => {
         console.error('Error downloading CSV:', err);

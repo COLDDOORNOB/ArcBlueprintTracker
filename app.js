@@ -1,7 +1,7 @@
 import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
 
@@ -19,6 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
   switchTab(state.currentTab); // Ensure initial UI reflects the current tab
   initCollectionFilters();
   initAuth(); // Initialize Firebase Auth
+  initEventBanner(); // Initialize Event Banner
+  initBlueprintSubmission(); // Initialize Blueprint Submission UI
   loadData();
 });
 
@@ -31,84 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
 const LOCAL_IMAGE_BASE = "./images/";
 const LOCAL_ICON_BASE = "./icons/";
 
-// Build a lookup of base filename -> hashed filename, e.g.
-// "Anvil-Level1" -> "Anvil-Level1_4008ab9b4b.png"
-const LOCAL_IMAGE_FILES = [
-  "Extended_Medium_Mag_III_00531083a8.png",
-  "Extended_Medium_Mag_II_2e66ba96e7.png",
-  "Extended_Light_Mag_III_d9347dc8af.png",
-  "Extended_Barrel_6f57d82e2b.png",
-  "Extended_Light_Mag_II_95a5cf317a.png",
-  "Explosive_Mine_f3f7dddb30.png",
-  "Complex_Gun_Parts_a4523a546f.png",
-  "Defibrillator_cbd07c7d0a.png",
-  "Compensator_II_9efd71b2c0.png",
-  "Compensator_III_0d2d5c294d.png",
-  "Combat_Mk._3__Flanking__b8b75b54bf.png",
-  "Combat_Mk._3__Aggressive__0c49a269d1.png",
-  "Bobcat-Level1_542f741fbd.png",
-  "Burletta-Level1_a959085f9a.png",
-  "Blaze_Grenade_b6c426c6f1.png",
-  "Barricade_Kit_b941aff2b2.png",
-  "Bettina_6c889eadf0.png",
-  "Aphelion_55eb3c8526.png",
-  "Angled_Grip_II_7b2a8db317.png",
-  "Angled_Grip_III_ba0d742697.png",
-  "Anvil-Level1_4008ab9b4c.png",
-  "Wolfpack_5d69c9575c.png",
-  "Vulcano-Level1_4e6ad17258.png",
-  "Vita_Spray_7142499abc.png",
-  "Vita_Shot_245f6df518.png",
-  "Vertical_Grip_III_e157ba22cd.png",
-  "Venator-Level1_f745282e98.png",
-  "Vertical_Grip_II_06f0877aa5.png",
-  "Trigger_Nade_a68e53c662.png",
-  "Torrente-Level1_4c179e6909.png",
-  "Tempest-Level1_3e74f4b8f2.png",
-  "Tagging_Grenade_76f0885a0b.png",
-  "Tactical_Mk._3__Healing__3e45bd6fe9.png",
-  "Tactical_Mk._3__Defensive__7ef33e823b.png",
-  "Stable_Stock_III_14dce56e4f.png",
-  "Stable_Stock_II_49853b0d73.png",
-  "Smoke_Grenade_d211fd4b6e.png",
-  "Snap_Hook_652f25b1ec.png",
-  "Silencer_I_e702af3150.png",
-  "Silencer_II_c3b8f6cd10.png",
-  "Showstopper_80e11cbf02.png",
-  "Shotgun_Silencer_e77598809f.png",
-  "Shotgun_Choke_II_0fb1aeefc5.png",
-  "Shotgun_Choke_III_d60e0aa440.png",
-  "Padded_Stock_2d6217c623.png",
-  "Remote_Raider_Flare_68128283b2.png",
-  "Osprey-Level1_14b1a9548e.png",
-  "Muzzle_Brake_III_d7c83e1c81.png",
-  "Medium_Gun_Parts_fb4d3a320f.png",
-  "Muzzle_Brake_II_65024a4a81.png",
-  "Lure_Grenade_fdb536acb5.png",
-  "Looting_Mk._3__Survivor__f49308eb27.png",
-  "Blue_Light_Stick_d11f5037e4.png",
-  "Lightweight_Stock_ff34cc3948.png",
-  "Light_Gun_Parts_48a0ac28f7.png",
-  "Jupiter_7c063c26c9.png",
-  "Jolt_Mine_4b49b4b521.png",
-  "Il_Toro-Level1_68a279b4f2.png",
-  "Hullcracker-Level1_487079afcf.png",
-  "Horizontal_Grip_0fc841c520.png",
-  "Heavy_Gun_Parts_7d1986dfd5.png",
-  "Equalizer_2299676690.png",
-  "Extended_Shotgun_Mag_III_ddfb6650ba.png",
-  "Extended_Shotgun_Mag_II_ccad252d22.png"
-];
-const LOCAL_IMAGE_MAP = (() => {
-  const m = new Map();
-  for (const f of LOCAL_IMAGE_FILES) {
-    // strip ".png" and trailing "_<hash>"
-    const stem = f.replace(/\.png$/i, "");
-    const base = stem.replace(/_[0-9a-f]{10}$/i, "");
-    m.set(base, f);
-  }
-  return m;
-})();
+// Image Map will be populated dynamically from image-manifest.json
+const LOCAL_IMAGE_MAP = new Map();
 
 function normalizeWikiStem(stem) {
   if (!stem) return "";
@@ -118,14 +44,16 @@ function normalizeWikiStem(stem) {
   stem = stem.replace(/Magazine/g, "Mag");
   // Convert common wiki filename quirks into our local naming scheme
   // Combat_Mk._3_(Flanking) -> Combat_Mk._3__Flanking__
-  // We match optional space before ( so we don't get triple underscores like ___Flanking__
-  stem = stem.replace(/\s*\(/g, "__").replace(/\)/g, "__");
+  // We match optional space before ( and inside the parentheses
+  stem = stem.replace(/\s*\(/g, "_").replace(/\)/g, "_");
   // Trigger_'Nade -> Trigger_Nade
   stem = stem.replace(/['’]/g, "");
-  // Spaces -> underscores
-  stem = stem.replace(/\s+/g, "_");
-  // Clean up trailing underscores if any (optional, but good for consistency)
-  stem = stem.replace(/_+$/, "");
+  // Spaces -> underscores (including non-breaking spaces)
+  stem = stem.replace(/\s/g, "_");
+  // Collapse multiple underscores into one
+  stem = stem.replace(/_+/g, "_");
+  // Clean up trailing/leading underscores
+  stem = stem.replace(/^_+|_+$/g, "");
   return stem;
 }
 
@@ -279,6 +207,10 @@ function cycleItemStatus(itemName, frame) {
   } else {
     // Was Uncollected -> Make Collected
     state.collectedItems.add(itemName);
+    // Show toast asking for location data (only on collection tab)
+    if (state.currentTab === "collection") {
+      showCollectToast(itemName);
+    }
   }
 
   saveCollectionState();
@@ -519,17 +451,20 @@ function switchTab(tabName) {
   const blueprintsBtn = document.getElementById("tabBlueprints");
   const collectionBtn = document.getElementById("tabCollection");
   const collectionOnlyElements = document.querySelectorAll(".collection-only");
+  const eventBanner = document.getElementById("eventBanner");
 
   if (tabName === "blueprints") {
     blueprintsBtn.classList.add("tab-button-active");
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.add("hidden"));
+    if (!eventBannerDismissed && eventBanner) eventBanner.classList.remove("hidden");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
     document.body.classList.add("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.remove("hidden"));
+    if (eventBanner) eventBanner.classList.add("hidden");
   }
 
   applyFilters();
@@ -550,6 +485,198 @@ function initTabNavigation() {
   if (logoHomeMobile) logoHomeMobile.onclick = () => switchTab("blueprints");
 }
 
+// Event Banner Management
+let eventBannerDismissed = false; // Temporary state, clears on refresh
+
+function initEventBanner() {
+  const banner = document.getElementById("eventBanner");
+  const closeBtn = document.getElementById("closeEventBanner");
+
+  if (banner && !eventBannerDismissed && state.currentTab === "blueprints") {
+    banner.classList.remove("hidden");
+  }
+
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      if (banner) banner.classList.add("hidden");
+      eventBannerDismissed = true;
+    };
+  }
+}
+
+// Blueprint Submission System
+let toastTimeout = null;
+let pendingBlueprintName = null;
+
+function initBlueprintSubmission() {
+  const fab = document.getElementById("submitLocationFab");
+  const toast = document.getElementById("collectToast");
+  const toastText = document.getElementById("collectToastText");
+  const toastProgress = document.getElementById("collectToastProgress");
+  const modal = document.getElementById("submitModal");
+  const closeModal = document.getElementById("closeSubmitModal");
+  const form = document.getElementById("submitLocationForm");
+  const blueprintSelect = document.getElementById("submitBlueprintName");
+
+  // FAB click -> open modal
+  if (fab) {
+    fab.onclick = () => openSubmissionModal();
+  }
+
+  // Toast click -> open modal with pre-filled blueprint
+  if (toast) {
+    toast.onclick = () => {
+      hideToast();
+      if (pendingBlueprintName) {
+        openSubmissionModal(pendingBlueprintName);
+      }
+    };
+  }
+
+  // Close modal
+  if (closeModal) {
+    closeModal.onclick = () => closeSubmissionModal();
+  }
+
+  // Close modal on backdrop click
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) closeSubmissionModal();
+    };
+  }
+
+  // Form submission
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      await submitBlueprintLocation();
+    };
+  }
+}
+
+function populateBlueprintPicklist() {
+  const select = document.getElementById("submitBlueprintName");
+  if (!select || !state.all || state.all.length === 0) return;
+
+  // Clear existing options except the first
+  select.innerHTML = '<option value="">Select a Blueprint...</option>';
+
+  // Add all blueprints from state.all
+  for (const item of state.all) {
+    const option = document.createElement("option");
+    option.value = item.name;
+    option.textContent = item.name;
+    select.appendChild(option);
+  }
+}
+
+function openSubmissionModal(prefilledBlueprint = null) {
+  const modal = document.getElementById("submitModal");
+  const blueprintSelect = document.getElementById("submitBlueprintName");
+
+  // Populate the picklist first
+  populateBlueprintPicklist();
+
+  // Pre-fill if provided
+  if (prefilledBlueprint && blueprintSelect) {
+    blueprintSelect.value = prefilledBlueprint;
+  }
+
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+    document.body.style.overflow = "hidden"; // Lock scroll
+  }
+}
+
+function closeSubmissionModal() {
+  const modal = document.getElementById("submitModal");
+  const form = document.getElementById("submitLocationForm");
+
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+    document.body.style.overflow = ""; // Unlock scroll
+  }
+
+  if (form) form.reset();
+  pendingBlueprintName = null;
+}
+
+function showCollectToast(blueprintName) {
+  const toast = document.getElementById("collectToast");
+  const toastText = document.getElementById("collectToastText");
+  const toastProgress = document.getElementById("collectToastProgress");
+
+  if (!toast || !toastText || !toastProgress) return;
+
+  // Clear any existing timeout
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
+
+  pendingBlueprintName = blueprintName;
+  toastText.textContent = `${blueprintName} Blueprint collected? Tell us where!`;
+
+  // Reset and start progress animation
+  toastProgress.classList.remove("animate");
+  void toastProgress.offsetWidth; // Force reflow
+  toastProgress.classList.add("animate");
+
+  toast.classList.remove("hidden");
+
+  // Hide after 10 seconds
+  toastTimeout = setTimeout(() => {
+    hideToast();
+  }, 10000);
+}
+
+function hideToast() {
+  const toast = document.getElementById("collectToast");
+  const toastProgress = document.getElementById("collectToastProgress");
+
+  if (toast) toast.classList.add("hidden");
+  if (toastProgress) toastProgress.classList.remove("animate");
+
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
+}
+
+async function submitBlueprintLocation() {
+  const blueprintName = document.getElementById("submitBlueprintName")?.value;
+  const map = document.getElementById("submitMap")?.value;
+  const condition = document.getElementById("submitCondition")?.value;
+  const location = document.getElementById("submitLocation")?.value;
+  const container = document.getElementById("submitContainer")?.value;
+
+  // Require at least one field
+  if (!blueprintName && !map && !condition && !location && !container) {
+    alert("Please fill in at least one field.");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "blueprintSubmissions"), {
+      blueprintName: blueprintName || "",
+      map: map || "",
+      condition: condition || "",
+      location: location || "",
+      container: container || "",
+      submittedAt: new Date().toISOString(),
+      userId: auth.currentUser?.uid || "anonymous"
+    });
+
+    closeSubmissionModal();
+    // Show a quick success message (optional: could use a toast)
+    console.log("Blueprint location submitted successfully!");
+  } catch (error) {
+    console.error("Error submitting blueprint location:", error);
+    alert("Failed to submit. Please try again.");
+  }
+}
 
 function resolveLocalImageUrl(imgUrl, itemName) {
   // 1) If sheet already points to a local image path, keep it.
@@ -567,7 +694,7 @@ function resolveLocalImageUrl(imgUrl, itemName) {
   // 3) Fallback: derive from item name (spaces -> underscores)
   const fromName = normalizeWikiStem((itemName || "").trim());
 
-  // 2.5) Check manual mappings
+  // 4) Check manual mappings
   if (MANUAL_IMAGE_MAPPINGS[fromName]) {
     const mapped = MANUAL_IMAGE_MAPPINGS[fromName];
     // Try exact or prefix match for the mapped name
@@ -577,30 +704,35 @@ function resolveLocalImageUrl(imgUrl, itemName) {
     }
   }
 
-  // Try exact matches in map
-  const candidates = [stem, fromName];
+  // 5) Try exact matches in our known/hashed map
+  const candidates = [stem.toLowerCase(), fromName.toLowerCase()];
   for (const c of candidates) {
     if (!c) continue;
     if (LOCAL_IMAGE_MAP.has(c)) return LOCAL_IMAGE_BASE + LOCAL_IMAGE_MAP.get(c);
   }
 
-  // Try loose match: if any local base starts with candidate
+  // 6) Try loose match in our known/hashed map
   for (const c of candidates) {
     if (!c) continue;
     for (const [base, filename] of LOCAL_IMAGE_MAP.entries()) {
-      if (base === c) return LOCAL_IMAGE_BASE + filename;
-      if (base.startsWith(c)) return LOCAL_IMAGE_BASE + filename;
+      if (base === c || base.startsWith(c)) return LOCAL_IMAGE_BASE + filename;
     }
   }
 
-  // Give up: return empty string (don't use the CSV URL as it might be a Wiki link)
+  // 7) DYNAMIC FALLBACK: If not in our hashed list, try convention-based path
+  // This allows the user to just drop "My_New_Item.png" or "My_New_Item.webp" into the folder.
+  // We prefer .png if stem exists, otherwise try both.
+  if (fromName) {
+    return LOCAL_IMAGE_BASE + fromName + ".png";
+  }
+
   return "";
 }
 const GRID = {
   min: 70,
   max: 220,
   step: 10,
-  default: 120,
+  default: 160,
   storageKey: "arc_gridSize_v2",
 };
 
@@ -926,7 +1058,30 @@ function initUI() {
   setupCollapsible("toggleConfMobile", "confFiltersMobile", "iconConfMobile");
 }
 
-function loadData() {
+async function loadData() {
+  setMetaLine("Fetching assets...");
+
+  // 1. Fetch image manifest to populate LOCAL_IMAGE_MAP
+  try {
+    const manifestUrl = "./image-manifest.json?t=" + Date.now();
+    const manifestRes = await fetch(manifestUrl);
+    if (manifestRes.ok) {
+      const filenames = await manifestRes.json();
+      LOCAL_IMAGE_MAP.clear();
+      for (const f of filenames) {
+        // strip extension and hash if any
+        const stem = f.replace(/\.png$|\.webp$|\.jpg$|\.jpeg$/i, "");
+        const base = stem.replace(/_[0-9a-f]{10}$/i, "");
+        // Normalize and lowercase the base key for case-insensitive lookup
+        const normalizedBase = normalizeWikiStem(base).toLowerCase();
+        LOCAL_IMAGE_MAP.set(normalizedBase, f);
+      }
+      console.log(`Loaded ${LOCAL_IMAGE_MAP.size} images from manifest.`);
+    }
+  } catch (e) {
+    console.warn("Static image manifest not found or failed to load. Falling back to naming convention.", e);
+  }
+
   setMetaLine("Fetching sheet...");
   let url = getCsvUrl();
   // Append cache-buster correctly
