@@ -539,13 +539,15 @@ function switchTab(tabName) {
 function initTabNavigation() {
   const blueprintsBtn = document.getElementById("tabBlueprints");
   const collectionBtn = document.getElementById("tabCollection");
+  const logoHome = document.getElementById("logoHome");
+  const logoHomeMobile = document.getElementById("logoHomeMobile");
 
-  if (blueprintsBtn) {
-    blueprintsBtn.onclick = () => switchTab("blueprints");
-  }
-  if (collectionBtn) {
-    collectionBtn.onclick = () => switchTab("collection");
-  }
+  if (blueprintsBtn) blueprintsBtn.onclick = () => switchTab("blueprints");
+  if (collectionBtn) collectionBtn.onclick = () => switchTab("collection");
+
+  // Logo home navigation
+  if (logoHome) logoHome.onclick = () => switchTab("blueprints");
+  if (logoHomeMobile) logoHomeMobile.onclick = () => switchTab("blueprints");
 }
 
 
