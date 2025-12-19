@@ -201,6 +201,8 @@ function cycleItemStatus(itemName, frame) {
     // Was Collected -> Make Wishlisted
     state.collectedItems.delete(itemName);
     state.wishlistedItems.add(itemName);
+    // Hide the toast since they're no longer marking as collected
+    hideToast();
   } else if (state.wishlistedItems.has(itemName)) {
     // Was Wishlisted -> Make Uncollected
     state.wishlistedItems.delete(itemName);
