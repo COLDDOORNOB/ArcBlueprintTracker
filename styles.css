@@ -5,12 +5,23 @@
 body {
   overflow-y: scroll;
   /* Always show scrollbar to prevent layout shift */
-  background-image: url("Background/stripes.png");
+}
+
+/* GPU-accelerated background on a separate layer that won't break fixed positioning */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background-image: url("/Background/stripes.png");
   background-repeat: no-repeat;
   background-position: left top;
   background-size: auto 100vh;
-  background-attachment: fixed;
-  /* Performance optimizations */
+  z-index: -1;
+  pointer-events: none;
+  /* GPU acceleration on the pseudo-element, not body */
   will-change: transform;
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -293,12 +304,10 @@ input[type=range]::-webkit-slider-runnable-track {
 
 /* Floating Mobile Filter Button */
 .mobile-filter-btn {
-  position: fixed;
-  top: 16px;
-  left: 16px;
+  position: static;
   z-index: 1000;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(24, 24, 27, 0.8);
   backdrop-filter: blur(12px);
@@ -310,6 +319,7 @@ input[type=range]::-webkit-slider-runnable-track {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
 }
 
 .mobile-filter-btn:active {
@@ -417,9 +427,11 @@ input[type=range]::-webkit-slider-runnable-track {
   /* Let clicks pass through to card */
 }
 
-/* Show hint on hover */
-.card-compact:hover .collection-hint {
-  opacity: 1;
+/* Show hint on hover - ONLY on devices that support true hover */
+@media (hover: hover) {
+  .card-compact:hover .collection-hint {
+    opacity: 1;
+  }
 }
 
 .collection-hint-icon {
@@ -481,6 +493,130 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 5;
   pointer-events: none;
   border-radius: 16px;
+}
+
+/* Blueprint Submission FAB */
+#submitLocationFab {
+  position: fixed !important;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  box-shadow: 0 8px 20px -5px rgba(4, 120, 87, 0.5);
+}
+
+#submitLocationFab:hover {
+  box-shadow: 0 12px 28px -5px rgba(4, 120, 87, 0.6);
+}
+
+/* Collection Toast Notification */
+#collectToast {
+  position: fixed !important;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: toastSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes toastProgressShrink {
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
+}
+
+#collectToastProgress.animate {
+  animation: toastProgressShrink 10s linear forwards;
+}
+
+/* Success Toast Notification */
+#successToast {
+  position: fixed !important;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: toastSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#successToastProgress.animate {
+  animation: toastProgressShrink 5s linear forwards;
+}
+
+/* Submit Modal */
+#submitModal {
+  position: fixed !important;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+}
+
+#submitModal.flex {
+  display: flex;
+}
+
+#submitModal>div {
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Event Banner Polish */
+#eventBanner {
+  animation: bannerSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.banner-pill {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.banner-pill:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.2),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1),
+    inset 0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+@keyframes bannerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Wishlist visual styles */

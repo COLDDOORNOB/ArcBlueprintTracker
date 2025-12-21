@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User collection data (existing)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Blueprint submissions - allow authenticated users to write
+    match /blueprintSubmissions/{docId} {
+      // Anyone can submit (logged in or not)
+      allow create: if true;
+      
+      // Only allow reads for authenticated users (optional, for admin review)
+      allow read: if request.auth != null;
+      
+      // No updates or deletes allowed
+      allow update, delete: if false;
+    }
+  }
+}
