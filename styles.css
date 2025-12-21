@@ -445,10 +445,10 @@ input[type=range]::-webkit-slider-runnable-track {
   display: none !important;
 }
 
-/* Hide complex filters in collection mode */
-.collection-mode .blueprints-only {
+/* Hide complex filters in collection mode - DISABLED to show all filters */
+/* .collection-mode .blueprints-only {
   display: none !important;
-}
+} */
 
 /* Collected Badge (Blueprints Tab) */
 .collected-badge {
