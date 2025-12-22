@@ -1,0 +1,8 @@
+# Robots.txt for Arc Blueprint Tracker
+# https://arcblueprinttracker.web.app/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://arcblueprinttracker.web.app/sitemap.xml

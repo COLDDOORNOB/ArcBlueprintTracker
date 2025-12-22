@@ -5,9 +5,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Automated Deployment Workflow Trigger -->
-  <title>Arc Blueprint Tracker</title>
+  <title>Arc Blueprint Tracker - Track Your Arc Raiders Blueprints</title>
   <meta name="color-scheme" content="dark light" />
-  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description"
+    content="Track and manage your Arc Raiders blueprint collection. Find blueprint locations, filter by rarity, map, and item type. Free online blueprint tracker for Arc Raiders players.">
+  <meta name="keywords"
+    content="Arc Raiders, blueprint tracker, Arc Raiders blueprints, Arc Raiders collection, Arc Raiders wiki, blueprint locations, gaming tracker">
+  <meta name="author" content="ColdDoorNob">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://arcblueprinttracker.web.app/">
+
+  <!-- Open Graph / Social Media Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://arcblueprinttracker.web.app/">
+  <meta property="og:title" content="Arc Blueprint Tracker - Track Your Arc Raiders Blueprints">
+  <meta property="og:description"
+    content="Track and manage your Arc Raiders blueprint collection. Find blueprint locations, filter by rarity, map, and item type.">
+  <meta property="og:site_name" content="Arc Blueprint Tracker">
+
+  <!-- Twitter Card Tags -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Arc Blueprint Tracker - Track Your Arc Raiders Blueprints">
+  <meta name="twitter:description"
+    content="Track and manage your Arc Raiders blueprint collection. Find blueprint locations, filter by rarity, map, and item type.">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
+  <link rel="manifest" href="/favicons/site.webmanifest">
+  <link rel="shortcut icon" href="/favicons/favicon.ico">
+
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script type="importmap">
@@ -17,29 +47,38 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="/assets/index-D_SCueOf.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-hg8iDUK4.css">
+  <script type="module" crossorigin src="/assets/index-l3atceS_.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DoDv--FZ.css">
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
-  <button id="mobileFilterBtn" class="mobile-filter-btn md:hidden" aria-label="Open filters">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <line x1="4" y1="6" x2="20" y2="6"></line>
-      <line x1="7" y1="12" x2="17" y2="12"></line>
-      <line x1="10" y1="18" x2="14" y2="18"></line>
-    </svg>
-  </button>
   <!-- Tab Navigation -->
   <div class="tab-nav">
+    <button id="mobileFilterBtn" class="mobile-filter-btn md:hidden" aria-label="Open filters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="6" x2="20" y2="6"></line>
+        <line x1="7" y1="12" x2="17" y2="12"></line>
+        <line x1="10" y1="18" x2="14" y2="18"></line>
+      </svg>
+    </button>
     <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
     <button id="tabCollection" class="tab-button">My Collection</button>
   </div>
+
+  <!-- Mobile Header (must be outside flex container) -->
+  <header class="md:hidden relative border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-4 py-3">
+    <div>
+      <input id="searchInputMobile" placeholder="Search…"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
+    </div>
+  </header>
 
   <div class="min-h-screen flex">
     <aside class="w-[320px] shrink-0 border-r border-zinc-800 bg-zinc-950/60 backdrop-blur px-4 py-5 hidden md:block">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <img src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker" class="h-14" />
+          <img id="logoHome" src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker"
+            class="h-14 cursor-pointer" />
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
         <button id="resetBtn"
@@ -48,7 +87,7 @@
 
       <div id="authSection" class="mt-6 border-y border-zinc-800/50 py-4">
         <button id="loginBtn"
-          class="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-zinc-200 transition-colors">
+          class="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-zinc-700 transition-colors">
           <svg class="w-4 h-4" viewBox="0 0 24 24">
             <path fill="currentColor"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -83,7 +122,7 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
         </div>
-        <input id="gridSize" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
+        <input id="gridSize" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
       <div class="mt-4 blueprints-only">
@@ -100,7 +139,6 @@
           <option value="name_asc">Name (A → Z)</option>
           <option value="name_desc">Name (Z → A)</option>
           <option value="type_asc">Type (A → Z)</option>
-          <option value="map_asc">Map (A → Z)</option>
         </select>
       </div>
 
@@ -109,6 +147,7 @@
         <div class="mt-2 flex gap-2">
           <button id="collectedAllBlueprints" class="chip chip-active flex-1">All</button>
           <button id="collectedYesBlueprints" class="chip flex-1">Collected</button>
+          <button id="collectedWishBlueprints" class="chip flex-1">Wishlist</button>
           <button id="collectedNoBlueprints" class="chip flex-1">Not Collected</button>
         </div>
       </div>
@@ -186,28 +225,91 @@
       <div class="mt-8 text-xs text-zinc-500 leading-relaxed blueprints-only">
         Item Data source: TheGamingMerchant on YouTube. Images and UI icons from ARC Raiders Wiki.
       </div>
+
+      <div class="mt-6 pt-4 border-t border-zinc-800 text-xs text-zinc-500 leading-relaxed">
+        To submit bugs, request new features, or anything else email me at <a href="mailto:colddoornob@gmail.com"
+          class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a>
+      </div>
     </aside>
 
-    <header
-      class="md:hidden fixed top-0 left-0 right-0 z-30 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur px-4 py-3">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <img src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker" class="h-12" />
-          <div class="text-xs text-zinc-400" id="metaLineMobile">Loading…</div>
-        </div>
-        <button id="openFiltersBtn"
-          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Filters</button>
-      </div>
-      <div class="mt-3">
-        <input id="searchInputMobile" placeholder="Search…"
-          class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
-      </div>
-    </header>
 
-    <main class="flex-1 px-4 md:px-6 py-5 md:py-6 md:pt-6 pt-[120px] md:pt-6">
-      <div class="flex items-center justify-between gap-3 mb-4">
+    <main class="flex-1 px-4 md:px-6 py-5 md:py-6">
+      <!-- Special Event Banner -->
+      <div id="eventBanner" class="blueprints-only hidden mb-6 px-1">
+        <div
+          class="banner-pill flex items-center justify-between gap-4 px-6 py-3 rounded-full border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+              <svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-white/90">
+              5X Event Currently Active for Blueprints | <span class="text-amber-400">Go get your Blueprints
+                Raiders!</span>
+            </p>
+          </div>
+          <button id="closeEventBanner" class="text-white/40 hover:text-white transition-colors p-1"
+            aria-label="Dismiss banner">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <!-- Progress Bar Section (Collection Only) -->
+      <div id="collectionProgressContainer" class="collection-only mb-6 hidden px-1">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
+          <div class="flex flex-col">
+            <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Total Progress</span>
+            <span
+              class="text-4xl font-black bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent leading-none"
+              id="progressPercent">0%</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-zinc-500 font-bold bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800"
+              id="progressCount">0 / 0</span>
+          </div>
+        </div>
+        <div class="h-2.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800/50">
+          <div id="progressBar"
+            class="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full relative shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+            style="width: 0%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);">
+            <div class="absolute inset-0 bg-white/10 animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-6 min-h-[32px]">
         <div class="flex items-center gap-2 flex-wrap" id="activeChips"></div>
-        <div class="text-xs text-zinc-400" id="resultCount"></div>
+
+        <div id="collectionHelp"
+          class="collection-only flex items-center gap-2.5 p-1.5 pr-4 bg-zinc-900 border border-zinc-800 rounded-full w-fit shadow-xl shrink min-w-0">
+          <div
+            class="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 border border-zinc-700">
+            <svg class="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <span class="text-[11px] text-zinc-400 font-medium leading-tight">Click once to mark an item
+            as Collected and again to Wishlist it.</span>
+        </div>
+
+        <div id="blueprintHelp"
+          class="blueprints-only flex items-center gap-2.5 p-1.5 pr-4 bg-zinc-900 border border-zinc-800 rounded-full w-fit shadow-xl shrink min-w-0">
+          <div
+            class="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 border border-zinc-700">
+            <svg class="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <span class="text-[11px] text-zinc-400 font-medium leading-tight">Click an item to see details/spawn
+            location.</span>
+        </div>
+
+        <div class="text-xs text-zinc-500 font-medium whitespace-nowrap" id="resultCount"></div>
       </div>
 
       <div id="grid" class="grid gap-3"></div>
@@ -218,6 +320,14 @@
           class="mt-3 text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
           filters</button>
       </div>
+
+      <!-- Mobile Footer -->
+      <footer class="md:hidden mt-12 mb-20 px-1 text-center text-xs text-zinc-500 leading-relaxed">
+        <p>Item Data source: TheGamingMerchant on YouTube. Images and UI icons from ARC Raiders Wiki.</p>
+        <p class="mt-2">To submit bugs, request new features, or anything else email me at <a
+            href="mailto:colddoornob@gmail.com"
+            class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a></p>
+      </footer>
     </main>
   </div>
 
@@ -225,15 +335,17 @@
     <div id="drawerBackdrop" class="absolute inset-0 bg-black/60"></div>
     <div
       class="absolute left-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-r border-zinc-800 p-4 pt-16 overflow-y-auto">
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold">Filters</div>
+      <div class="flex items-center justify-between mb-4">
+        <img id="logoHomeMobile" src="Background/Arc BP Tracker Logo White Small.png" alt="ARC Blueprint Tracker"
+          class="h-12 cursor-pointer" />
         <button id="closeFiltersBtn"
           class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Close</button>
       </div>
+      <div class="text-xs text-zinc-400 mb-4" id="metaLineMobile">Loading…</div>
 
       <div id="authSectionMobile" class="mt-4 border-b border-zinc-800/50 pb-4">
         <button id="loginBtnMobile"
-          class="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 px-4 py-2 rounded-xl font-medium text-sm">
+          class="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-zinc-700 transition-colors">
           Sign in with Google
         </button>
         <div id="userProfileMobile" class="hidden flex items-center justify-between gap-3">
@@ -268,6 +380,7 @@
         <div class="mt-2 flex gap-2">
           <button id="collectedAllMobile" class="chip chip-active flex-1">All</button>
           <button id="collectedYesMobile" class="chip flex-1">Collected</button>
+          <button id="collectedWishMobile" class="chip flex-1">Wishlist</button>
           <button id="collectedNoMobile" class="chip flex-1">Not Collected</button>
         </div>
       </div>
@@ -277,7 +390,7 @@
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
         </div>
-        <input id="gridSizeMobile" type="range" min="120" max="220" step="10" value="170" class="mt-2 w-full" />
+        <input id="gridSizeMobile" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
       <div class="mt-6 blueprints-only">
@@ -355,9 +468,134 @@
           class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
           filters</button>
       </div>
+
+      <div class="mt-8 pt-4 border-t border-zinc-800 text-xs text-zinc-500 leading-relaxed">
+        To submit bugs, request new features, or anything else email me at <a href="mailto:colddoornob@gmail.com"
+          class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a>
+      </div>
     </div>
   </div>
 
+  <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
+  <button id="submitLocationFab"
+    class="collection-only hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
+    aria-label="Submit Blueprint Location">
+    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+      </svg>
+    </div>
+    <div class="text-left leading-tight">
+      <div class="text-xs font-semibold">Submit Blueprint</div>
+      <div class="text-xs font-semibold">Location</div>
+    </div>
+  </button>
+
+  <!-- Timed Toast Notification (My Collection Only) -->
+  <div id="collectToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden">
+    <div
+      class="relative px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors">
+      <p id="collectToastText" class="text-sm font-medium text-white"></p>
+      <div id="collectToastProgress" class="absolute bottom-0 left-0 h-1 bg-white/40 rounded-b-xl transition-all"
+        style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Success Toast Notification -->
+  <div id="successToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden">
+    <div class="relative px-5 py-3 rounded-xl bg-emerald-700 border border-emerald-600/50 shadow-2xl">
+      <p class="text-sm font-medium text-white">Submitted! Thanks for contributing 🎉</p>
+      <div id="successToastProgress" class="absolute bottom-0 left-0 h-1 bg-white/40 rounded-b-xl transition-all"
+        style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- Blueprint Submission Modal -->
+  <div id="submitModal"
+    class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div
+      class="relative w-full max-w-lg bg-zinc-900/95 backdrop-blur-xl rounded-2xl border border-zinc-700 shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-5 border-b border-zinc-800">
+        <h2 class="text-lg font-semibold text-white">Submit Blueprint Location</h2>
+        <button id="closeSubmitModal" class="text-zinc-500 hover:text-white transition-colors p-1" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <!-- Modal Body -->
+      <form id="submitLocationForm" class="p-5 space-y-4">
+        <!-- Blueprint Name (can be pre-filled or picklist) -->
+        <div>
+          <label for="submitBlueprintName" class="block text-sm font-medium text-zinc-400 mb-1.5">What Blueprint did
+            you collect?</label>
+          <select id="submitBlueprintName"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Blueprint...</option>
+          </select>
+        </div>
+        <!-- Map -->
+        <div>
+          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
+          <select id="submitMap"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Map...</option>
+            <option value="Dam Battlegrounds">Dam Battlegrounds</option>
+            <option value="Blue Gate">Blue Gate</option>
+            <option value="Spaceport">Spaceport</option>
+            <option value="Buried City">Buried City</option>
+            <option value="Stella Montis">Stella Montis</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <!-- Condition -->
+        <div>
+          <label for="submitCondition" class="block text-sm font-medium text-zinc-400 mb-1.5">What Condition was it
+            on?</label>
+          <select id="submitCondition"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <option value="">Select a Condition...</option>
+            <option value="Day">Day</option>
+            <option value="Night">Night</option>
+            <option value="Storm">Storm</option>
+            <option value="Cold Snap">Cold Snap</option>
+            <option value="Harvester">Harvester</option>
+            <option value="Matriarch">Matriarch</option>
+            <option value="Hidden Bunker">Hidden Bunker</option>
+            <option value="Husk Graveyard">Husk Graveyard</option>
+            <option value="Launch Tower Loot">Launch Tower Loot</option>
+            <option value="Locked Gate">Locked Gate</option>
+            <option value="Prospecting Probes">Prospecting Probes</option>
+            <option value="Lush Blooms">Lush Blooms</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <!-- Location -->
+        <div>
+          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What location on the map?
+            (e.g., Security Wing, Village)</label>
+          <input type="text" id="submitLocation"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            placeholder="Enter location...">
+        </div>
+        <!-- Container -->
+        <div>
+          <label for="submitContainer" class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?
+            (e.g., Breachable Rusty Metal Box)</label>
+          <input type="text" id="submitContainer"
+            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            placeholder="Enter container type...">
+        </div>
+        <!-- Submit Button -->
+        <button type="submit" id="submitLocationBtn"
+          class="w-full mt-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Submit Location Data
+        </button>
+      </form>
+    </div>
+  </div>
+
 </body>
 
 </html>
