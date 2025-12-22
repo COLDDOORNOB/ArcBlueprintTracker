@@ -456,6 +456,7 @@ function switchTab(tabName) {
   const blueprintsBtn = document.getElementById("tabBlueprints");
   const collectionBtn = document.getElementById("tabCollection");
   const collectionOnlyElements = document.querySelectorAll(".collection-only");
+  const blueprintsOnlyElements = document.querySelectorAll(".blueprints-only:not(#eventBanner)");
   const eventBanner = document.getElementById("eventBanner");
 
   if (tabName === "blueprints") {
@@ -463,12 +464,14 @@ function switchTab(tabName) {
     collectionBtn.classList.remove("tab-button-active");
     document.body.classList.remove("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.add("hidden"));
+    blueprintsOnlyElements.forEach(el => el.classList.remove("hidden"));
     if (ENABLE_EVENT_BANNER && !eventBannerDismissed && eventBanner) eventBanner.classList.remove("hidden");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
     document.body.classList.add("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.remove("hidden"));
+    blueprintsOnlyElements.forEach(el => el.classList.add("hidden"));
     if (eventBanner) eventBanner.classList.add("hidden");
   }
 

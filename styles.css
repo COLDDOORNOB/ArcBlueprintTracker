@@ -284,6 +284,15 @@ input[type=range]::-webkit-slider-runnable-track {
     order: 3;
     margin-top: 0.5rem;
   }
+
+  /* Prevent iOS Safari zoom on input focus - requires 16px minimum */
+  input[type="text"],
+  input[type="search"],
+  input:not([type]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 @media (max-width: 380px) {
