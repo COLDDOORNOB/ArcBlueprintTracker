@@ -496,7 +496,7 @@ function initTabNavigation() {
 // Event Banner Management
 // NOTE: Keep this code - it's reusable for future announcements!
 // To re-enable, set ENABLE_EVENT_BANNER to true and update the banner content in index.html
-const ENABLE_EVENT_BANNER = false;
+const ENABLE_EVENT_BANNER = true;
 let eventBannerDismissed = false; // Temporary state, clears on refresh
 
 function initEventBanner() {
@@ -613,7 +613,14 @@ function closeSubmissionModal() {
     document.body.style.overflow = ""; // Unlock scroll
   }
 
-  if (form) form.reset();
+  if (form) {
+    form.reset();
+    // Manually unchecked just in case (though form.reset should handle it if they are inside the form)
+    const t = document.getElementById("submitTrialsReward");
+    const q = document.getElementById("submitQuestReward");
+    if (t) t.checked = false;
+    if (q) q.checked = false;
+  }
   pendingBlueprintName = null;
 }
 
@@ -665,10 +672,15 @@ async function submitBlueprintLocation() {
   const condition = document.getElementById("submitCondition")?.value;
   const location = document.getElementById("submitLocation")?.value;
   const container = document.getElementById("submitContainer")?.value;
+  const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
+  const questReward = document.getElementById("submitQuestReward")?.checked || false;
 
-  // Require at least one field
-  if (!blueprintName && !map && !condition && !location && !container) {
-    alert("Please fill in at least one field.");
+  // Require at least one data field (Map/Cond/Loc/Cont/Trials/Quest)
+  // Submitting ONLY a blueprint name is not useful.
+  const hasData = map || condition || location || container || trialsReward || questReward;
+
+  if (!hasData) {
+    alert("Please provide at least one detail (Map, Condition, Location, Container, or Reward Type).");
     return;
   }
 
@@ -679,6 +691,8 @@ async function submitBlueprintLocation() {
       condition: condition || "",
       location: location || "",
       container: container || "",
+      trialsReward: trialsReward,
+      questReward: questReward,
       submittedAt: new Date().toISOString(),
       userId: auth.currentUser?.uid || "anonymous"
     });
@@ -1145,6 +1159,15 @@ async function loadData() {
       const colRarity = findHeader(headers, ["Rarity", "Item Rarity"]);
       const colConf = findHeader(headers, ["Data Confidence", "Confidence"]);
       const colWiki = findHeader(headers, ["Item URL", "Wiki URL", "URL", "Link", "Wiki"]) || headers[7];
+      const colTrialsReward = findHeader(headers, ["Trials Reward", "Trial Reward", "Trials"]) || headers[9];
+      const colQuestReward = findHeader(headers, ["Quest Reward", "Quest"]) || headers[10];
+      const colDescription = findHeader(headers, ["Description", "Desc", "Flavor Text"]) || headers[11];
+
+      // Helper to parse boolean checkbox values from CSV
+      const parseBoolField = (val) => {
+        const v = norm(val).toLowerCase();
+        return v === "true" || v === "yes" || v === "1" || v === "x" || v === "✓";
+      };
 
       state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, conf: colConf, wiki: colWiki };
 
@@ -1166,7 +1189,10 @@ async function loadData() {
 
         const iconFromSheet = colTypeIcon ? iconFromCellValue(r[colTypeIcon]) : "";
         const typeIcon = iconFromSheet || detectIconForType(type);
-        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon });
+        const trialsReward = colTrialsReward ? parseBoolField(r[colTrialsReward]) : false;
+        const questReward = colQuestReward ? parseBoolField(r[colQuestReward]) : false;
+        const description = colDescription ? norm(r[colDescription]) : "";
+        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description });
       }
 
       state.all = items;
@@ -1533,24 +1559,56 @@ function renderGrid() {
     const details = document.createElement("div");
     details.className = "details-overlay hidden";
 
+    // -- "Most Likely" Group Container --
+    const spawnGroup = document.createElement("div");
+    spawnGroup.className = "bg-zinc-900/50 rounded-lg p-3 border border-zinc-800 mb-3";
+
+    // Group Header
+    const groupHeader = document.createElement("div");
+    groupHeader.className = "text-[10px] uppercase font-bold text-zinc-500 mb-2 tracking-wider";
+    groupHeader.textContent = "Most Likely Spawn";
+    spawnGroup.appendChild(groupHeader);
+
+    let hasSpawnData = false;
     const makeRow = (label, value) => {
       // Hide if value is empty or exactly "N/A"
       if (!value || value === "N/A") return null;
+
       const row = document.createElement("div");
       row.className = "details-row";
+
       const l = document.createElement("div");
       l.className = "details-label";
       l.textContent = label;
+
       const v = document.createElement("div");
       v.className = "details-value";
       v.textContent = value;
-      row.appendChild(l); row.appendChild(v);
+
+      row.appendChild(l);
+      row.appendChild(v);
       return row;
     };
 
-    [makeRow("Map", it.map), makeRow("Location", it.loc), makeRow("Container", it.cont), makeRow("Condition", it.cond)]
+    // Add spawn fields to the group
+    [
+      makeRow("Map", it.map),
+      makeRow("Location", it.loc),
+      makeRow("Container", it.cont),
+      makeRow("Condition", it.cond)
+    ]
       .filter(Boolean)
-      .forEach(r => details.appendChild(r));
+      .forEach(r => {
+        spawnGroup.appendChild(r);
+        hasSpawnData = true;
+      });
+
+    // Only append the group if it has content
+    if (hasSpawnData) {
+      details.appendChild(spawnGroup);
+    }
+
+    // -- Fields Outside Group (Confidence, Rewards) --
 
     if (it.conf) {
       const row = document.createElement("div");
@@ -1572,6 +1630,68 @@ function renderGrid() {
 
       val.appendChild(dot);
       val.appendChild(text);
+
+      row.appendChild(label);
+      row.appendChild(val);
+      details.appendChild(row);
+    }
+
+    // Trials Reward row (only show if true)
+    if (it.trialsReward) {
+      const row = document.createElement("div");
+      row.className = "details-row";
+
+      const label = document.createElement("div");
+      label.className = "details-label";
+      label.textContent = "Trials Reward";
+
+      const val = document.createElement("div");
+      val.className = "details-value";
+      val.innerHTML = `<span class="inline-flex items-center gap-1.5 text-emerald-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>Yes</span>`;
+
+      row.appendChild(label);
+      row.appendChild(val);
+      details.appendChild(row);
+    }
+
+    // Quest Reward row (only show if true)
+    if (it.questReward) {
+      const row = document.createElement("div");
+      row.className = "details-row";
+
+      const label = document.createElement("div");
+      label.className = "details-label";
+      label.textContent = "Quest Reward";
+
+      const val = document.createElement("div");
+      val.className = "details-value";
+      val.innerHTML = `<span class="inline-flex items-center gap-1.5 text-amber-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>Yes</span>`;
+
+      row.appendChild(label);
+      row.appendChild(val);
+      details.appendChild(row);
+    }
+
+
+
+    // Description (if present) - Standard Row Layout
+    if (it.description) {
+      const row = document.createElement("div");
+      row.className = "details-row";
+
+      const label = document.createElement("div");
+      label.className = "details-label";
+      label.textContent = "Description";
+
+      const val = document.createElement("div");
+      val.className = "details-value";
+      val.textContent = it.description;
+      // If description is long, we might want to ensure it wraps nicely, but details-value usually handles it.
+      // We can add italic if desired, or keep it standard white. 
+      // User said "text should show in white", so keeping standard.
+      // If user wants italic, I can add `italic` class to val.className or val.classList.add("italic").
+      // Based on previous prompt "make it italic also", I will keep it italic but in the standard row format.
+      val.classList.add("italic");
 
       row.appendChild(label);
       row.appendChild(val);

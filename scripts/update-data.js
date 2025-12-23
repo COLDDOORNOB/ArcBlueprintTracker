@@ -53,4 +53,6 @@ function download(url, dest) {
     });
 }
 
-download(CSV_URL, OUTPUT_PATH);
+const timestamp = Date.now();
+const urlWithCacheBuster = CSV_URL + "&t=" + timestamp;
+download(urlWithCacheBuster, OUTPUT_PATH);

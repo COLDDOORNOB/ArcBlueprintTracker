@@ -11,8 +11,8 @@ service cloud.firestore {
       // Anyone can submit (logged in or not)
       allow create: if true;
       
-      // Only allow reads for authenticated users (optional, for admin review)
-      allow read: if request.auth != null;
+      // Allow public read for automation (Google Sheets)
+      allow read: if true;
       
       // No updates or deletes allowed
       allow update, delete: if false;
