@@ -1,6 +1,6 @@
 import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
@@ -389,6 +389,8 @@ function initAuth() {
   const login = async () => {
     try {
       console.log("Attempting Google Sign-in...");
+      // FORCE "Local" Persistence (Keep logged in indefinitely)
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithPopup(auth, googleProvider);
       console.log("Sign-in successful!");
     } catch (error) {
