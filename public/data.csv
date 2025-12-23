@@ -2,7 +2,7 @@ Blueprint Name,Most Likely Container,Most Likely Map,Most Likely Condition,Most 
 Anvil,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Anvil,Very High
 Angled Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Angled_Grip_II,Very High
 Angled Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Angled_Grip_III,Very High
-Aphelion,Stella Montis,Stella Montis,Any,Matriarch,Weapon,legendary,https://arcraiders.wiki/wiki/Aphelion,Confirmed
+Aphelion,Any,Stella Montis,Any,Any,Weapon,legendary,https://arcraiders.wiki/wiki/Aphelion,Very High
 Barricade Kit,"Server Cabinet, but can spawn anywhere",Any,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Barricade_Kit,Confident
 Bettina,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,epic,https://arcraiders.wiki/wiki/Bettina,Very High
 Blaze Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Blaze_Grenade,Low
@@ -24,7 +24,8 @@ Extended Medium Magazine III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/
 Extended Shotgun Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_II,Very High
 Extended Shotgun Magazine III,Any,Any,Night or Storm,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_III,Low
 Equalizer,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Equalizer,Confirmed
-Fireworks Box,Any,Any,Cold Snap,Any,Quick Use,rare,https://arcraiders.wiki/wiki/Fireworks_Box,Low
+Fireworks Box,Any,Any,Cold Snap,Any,Quick Use,rare,https://arcraiders.wiki/wiki/Fireworks_Box,Very High
+Gas Mine,Any,Any,Stella Montis,Any,Grenade,common,https://arcraiders.wiki/wiki/Gas_Mine,Very High
 Heavy Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Heavy_Gun_Parts,Very High
 Horizontal Grip,N/A,N/A,N/A,N/A,Mod,epic,https://arcraiders.wiki/wiki/Horizontal_Grip,Not Enough Data
 Hullcracker,Quest Reward - Major's Footlocker,N/A,N/A,N/A,Weapon,epic,https://arcraiders.wiki/wiki/Hullcracker,Confirmed
@@ -43,10 +44,10 @@ Medium Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any
 Muzzle Brake II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Muzzle_Brake_II,Very High
 Muzzle Brake III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Muzzle_Brake_III,Low
 Osprey,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Osprey,Very High
-Pulse Mine,N/A,"Not enough data, N/A","Not enough data, N/A",N/A,Quick Use,uncommon,https://arcraiders.wiki/wiki/Pulse_Mine,Not Enough Data
+Pulse Mine,Any,Stella Montis,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Pulse_Mine,Very High
 Padded Stock,"Residential Containers (wardrobes, drawers, etc)",Any,Any,Any,Mod,epic,https://arcraiders.wiki/wiki/Padded_Stock,Low
 Remote Raider Flare,"Not enough data, N/A","Not enough data, N/A","Not enough data, N/A","Not enough data, N/A",Quick Use,uncommon,https://arcraiders.wiki/wiki/Remote_Raider_Flare,Low
-Seeker Grenade,Any,Any,Any,Any,Grenade,uncommon,https://arcraiders.wiki/wiki/Seeker_Grenade,Low
+Seeker Grenade,Any,Stella Montis,Any,Any,Grenade,uncommon,https://arcraiders.wiki/wiki/Seeker_Grenade,Low
 Shotgun Choke II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,Any,Mod,uncommon,https://arcraiders.wiki/wiki/Shotgun_Choke_II,Low
 Shotgun Choke III,Any,Any,Any,Any,Mod,rare,https://arcraiders.wiki/wiki/Shotgun_Choke_III,Low
 Shotgun Silencer,"Rusty Breachable Raider Box, Red Locker",Any,Night or Storm,Any,Mod,epic,https://arcraiders.wiki/wiki/Shotgun_Silencer,Low
@@ -62,7 +63,7 @@ Tactical Mk. 3 (Healing),Metal Lockers in Blue Gate security wing,Blue Gate,Any,
 Tagging Grenade,Rusty Breachable Raider Box,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Tagging_Grenade,Low
 Tempest,Any,Any,Night,Any,Weapon,epic,https://arcraiders.wiki/wiki/Tempest,Very High
 Torrente,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Torrente,Very High
-Trailblazer,Any,Stella Montis,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Trailblazer,Not Enough Data
+Trailblazer,Any,Stella Montis,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Trailblazer,Very High
 Trigger 'Nade,Quest Reward - Sparks Fly,N/A,N/A,N/A,Grenade,rare,https://arcraiders.wiki/wiki/Trigger_%27Nade,Confirmed
 Venator,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Venator,Very High
 Vertical Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Vertical_Grip_II,Very High
