@@ -467,7 +467,7 @@ function switchTab(tabName) {
     document.body.classList.remove("collection-mode");
     collectionOnlyElements.forEach(el => el.classList.add("hidden"));
     blueprintsOnlyElements.forEach(el => el.classList.remove("hidden"));
-    if (ENABLE_EVENT_BANNER && !eventBannerDismissed && eventBanner) eventBanner.classList.remove("hidden");
+    if (!eventBannerDismissed && eventBanner && eventBanner.classList.contains("banner-active")) eventBanner.classList.remove("hidden");
   } else {
     blueprintsBtn.classList.remove("tab-button-active");
     collectionBtn.classList.add("tab-button-active");
@@ -495,22 +495,30 @@ function initTabNavigation() {
   if (logoHomeMobile) logoHomeMobile.onclick = () => switchTab("blueprints");
 }
 
-// Event Banner Management
-// NOTE: Keep this code - it's reusable for future announcements!
-// To re-enable, set ENABLE_EVENT_BANNER to true and update the banner content in index.html
-const ENABLE_EVENT_BANNER = true;
+// Event Banner Management (Dynamic from Firestore)
 let eventBannerDismissed = false; // Temporary state, clears on refresh
 
 function initEventBanner() {
-  // Banner disabled - set ENABLE_EVENT_BANNER to true to re-enable
-  if (!ENABLE_EVENT_BANNER) return;
-
   const banner = document.getElementById("eventBanner");
   const closeBtn = document.getElementById("closeEventBanner");
+  const bannerText = banner ? banner.querySelector("p") : null;
 
-  if (banner && !eventBannerDismissed && state.currentTab === "blueprints") {
-    banner.classList.remove("hidden");
-  }
+  // 1. Fetch Banner Config from Firestore
+  getDoc(doc(db, "siteConfig", "banner")).then((snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      // 2. Check if active and has text
+      if (data.active && data.text && bannerText && banner) {
+        bannerText.innerHTML = data.text; // Supports HTML for colors/bold
+        banner.classList.add("banner-active");
+
+        // 3. Show if not dismissed and on existing tab
+        if (!eventBannerDismissed && state.currentTab === "blueprints") {
+          banner.classList.remove("hidden");
+        }
+      }
+    }
+  }).catch((err) => console.debug("Banner fetch skipped", err));
 
   if (closeBtn) {
     closeBtn.onclick = () => {
@@ -676,6 +684,11 @@ async function submitBlueprintLocation() {
   const container = document.getElementById("submitContainer")?.value;
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
+
+  if (!blueprintName) {
+    alert("Please select a Blueprint Name.");
+    return;
+  }
 
   // Require at least one data field (Map/Cond/Loc/Cont/Trials/Quest)
   // Submitting ONLY a blueprint name is not useful.

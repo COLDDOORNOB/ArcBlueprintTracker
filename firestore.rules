@@ -17,5 +17,11 @@ service cloud.firestore {
       // No updates or deletes allowed
       allow update, delete: if false;
     }
+
+    // Site Configuration (Banner etc)
+    match /siteConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
