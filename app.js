@@ -784,7 +784,7 @@ function resolveLocalImageUrl(imgUrl, itemName) {
   // This allows the user to just drop "My_New_Item.png" or "My_New_Item.webp" into the folder.
   // We prefer .png if stem exists, otherwise try both.
   if (fromName) {
-    return LOCAL_IMAGE_BASE + fromName + ".png";
+    return LOCAL_IMAGE_BASE + fromName + ".webp";
   }
 
   return "";
@@ -836,13 +836,13 @@ const CONFIDENCE_COLORS = {
 //   ItemCategory_Augment.png
 // Store them in: ./icons/
 const ICON_FILE_BY_TYPE = [
-  { re: /weapon/i, file: "ItemCategory_Weapon.png" },
-  { re: /grenade/i, file: "ItemCategory_Grenade.png" },
-  { re: /quick\s*use|quickuse|consumable|med|healing|vita|tool|utility/i, file: "ItemCategory_QuickUse.png" },
-  { re: /augment/i, file: "ItemCategory_Augment.png" },
-  { re: /mod|attachment|barrel|muzzle|brake|choke|silencer|stock|grip|mag/i, file: "ItemCategory_Mod.png" },
-  { re: /material|parts|craft|component/i, file: "ItemCategory_Material.png" },
-  { re: /misc|key|trinket|other/i, file: "ItemCategory_Misc.png" },
+  { re: /weapon/i, file: "ItemCategory_Weapon.webp" },
+  { re: /grenade/i, file: "ItemCategory_Grenade.webp" },
+  { re: /quick\s*use|quickuse|consumable|med|healing|vita|tool|utility/i, file: "ItemCategory_QuickUse.webp" },
+  { re: /augment/i, file: "ItemCategory_Augment.webp" },
+  { re: /mod|attachment|barrel|muzzle|brake|choke|silencer|stock|grip|mag/i, file: "ItemCategory_Mod.webp" },
+  { re: /material|parts|craft|component/i, file: "ItemCategory_Material.webp" },
+  { re: /misc|key|trinket|other/i, file: "ItemCategory_Misc.webp" },
 ];
 
 // Local type icons (self-hosted)
@@ -886,19 +886,19 @@ function detectIconForType(typeText) {
   const k = t.toLowerCase().replace(/\s+/g, "");
 
   // First try exact-ish matches (best for clean sheets)
-  if (k === "weapon") return localIconPath("ItemCategory_Weapon.png");
-  if (k === "grenade") return localIconPath("ItemCategory_Grenade.png");
-  if (k === "quickuse") return localIconPath("ItemCategory_QuickUse.png");
-  if (k === "mod") return localIconPath("ItemCategory_Mod.png");
-  if (k === "augment") return localIconPath("ItemCategory_Augment.png");
-  if (k === "material") return localIconPath("ItemCategory_Material.png");
-  if (k === "misc") return localIconPath("ItemCategory_Misc.png");
+  if (k === "weapon") return localIconPath("ItemCategory_Weapon.webp");
+  if (k === "grenade") return localIconPath("ItemCategory_Grenade.webp");
+  if (k === "quickuse") return localIconPath("ItemCategory_QuickUse.webp");
+  if (k === "mod") return localIconPath("ItemCategory_Mod.webp");
+  if (k === "augment") return localIconPath("ItemCategory_Augment.webp");
+  if (k === "material") return localIconPath("ItemCategory_Material.webp");
+  if (k === "misc") return localIconPath("ItemCategory_Misc.webp");
 
   // Then fall back to regex classification
   for (const entry of ICON_FILE_BY_TYPE) {
     if (entry.re.test(t)) return localIconPath(entry.file);
   }
-  return localIconPath("ItemCategory_Misc.png");
+  return localIconPath("ItemCategory_Misc.webp");
 }
 
 // If the sheet provides a custom icon value, use it.

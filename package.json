@@ -12,6 +12,7 @@
     "devDependencies": {
         "firebase-tools": "^15.0.0",
         "serve": "^14.2.0",
+        "sharp": "^0.34.5",
         "vite": "^5.0.0"
     },
     "dependencies": {
