@@ -1,7 +1,7 @@
 name: Update Data
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs at 00:00 UTC every day
+    - cron: '0 0-8,16-23 * * *' # Runs hourly from 8 AM to 12 AM PT (16:00 - 08:00 UTC)
   workflow_dispatch: # Allows manual trigger
 
 jobs:
