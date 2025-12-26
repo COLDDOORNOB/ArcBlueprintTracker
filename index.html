@@ -62,8 +62,9 @@
 <body class="bg-zinc-950 text-zinc-100">
   <!-- Tab Navigation -->
   <div class="tab-nav">
-    <button id="mobileFilterBtn" class="mobile-filter-btn md:hidden" aria-label="Open filters">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <button id="mobileFilterBtn" class="nav-circle-btn md:hidden" aria-label="Open filters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        class="w-6 h-6">
         <line x1="4" y1="6" x2="20" y2="6"></line>
         <line x1="7" y1="12" x2="17" y2="12"></line>
         <line x1="10" y1="18" x2="14" y2="18"></line>
@@ -71,15 +72,13 @@
     </button>
     <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
     <button id="tabCollection" class="tab-button">My Collection</button>
-    <button id="announcementsBtn"
-      class="absolute right-4 md:right-6 tab-button px-3 py-2 flex items-center justify-center gap-2"
-      aria-label="Announcements">
+    <button id="announcementsBtn" class="nav-circle-btn md:absolute md:right-6" aria-label="Announcements">
       <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
       </svg>
       <div id="newsBadge"
-        class="absolute -top-2 -left-2 w-5 h-5 bg-emerald-500 text-xs font-bold text-white flex items-center justify-center rounded-full border border-zinc-900 hidden">
+        class="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-[10px] font-black text-white flex items-center justify-center rounded-full border-2 border-zinc-950 hidden shadow-lg">
         0</div>
     </button>
   </div>
@@ -310,7 +309,7 @@
             <span class="text-xs text-zinc-500 font-bold bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800"
               id="progressCount">0 / 0</span>
             <button id="showWrappedBtn"
-              class="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
+              class="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-[10px] sm:text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />

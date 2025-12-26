@@ -293,6 +293,48 @@ input[type=range]::-webkit-slider-runnable-track {
   textarea {
     font-size: 16px !important;
   }
+
+  .tab-nav {
+    justify-content: space-between !important;
+    padding: 12px 12px !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+
+  .tab-button {
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 42px !important;
+  }
+}
+
+/* Universal Circular Button Style (Design Only) */
+.nav-circle-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(39, 39, 42, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.6);
+  display: inline-flex;
+  /* Use inline-flex to be less intrusive */
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.nav-circle-btn:hover {
+  background: rgba(63, 63, 70, 0.5);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 @media (max-width: 380px) {
