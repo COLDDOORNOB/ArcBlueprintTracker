@@ -14,6 +14,7 @@ window.setGridSize = setGridSize;
 // We will kick off loadData when the DOM is ready.
 document.addEventListener("DOMContentLoaded", () => {
   loadCollectionState();
+  loadSpares(); // Load spares data
   loadFilters(); // Load persisted filters
   initTabNavigation();
   switchTab(state.currentTab); // Ensure initial UI reflects the current tab
@@ -22,6 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initEventBanner(); // Initialize Event Banner
   initBlueprintSubmission(); // Initialize Blueprint Submission UI
   initWrapped(); // Initialize Wrapped feature
+  initAnnouncements(); // Initialize Announcements feature
+  initContextMenu(); // Initialize Context Menu for My Collection
   loadData();
 });
 
@@ -92,6 +95,28 @@ function saveCollectionState() {
     localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error("Failed to save collection state:", e);
+  }
+}
+
+// === Spares Management ===
+const SPARES_STORAGE_KEY = "arc_spares_v1";
+
+function loadSpares() {
+  try {
+    const data = localStorage.getItem(SPARES_STORAGE_KEY);
+    if (data) {
+      state.spares = JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Failed to load spares:", e);
+  }
+}
+
+function saveSpares() {
+  try {
+    localStorage.setItem(SPARES_STORAGE_KEY, JSON.stringify(state.spares));
+  } catch (e) {
+    console.error("Failed to save spares:", e);
   }
 }
 
@@ -668,13 +693,18 @@ function initWrapped() {
       showBtn.textContent = "Loading Data...";
       await fetchUserContributions();
       showBtn.disabled = false;
-      showBtn.innerHTML = `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg> View 2025 Wrapped`;
+      showBtn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg> View My Blueprint Wrapped 2025`;
     }
 
     // 2. Populate UI
     const total = state.all.length;
     const collected = state.collectedItems.size;
     const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
+
+    // Update Percentage and Progress Bar
+    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+    const progressBar = document.getElementById("wrappedProgressBar");
+    if (progressBar) progressBar.style.width = `${percent}%`;
 
     // Calculate Weapon/Augment stats
     const weaponsAll = state.all.filter(it => /weapon/i.test(it.type)).length;
@@ -734,7 +764,7 @@ function initWrapped() {
     stats.push({
       value: `${weaponsColl}/${weaponsAll}`,
       label: "Weapons<br>Collected",
-      color: "text-amber-500",
+      color: "text-amber-400",
       icon: `<img src="icons/ItemCategory_Weapon.webp" class="w-5 h-5 object-contain" style="filter: brightness(0) saturate(100%) invert(67%) sepia(74%) saturate(575%) hue-rotate(360deg) brightness(101%) contrast(101%);" alt="Weapon">`
     });
 
@@ -750,26 +780,39 @@ function initWrapped() {
     stats.forEach((stat, index) => {
       const pill = document.createElement("div");
       pill.className = "rounded-xl p-3 border border-white/10 flex flex-col items-center justify-center flex-1 min-w-[90px]";
-      // Randomize gradient angle slightly (120-150 degrees)
+
+      // Randomize gradient angle slightly
       const angle = 120 + Math.floor(Math.random() * 30);
-      // Alternate between 2-part and 3-part gradients (50% opaque)
+
+      // USER REQUEST: 
+      // 1. 100% Opacity (Solid background, no throughput)
+      // 2. Solid colored layer matching the green at 50% opacity
+      // Implementation: Solid Dark Base (#09090b) + Linear Gradient of the green at 50%
+
+      pill.style.boxShadow = "inset 0 0 15px rgba(255, 255, 255, 0.03)";
+
+      // Base Green: Bright Emerald (closer to UI green)
+      // Tailwind emerald-500 is approx rgb(16, 185, 129)
+      const greenBase = "rgba(16, 185, 129, 0.4)"; // Slightly lower opacity since it's brighter
+      const greenHighlight = "rgba(52, 211, 153, 0.4)"; // emerald-400
+
       if (index % 2 === 0) {
-        // 2-part gradient
-        pill.style.background = `linear-gradient(${angle}deg, rgba(26, 74, 56, 0.5), rgba(13, 40, 32, 0.5))`;
+        // Solid background composed of black + brighter green
+        pill.style.background = `linear-gradient(${angle}deg, ${greenBase}, ${greenBase}), #09090b`;
       } else {
-        // 3-part gradient with lighter center
-        pill.style.background = `linear-gradient(${angle}deg, rgba(26, 74, 56, 0.5), rgba(20, 61, 48, 0.5) 50%, rgba(26, 74, 56, 0.5))`;
+        // Slight streak variant
+        pill.style.background = `linear-gradient(${angle}deg, ${greenBase}, ${greenHighlight} 50%, ${greenBase}), #09090b`;
       }
 
       // Make icons larger
       const largerIcon = stat.icon.replace('w-4 h-4', 'w-6 h-6').replace('w-5 h-5', 'w-7 h-7');
 
       pill.innerHTML = `
-        <div class="${stat.color} mb-1">
+        <div class="${stat.color} mb-1 drop-shadow-md">
           ${largerIcon}
         </div>
-        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-black ${stat.color}">${stat.value}</span>
-        <div class="text-xs text-zinc-300 uppercase font-black tracking-wider text-center leading-tight">${stat.label}</div>
+        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-black ${stat.color} drop-shadow-lg">${stat.value}</span>
+        <div class="text-xs text-zinc-300 uppercase font-black tracking-wider text-center leading-tight drop-shadow-md opacity-90">${stat.label}</div>
       `;
 
       statsGrid.appendChild(pill);
@@ -779,11 +822,43 @@ function initWrapped() {
     const highlightsWrap = document.getElementById("wrappedHighlights");
     highlightsWrap.innerHTML = "";
 
-    const rareBlueprints = state.all.filter(it =>
+    // USER PRIORITY LIST
+    const WRAPPED_PRIORITY = [
+      "Bobcat", "Looting Mk. 3 (Survivor)", "Aphelion", "Equalizer", "Jupiter",
+      "Combat Mk. 3 (Aggressive)", "Combat Mk. 3 (Flanking)", "Vulcano",
+      "Snap Hook", "Deadline", "Wolfpack", "Tactical Mk. 3 (Defensive)",
+      "Tactical Mk. 3 (Healing)", "Venator", "Tempest", "Torrente",
+      "Bettina", "Anvil", "Osprey"
+    ];
+
+    // Filter all collected items (excluding mods/materials)
+    let collectedValid = state.all.filter(it =>
       state.collectedItems.has(it.name) &&
-      (it.rarity === "Legendary" || it.rarity === "Epic") &&
-      !/mod|material|parts|component|attachment/i.test(it.type)
-    ).slice(0, 6);
+      !/mod|material|parts|component|attachment|misc/i.test(it.type)
+    );
+
+    // Sort by Priority List first, then by Rarity Descending
+    collectedValid.sort((a, b) => {
+      const idxA = WRAPPED_PRIORITY.indexOf(a.name);
+      const idxB = WRAPPED_PRIORITY.indexOf(b.name);
+
+      // If both are in priority list, sort by list order
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+
+      // If only A is in list, A comes first
+      if (idxA !== -1) return -1;
+
+      // If only B is in list, B comes first
+      if (idxB !== -1) return 1;
+
+      // Otherwise, sort by Rarity (Highest first)
+      return rarityRank(b.rarity) - rarityRank(a.rarity);
+    });
+
+    // Take top 8
+    const rareBlueprints = collectedValid.slice(0, 8);
+
+
 
     if (rareBlueprints.length === 0) {
       highlightsWrap.innerHTML = `<div class="text-zinc-500 text-xs w-full text-center py-4 italic">No rare blueprints collected yet... keep hunting!</div>`;
@@ -792,60 +867,99 @@ function initWrapped() {
     rareBlueprints.forEach(bp => {
       const color = rarityColor(bp.rarity);
       const miniCard = document.createElement("div");
-      miniCard.className = "flex flex-col items-center w-full card-compact";
+      // Use exact card-compact structure, but force width to fit grid
+      // USER REQUEST: removed dark grey rectangle
+      miniCard.className = "card-compact w-full p-2";
 
       const frame = document.createElement("div");
-      frame.className = "w-[72%] aspect-square rounded-2xl border-2 overflow-hidden relative shadow-2xl mx-auto";
+      frame.className = "rarity-frame rarity-glow relative overflow-hidden";
       frame.style.borderColor = color;
 
-      // Rarity gradient: rarity color at bottom-left, fading to dark at top-right
-      frame.style.background = `
-        linear-gradient(to top right, ${color}66 0%, ${color}22 30%, rgba(9,9,11,0.95) 100%),
-        linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)),
+      const imgWrap = document.createElement("div");
+      imgWrap.className = "relative aspect-square rounded-[16px] flex items-center justify-center overflow-hidden";
+      // EXACT Gradient stack from renderGrid
+      imgWrap.style.background = `
+        linear-gradient(to top right, ${color}44 0%, rgba(24,24,27,0.5) 75%),
+        linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
         url('Background/Arc BP Image Background.webp')
       `;
-      frame.style.backgroundSize = "cover";
-      frame.style.backgroundPosition = "center";
+      imgWrap.style.backgroundSize = "cover, cover, cover";
+      imgWrap.style.backgroundPosition = "center, center, center";
+
+      const img = document.createElement("img");
+      img.src = bp.img || "";
+      img.className = "w-full h-full object-contain p-2 relative z-10";
 
       // Concave Ramp
       const corner = document.createElement("div");
       corner.className = "rarity-corner";
-      corner.style.bottom = "-25%";
-      corner.style.left = "-25%";
-      corner.style.width = "115%";
-      corner.style.height = "115%";
+      // EXACT corner gradient from renderGrid
       corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${color}66 60%, ${color}cc 100%)`;
-      frame.appendChild(corner);
 
-      const img = document.createElement("img");
-      img.src = bp.img || "";
-      img.className = "w-full h-full object-contain p-6 relative z-10 drop-shadow-2xl";
-
-      const glow = document.createElement("div");
-      glow.className = "absolute inset-0 pointer-events-none";
-      glow.style.background = `radial-gradient(circle at center, ${color}22 0%, transparent 80%)`;
-      frame.appendChild(glow);
-      frame.appendChild(img);
-
-      // Pill-shaped banner with Name - FIXED SIZE, scaled text
+      // Type Tab -> NOW DISPLAYS NAME
       const tab = document.createElement("div");
-      tab.className = "absolute bottom-2 left-1/2 -translate-x-1/2 h-7 w-[85%] rounded-full border border-white/20 backdrop-blur-xl z-30 flex items-center justify-center shadow-2xl overflow-hidden";
-      tab.style.background = `${color}44`;
+      tab.className = "type-tab";
+
+      // ERSATZ GLASS EFFECT (Solid Base + Rarity Overlay)
+      // Base: #09090b (Zinc-950)
+      // Overlay: Rarity Color at ~40-50%
+      const angle = 110 + Math.floor(Math.random() * 40);
+      tab.style.background = `linear-gradient(${angle}deg, ${color}99, ${color}66), #09090b`;
+
       tab.style.borderColor = color;
+      // USER REQUEST: No shadow needed
+      tab.style.maxWidth = "90%"; // Prevent overflow
+
+      const tabIcon = document.createElement("img");
+      tabIcon.src = bp.typeIcon || detectIconForType(bp.type);
+      tabIcon.className = "w-5 h-5 object-contain shadow-sm drop-shadow-md"; // Larger (w-5)
+
+      const tabText = document.createElement("span");
+      // USER REQUEST: Dynamic scaling instead of ellipsis truncate
+      tabText.textContent = bp.name;
+
+      // Allow max-width to expand slightly more
+      tab.style.maxWidth = "96%";
+      tab.style.paddingRight = "8px"; // Standardize padding
+
+      let fontSize = "15px";
+      let lineHeight = "normal";
+
+      // AGGRESSIVE SCALING with Direct Style Override
+      // Tailwind classes might be overridden by specific CSS, so we use inline styles.
+      if (bp.name.length > 25) { fontSize = "9px"; lineHeight = "1"; }
+      else if (bp.name.length > 15) { fontSize = "10px"; lineHeight = "1.1"; }
+      else if (bp.name.length > 12) { fontSize = "12px"; lineHeight = "1.2"; }
+
+      // Apply styles directly
+      tabText.style.fontSize = fontSize;
+      tabText.style.lineHeight = lineHeight;
+      tabText.style.whiteSpace = "normal";
+
+      // Base classes without size
+      tabText.className = `ml-1.5 font-black uppercase tracking-wide drop-shadow-lg text-white whitespace-normal break-words text-left`;
+
+      tab.appendChild(tabIcon);
+      tab.appendChild(tabText);
+
+      imgWrap.appendChild(img);
+      imgWrap.appendChild(corner);
+      imgWrap.appendChild(tab);
+      frame.appendChild(imgWrap);
+
+      // Name (Below Image)
+      const title = document.createElement("div");
+      title.className = "mt-2 px-1 pb-1 text-center";
 
       const name = document.createElement("div");
-      // Less aggressive scaling - only for very long names
-      const nameLength = bp.name.length;
-      let fontSize = "text-sm"; // Default for most names
-      if (nameLength > 25) fontSize = "text-[10px]";
-      else if (nameLength > 20) fontSize = "text-xs";
-      name.className = `${fontSize} font-black text-white uppercase tracking-tight px-1 text-center truncate w-full`;
+      name.className = "font-semibold leading-tight text-white";
+      name.style.fontSize = "14px"; // Fixed readable size for screenshot
       name.textContent = bp.name;
 
-      tab.appendChild(name);
-      frame.appendChild(tab);
+      title.appendChild(name);
 
       miniCard.appendChild(frame);
+
       highlightsWrap.appendChild(miniCard);
     });
 
@@ -910,6 +1024,13 @@ function initWrapped() {
       modal.classList.remove("flex");
       document.body.style.overflow = "";
     };
+
+    // Close on ESC
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+        closeBtn.click();
+      }
+    });
   }
 
   if (downloadBtn) {
@@ -919,10 +1040,22 @@ function initWrapped() {
       downloadBtn.textContent = "Generating...";
 
       try {
-        // Capture at native size - matches preview exactly
+        // Force Square Aspect Ratio
+        const width = node.offsetWidth;
+        const height = node.offsetHeight;
+        const size = Math.max(width, height);
+
+        // Capture with forced square dimensions
         const dataUrl = await htmlToImage.toPng(node, {
+          width: size,
+          height: size,
           pixelRatio: 2,
-          backgroundColor: "#09090b"
+          backgroundColor: "#09090b",
+          style: {
+            borderRadius: '0', // Override rounded corners
+            width: `${size}px`, // Explicitly set size to ensure background covers
+            height: `${size}px`
+          }
         });
 
         const link = document.createElement('a');
@@ -934,7 +1067,225 @@ function initWrapped() {
         alert("Failed to generate image. Try again?");
       } finally {
         downloadBtn.disabled = false;
-        downloadBtn.textContent = "Download Square";
+        downloadBtn.textContent = "Download";
+      }
+    };
+  }
+
+  // 5. Dynamic Scaling Logic for 1080p/Small Screens
+  const scaleContent = () => {
+    // The first child div is the wrapper we want to scale (flex-col container)
+    const modalContent = modal.querySelector(":scope > div");
+    if (!modalContent || modal.classList.contains("hidden")) return;
+
+    // Reset to measure natural size
+    modalContent.style.transform = "none";
+
+    // Safety buffer (buttons + margins)
+    const padding = 40;
+    const availableHeight = window.innerHeight - padding;
+    const availableWidth = window.innerWidth - padding;
+
+    const naturalHeight = modalContent.scrollHeight;
+    const naturalWidth = modalContent.scrollWidth;
+
+    const scaleY = availableHeight / naturalHeight;
+    const scaleX = availableWidth / naturalWidth;
+
+    // Use the smaller scale to fit BOTH width and height
+    const scale = Math.min(scaleX, scaleY, 1); // Never scale UP, only down
+
+    if (scale < 1) {
+      // Use ZOOM for sharp text rendering (Transform causes blur)
+      modalContent.style.zoom = scale;
+      modalContent.style.transform = "none";
+    } else {
+      modalContent.style.zoom = "1";
+      modalContent.style.transform = "none";
+    }
+  };
+
+  window.addEventListener("resize", scaleContent);
+
+  // Observer to trigger scale when modal opens
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === "attributes" && mutation.attributeName === "class") {
+        if (!modal.classList.contains("hidden")) {
+          // Wait for layout to stabilize
+          requestAnimationFrame(() => {
+            requestAnimationFrame(scaleContent);
+          });
+        }
+      }
+    });
+  });
+
+  observer.observe(modal, { attributes: true });
+}
+
+const READ_POSTS_KEY = "arc_read_posts_v1";
+
+function initAnnouncements() {
+  const btn = document.getElementById("announcementsBtn");
+  const drawer = document.getElementById("announcementsDrawer");
+  const closeBtn = document.getElementById("closeAnnouncementsBtn");
+  const backdrop = drawer ? drawer.querySelector(":scope > div:first-child") : null;
+  const panel = drawer ? drawer.querySelector(":scope > div:last-child") : null;
+  const feed = document.getElementById("announcementsFeed");
+  const badge = document.getElementById("newsBadge");
+
+  // State
+  let readPosts = new Set();
+  try {
+    const data = localStorage.getItem(READ_POSTS_KEY);
+    if (data) readPosts = new Set(JSON.parse(data));
+  } catch (e) { console.error("Failed to load read posts", e); }
+
+  const saveReadState = () => {
+    localStorage.setItem(READ_POSTS_KEY, JSON.stringify(Array.from(readPosts)));
+  };
+
+  const updateUI = () => {
+    const cards = feed ? feed.querySelectorAll(".announcement-card") : [];
+    let unreadCount = 0;
+
+    cards.forEach(card => {
+      const id = card.dataset.id;
+      const dot = card.querySelector(".unread-dot");
+      const isRead = readPosts.has(id);
+
+      if (isRead) {
+        if (dot) dot.classList.add("hidden");
+        card.classList.add("read");
+      } else {
+        if (dot) dot.classList.remove("hidden");
+        unreadCount++;
+      }
+    });
+
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+  };
+
+  // Dev Reset
+  const devBtn = document.getElementById("devResetAnnouncements");
+  if (devBtn) {
+    devBtn.onclick = (e) => {
+      e.stopPropagation();
+      readPosts.clear();
+      saveReadState();
+
+      // Collapse everything
+      if (feed) {
+        feed.querySelectorAll(".announcement-body").forEach(b => {
+          b.classList.add("max-h-0", "opacity-0");
+          b.classList.remove("max-h-[1500px]", "opacity-100");
+        });
+      }
+      updateUI();
+    };
+  }
+
+  // Mark All Read
+  const markAllReadBtn = document.getElementById("markAllReadBtn");
+  if (markAllReadBtn) {
+    markAllReadBtn.onclick = (e) => {
+      e.stopPropagation();
+      const cards = feed ? feed.querySelectorAll(".announcement-card") : [];
+      cards.forEach(card => {
+        const id = card.dataset.id;
+        if (id) readPosts.add(id);
+      });
+      saveReadState();
+      updateUI();
+    };
+  }
+
+  // Generate Wrapped from News
+  const wrappedFromNewsBtn = document.getElementById("generateWrappedFromNews");
+  if (wrappedFromNewsBtn) {
+    wrappedFromNewsBtn.onclick = (e) => {
+      e.stopPropagation();
+      closeDrawer(); // Close announcements
+
+      // Switch to My Collection tab first
+      const myCollTab = document.querySelector('[onclick*="switchTab(\'myCollection\')"]');
+      if (myCollTab) myCollTab.click();
+
+      // Trigger the main Wrapped button
+      const showWrappedBtn = document.getElementById("showWrappedBtn");
+      if (showWrappedBtn) showWrappedBtn.click();
+    };
+  }
+
+  // Initial UI Check
+  if (feed) updateUI();
+
+  if (!btn || !drawer || !closeBtn || !backdrop || !panel) return;
+
+  const openDrawer = () => {
+    drawer.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      backdrop.classList.remove("opacity-0");
+      panel.classList.remove("translate-x-full");
+    });
+    document.body.style.overflow = "hidden";
+  };
+
+  const closeDrawer = () => {
+    backdrop.classList.add("opacity-0");
+    panel.classList.add("translate-x-full");
+    setTimeout(() => {
+      drawer.classList.add("hidden");
+      document.body.style.overflow = "";
+    }, 300);
+  };
+
+  btn.onclick = openDrawer;
+  closeBtn.onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !drawer.classList.contains("hidden")) {
+      closeDrawer();
+    }
+  });
+
+  // Card delegation
+  if (feed) {
+    feed.onclick = (e) => {
+      const card = e.target.closest(".announcement-card");
+      if (!card) return;
+
+      const body = card.querySelector(".announcement-body");
+      const id = card.dataset.id;
+      if (!body) return;
+
+      // Toggle Expansion
+      const isExpanded = !body.classList.contains("max-h-0");
+
+      if (isExpanded) {
+        // Collapse
+        body.classList.add("max-h-0", "opacity-0");
+        body.classList.remove("max-h-[1500px]", "opacity-100");
+      } else {
+        // Expand
+        body.classList.remove("max-h-0", "opacity-0");
+        body.classList.add("max-h-[1500px]", "opacity-100");
+
+        // Mark Read
+        if (!readPosts.has(id)) {
+          readPosts.add(id);
+          saveReadState();
+          updateUI();
+        }
       }
     };
   }
@@ -1277,7 +1628,8 @@ const state = {
   wrappedData: {
     contributionCount: 0,
     loading: false
-  }
+  },
+  spares: {} // Item name -> count of spare blueprints
 };
 
 function getCsvUrl() {
@@ -1715,6 +2067,7 @@ function renderActiveChips() {
     let label = "Collected";
     if (state.filters.collected === "not-collected") label = "Not Collected";
     if (state.filters.collected === "wishlist") label = "Wishlist";
+    if (state.filters.collected === "spares") label = "Has Spares";
 
     push(`Status: ${label}`, () => {
       // Revert to all
@@ -1763,6 +2116,8 @@ function applyFilters() {
     // Or just not collected? User likely wants to see everything they still need.
     // Let's hide collected items. Wishlisted items are technically "not collected" yet.
     if (state.filters.collected === "not-collected" && isCollected) return false;
+    // "spares" shows only items with spares > 0
+    if (state.filters.collected === "spares" && !(state.spares[it.name] > 0)) return false;
 
     if (q) {
       const blob = (it.name + " " + it.type + " " + it.map + " " + it.cond + " " + it.loc + " " + it.cont).toLowerCase();
@@ -1811,6 +2166,7 @@ function renderGrid() {
     card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2 opacity-0"; // Start invisible
     card.style.position = "relative";
     card.style.overflow = "visible";
+    card.dataset.name = it.name; // For context menu
     // Reuse style settings
 
     const frame = document.createElement("div");
@@ -2087,6 +2443,16 @@ function renderGrid() {
     // Collection mode features
     updateCardVisuals(frame, it.name);
 
+    // Render spares pill if item has spares (both tabs for visibility, but clicakble in collection)
+    const sparesCount = state.spares[it.name] || 0;
+    if (sparesCount > 0) {
+      const pill = document.createElement("div");
+      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.innerHTML = `Spares: <span class="font-bold">${sparesCount}</span>`;
+      pill.dataset.itemName = it.name;
+      frame.appendChild(pill);
+    }
+
     // Different click behavior based on tab
     if (state.currentTab === "collection") {
       // Collection mode: Click entire card to cycle state
@@ -2226,25 +2592,27 @@ function initCollectionFilters() {
   const yesBtnBP = document.getElementById("collectedYesBlueprints");
   const wishlistBtnBP = document.getElementById("collectedWishBlueprints");
   const noBtnBP = document.getElementById("collectedNoBlueprints");
+  const sparesBtnBP = document.getElementById("collectedSparesBlueprints");
 
   // Mobile filters
   const allBtnMob = document.getElementById("collectedAllMobile");
   const yesBtnMob = document.getElementById("collectedYesMobile");
   const wishlistBtnMob = document.getElementById("collectedWishMobile");
   const noBtnMob = document.getElementById("collectedNoMobile");
+  const sparesBtnMob = document.getElementById("collectedSparesMobile");
 
   const setFilter = (value) => {
     state.filters.collected = value;
 
     // Synchronize all instances of these buttons
     const allSets = [
-      [allBtn, yesBtn, null, noBtn],
-      [allBtnBP, yesBtnBP, wishlistBtnBP, noBtnBP],
-      [allBtnMob, yesBtnMob, wishlistBtnMob, noBtnMob]
+      [allBtn, yesBtn, null, noBtn, null],
+      [allBtnBP, yesBtnBP, wishlistBtnBP, noBtnBP, sparesBtnBP],
+      [allBtnMob, yesBtnMob, wishlistBtnMob, noBtnMob, sparesBtnMob]
     ];
 
     allSets.forEach(set => {
-      const [a, y, w, n] = set;
+      const [a, y, w, n, s] = set;
       if (a) {
         a.classList.remove("chip-active");
         if (value === "all") a.classList.add("chip-active");
@@ -2260,6 +2628,10 @@ function initCollectionFilters() {
       if (n) {
         n.classList.remove("chip-active");
         if (value === "not-collected") n.classList.add("chip-active");
+      }
+      if (s) {
+        s.classList.remove("chip-active");
+        if (value === "spares") s.classList.add("chip-active");
       }
     });
 
@@ -2279,19 +2651,225 @@ function initCollectionFilters() {
   if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected");
   if (wishlistBtnBP) wishlistBtnBP.onclick = () => setFilter("wishlist");
   if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected");
+  if (sparesBtnBP) sparesBtnBP.onclick = () => setFilter("spares");
 
   if (allBtnMob) allBtnMob.onclick = () => setFilter("all");
   if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected");
   if (wishlistBtnMob) wishlistBtnMob.onclick = () => setFilter("wishlist");
   if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected");
+  if (sparesBtnMob) sparesBtnMob.onclick = () => setFilter("spares");
 
   // Initial sync on load
   setFilter(state.filters.collected);
 }
 
 
+// =====================================================
+// Context Menu for My Collection
+// =====================================================
+function initContextMenu() {
+  const menu = document.getElementById("itemContextMenu");
+  const grid = document.getElementById("grid");
+  if (!menu || !grid) return;
+
+  let activeCard = null;
+  let longPressTimer = null;
+  const LONG_PRESS_DURATION = 500; // ms
+
+  // Show menu at position
+  const showMenu = (x, y, card) => {
+    activeCard = card;
+    menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
+    menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
+    menu.classList.remove("hidden");
+    requestAnimationFrame(() => menu.classList.remove("opacity-0"));
+
+    // Update spares count display for this item
+    const contextSparesCount = document.getElementById("contextSparesCount");
+    if (contextSparesCount && card) {
+      const itemName = card.dataset.name;
+      const count = state.spares[itemName] || 0;
+      contextSparesCount.textContent = count;
+    }
+  };
+
+  // Hide menu
+  const hideMenu = () => {
+    menu.classList.add("opacity-0");
+    setTimeout(() => menu.classList.add("hidden"), 150);
+    activeCard = null;
+  };
+
+  // Right-click handler (Desktop) - Only for Collection tab
+  grid.addEventListener("contextmenu", (e) => {
+    if (state.currentTab !== "collection") return; // Only on Collection tab
+    const card = e.target.closest(".card-compact");
+    if (!card) return;
+    e.preventDefault();
+    showMenu(e.clientX, e.clientY, card);
+  });
+
+  // Long-press handlers (Mobile) - Only for Collection tab
+  grid.addEventListener("touchstart", (e) => {
+    if (state.currentTab !== "collection") return; // Only on Collection tab
+    const card = e.target.closest(".card-compact");
+    if (!card) return;
+
+    longPressTimer = setTimeout(() => {
+      const touch = e.touches[0];
+      showMenu(touch.clientX, touch.clientY, card);
+      // Vibrate if supported
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, LONG_PRESS_DURATION);
+  }, { passive: true });
+
+  grid.addEventListener("touchend", () => {
+    clearTimeout(longPressTimer);
+  }, { passive: true });
+
+  grid.addEventListener("touchmove", () => {
+    clearTimeout(longPressTimer);
+  }, { passive: true });
+
+  // Hide menu on click outside
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target)) hideMenu();
+  });
+
+  // Spares pill click handler (event delegation) - open context menu
+  grid.addEventListener("click", (e) => {
+    const pill = e.target.closest(".spares-pill");
+    if (!pill) return;
+    e.stopPropagation();
+    const card = pill.closest(".card-compact");
+    if (card) {
+      const rect = pill.getBoundingClientRect();
+      showMenu(rect.left, rect.bottom + 4, card);
+    }
+  });
+
+  // Hide menu on scroll
+  window.addEventListener("scroll", hideMenu, { passive: true });
+
+  // Hide menu on Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideMenu();
+  });
+
+  // Inline Spares Stepper Setup (in context menu)
+  const contextSparesCount = document.getElementById("contextSparesCount");
+  const contextSparesMinus = document.getElementById("contextSparesMinus");
+  const contextSparesPlus = document.getElementById("contextSparesPlus");
+
+  const updateContextSparesDisplay = () => {
+    if (activeCard && contextSparesCount) {
+      const itemName = activeCard.dataset.name;
+      const count = state.spares[itemName] || 0;
+      contextSparesCount.textContent = count;
+    }
+  };
+
+  const updateSparesPill = (card, itemName) => {
+    const frame = card?.querySelector(".rarity-frame");
+    if (!frame) return;
+
+    // Remove existing spares pill
+    const existingPill = frame.querySelector(".spares-pill");
+    if (existingPill) existingPill.remove();
+
+    const count = state.spares[itemName] || 0;
+    if (count > 0) {
+      const pill = document.createElement("div");
+      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.innerHTML = `Spares: <span class="font-bold">${count}</span>`;
+      pill.dataset.itemName = itemName;
+      frame.appendChild(pill);
+    }
+  };
+
+  // Spares - button handler (inline in context menu)
+  if (contextSparesMinus) {
+    contextSparesMinus.onclick = (e) => {
+      e.stopPropagation(); // Don't close menu
+      if (!activeCard) return;
+      const itemName = activeCard.dataset.name;
+      const current = state.spares[itemName] || 0;
+      if (current > 0) {
+        state.spares[itemName] = current - 1;
+        if (state.spares[itemName] === 0) {
+          delete state.spares[itemName];
+        }
+        saveSpares();
+        updateContextSparesDisplay();
+        updateSparesPill(activeCard, itemName);
+      }
+    };
+  }
+
+  // Spares + button handler (inline in context menu)
+  if (contextSparesPlus) {
+    contextSparesPlus.onclick = (e) => {
+      e.stopPropagation(); // Don't close menu
+      if (!activeCard) return;
+      const itemName = activeCard.dataset.name;
+      const current = state.spares[itemName] || 0;
+      state.spares[itemName] = current + 1;
+      saveSpares();
+      updateContextSparesDisplay();
+      updateSparesPill(activeCard, itemName);
+    };
+  }
 
 
+  // Menu item actions
+  menu.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn || !activeCard) return;
+
+    const action = btn.dataset.action;
+    const itemName = activeCard.dataset.name;
+    const frame = activeCard.querySelector(".rarity-frame");
+
+    if (!itemName) {
+      hideMenu();
+      return;
+    }
+
+    if (action === "collected") {
+      // Toggle collected state
+      if (state.collectedItems.has(itemName)) {
+        state.collectedItems.delete(itemName);
+      } else {
+        state.wishlistedItems.delete(itemName); // Remove from wishlist if present
+        state.collectedItems.add(itemName);
+      }
+      saveCollectionState();
+      if (frame) updateCardVisuals(frame, itemName);
+      updateProgress();
+      hideMenu();
+    } else if (action === "wishlisted") {
+      // Toggle wishlisted state
+      if (state.wishlistedItems.has(itemName)) {
+        state.wishlistedItems.delete(itemName);
+      } else {
+        state.collectedItems.delete(itemName); // Remove from collected if present
+        state.wishlistedItems.add(itemName);
+      }
+      saveCollectionState();
+      if (frame) updateCardVisuals(frame, itemName);
+      updateProgress();
+      hideMenu();
+    } else if (action === "uncollected") {
+      // Remove from both collected and wishlisted
+      state.collectedItems.delete(itemName);
+      state.wishlistedItems.delete(itemName);
+      saveCollectionState();
+      if (frame) updateCardVisuals(frame, itemName);
+      updateProgress();
+      hideMenu();
+    }
+  });
+}
 
 
 
