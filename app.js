@@ -1,7 +1,7 @@
 import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
 
@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth(); // Initialize Firebase Auth
   initEventBanner(); // Initialize Event Banner
   initBlueprintSubmission(); // Initialize Blueprint Submission UI
+  initWrapped(); // Initialize Wrapped feature
   loadData();
 });
 
@@ -380,6 +381,24 @@ async function loadFromCloud(user) {
   }
 }
 
+async function fetchUserContributions() {
+  if (!auth.currentUser) return;
+  state.wrappedData.loading = true;
+  try {
+    const q = query(
+      collection(db, "blueprintSubmissions"),
+      where("userId", "==", auth.currentUser.uid)
+    );
+    const querySnapshot = await getDocs(q);
+    state.wrappedData.contributionCount = querySnapshot.size;
+    console.log(`User has submitted ${querySnapshot.size} reports.`);
+  } catch (e) {
+    console.error("Failed to fetch user contributions:", e);
+  } finally {
+    state.wrappedData.loading = false;
+  }
+}
+
 function initAuth() {
   const loginBtn = document.getElementById("loginBtn");
   const loginBtnMob = document.getElementById("loginBtnMobile");
@@ -632,6 +651,293 @@ function closeSubmissionModal() {
     if (q) q.checked = false;
   }
   pendingBlueprintName = null;
+}
+
+function initWrapped() {
+  const showBtn = document.getElementById("showWrappedBtn");
+  const modal = document.getElementById("wrappedModal");
+  const closeBtn = document.getElementById("closeWrappedBtn");
+  const downloadBtn = document.getElementById("downloadWrappedBtn");
+
+  if (!showBtn || !modal) return;
+
+  showBtn.onclick = async () => {
+    // 1. Fetch data
+    if (auth.currentUser) {
+      showBtn.disabled = true;
+      showBtn.textContent = "Loading Data...";
+      await fetchUserContributions();
+      showBtn.disabled = false;
+      showBtn.innerHTML = `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg> View 2025 Wrapped`;
+    }
+
+    // 2. Populate UI
+    const total = state.all.length;
+    const collected = state.collectedItems.size;
+    const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
+
+    // Calculate Weapon/Augment stats
+    const weaponsAll = state.all.filter(it => /weapon/i.test(it.type)).length;
+    const weaponsColl = state.all.filter(it => /weapon/i.test(it.type) && state.collectedItems.has(it.name)).length;
+    const augmentsAll = state.all.filter(it => /augment/i.test(it.type)).length;
+    const augmentsColl = state.all.filter(it => /augment/i.test(it.type) && state.collectedItems.has(it.name)).length;
+
+    // Calculate Best Map (most contributed map)
+    const mapCounts = {};
+    if (state.wrappedData.contributions) {
+      state.wrappedData.contributions.forEach(c => {
+        if (c.map) {
+          mapCounts[c.map] = (mapCounts[c.map] || 0) + 1;
+        }
+      });
+    }
+    const bestMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0];
+
+    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+
+    // Build dynamic stats array
+    const statsGrid = document.getElementById("wrappedStatsGrid");
+    statsGrid.innerHTML = "";
+
+    const stats = [];
+
+    // Locations Reported (only if > 0)
+    if (state.wrappedData.contributionCount > 0) {
+      stats.push({
+        value: state.wrappedData.contributionCount,
+        label: "Locations<br>Reported",
+        color: "text-emerald-400",
+        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`
+      });
+    }
+
+    // Best Map (only if exists)
+    if (bestMap && bestMap[0]) {
+      stats.push({
+        value: bestMap[0],
+        label: "Best<br>Map",
+        color: "text-purple-400",
+        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>`,
+        smallText: true
+      });
+    }
+
+    // Blueprints Collected (always show) - checkmark icon
+    stats.push({
+      value: `${collected}/${total}`,
+      label: "Blueprints<br>Collected",
+      color: "text-white",
+      icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`
+    });
+
+    // Weapons (always show with game icon)
+    stats.push({
+      value: `${weaponsColl}/${weaponsAll}`,
+      label: "Weapons<br>Collected",
+      color: "text-amber-500",
+      icon: `<img src="icons/ItemCategory_Weapon.webp" class="w-5 h-5 object-contain" style="filter: brightness(0) saturate(100%) invert(67%) sepia(74%) saturate(575%) hue-rotate(360deg) brightness(101%) contrast(101%);" alt="Weapon">`
+    });
+
+    // Augments (always show with game icon)
+    stats.push({
+      value: `${augmentsColl}/${augmentsAll}`,
+      label: "Augments<br>Collected",
+      color: "text-cyan-400",
+      icon: `<img src="icons/ItemCategory_Augment.webp" class="w-5 h-5 object-contain" style="filter: brightness(0) saturate(100%) invert(76%) sepia(32%) saturate(1057%) hue-rotate(152deg) brightness(95%) contrast(92%);" alt="Augment">`
+    });
+
+    // Create stat pills
+    stats.forEach((stat, index) => {
+      const pill = document.createElement("div");
+      pill.className = "rounded-xl p-3 border border-white/10 flex flex-col items-center justify-center flex-1 min-w-[90px]";
+      // Randomize gradient angle slightly (120-150 degrees)
+      const angle = 120 + Math.floor(Math.random() * 30);
+      // Alternate between 2-part and 3-part gradients (50% opaque)
+      if (index % 2 === 0) {
+        // 2-part gradient
+        pill.style.background = `linear-gradient(${angle}deg, rgba(26, 74, 56, 0.5), rgba(13, 40, 32, 0.5))`;
+      } else {
+        // 3-part gradient with lighter center
+        pill.style.background = `linear-gradient(${angle}deg, rgba(26, 74, 56, 0.5), rgba(20, 61, 48, 0.5) 50%, rgba(26, 74, 56, 0.5))`;
+      }
+
+      // Make icons larger
+      const largerIcon = stat.icon.replace('w-4 h-4', 'w-6 h-6').replace('w-5 h-5', 'w-7 h-7');
+
+      pill.innerHTML = `
+        <div class="${stat.color} mb-1">
+          ${largerIcon}
+        </div>
+        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-black ${stat.color}">${stat.value}</span>
+        <div class="text-xs text-zinc-300 uppercase font-black tracking-wider text-center leading-tight">${stat.label}</div>
+      `;
+
+      statsGrid.appendChild(pill);
+    });
+
+    // Highlights (Legendary/Epic, not Mod/Material)
+    const highlightsWrap = document.getElementById("wrappedHighlights");
+    highlightsWrap.innerHTML = "";
+
+    const rareBlueprints = state.all.filter(it =>
+      state.collectedItems.has(it.name) &&
+      (it.rarity === "Legendary" || it.rarity === "Epic") &&
+      !/mod|material|parts|component|attachment/i.test(it.type)
+    ).slice(0, 6);
+
+    if (rareBlueprints.length === 0) {
+      highlightsWrap.innerHTML = `<div class="text-zinc-500 text-xs w-full text-center py-4 italic">No rare blueprints collected yet... keep hunting!</div>`;
+    }
+
+    rareBlueprints.forEach(bp => {
+      const color = rarityColor(bp.rarity);
+      const miniCard = document.createElement("div");
+      miniCard.className = "flex flex-col items-center w-full card-compact";
+
+      const frame = document.createElement("div");
+      frame.className = "w-[72%] aspect-square rounded-2xl border-2 overflow-hidden relative shadow-2xl mx-auto";
+      frame.style.borderColor = color;
+
+      // Rarity gradient: rarity color at bottom-left, fading to dark at top-right
+      frame.style.background = `
+        linear-gradient(to top right, ${color}66 0%, ${color}22 30%, rgba(9,9,11,0.95) 100%),
+        linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)),
+        url('Background/Arc BP Image Background.webp')
+      `;
+      frame.style.backgroundSize = "cover";
+      frame.style.backgroundPosition = "center";
+
+      // Concave Ramp
+      const corner = document.createElement("div");
+      corner.className = "rarity-corner";
+      corner.style.bottom = "-25%";
+      corner.style.left = "-25%";
+      corner.style.width = "115%";
+      corner.style.height = "115%";
+      corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${color}66 60%, ${color}cc 100%)`;
+      frame.appendChild(corner);
+
+      const img = document.createElement("img");
+      img.src = bp.img || "";
+      img.className = "w-full h-full object-contain p-6 relative z-10 drop-shadow-2xl";
+
+      const glow = document.createElement("div");
+      glow.className = "absolute inset-0 pointer-events-none";
+      glow.style.background = `radial-gradient(circle at center, ${color}22 0%, transparent 80%)`;
+      frame.appendChild(glow);
+      frame.appendChild(img);
+
+      // Pill-shaped banner with Name - FIXED SIZE, scaled text
+      const tab = document.createElement("div");
+      tab.className = "absolute bottom-2 left-1/2 -translate-x-1/2 h-7 w-[85%] rounded-full border border-white/20 backdrop-blur-xl z-30 flex items-center justify-center shadow-2xl overflow-hidden";
+      tab.style.background = `${color}44`;
+      tab.style.borderColor = color;
+
+      const name = document.createElement("div");
+      // Less aggressive scaling - only for very long names
+      const nameLength = bp.name.length;
+      let fontSize = "text-sm"; // Default for most names
+      if (nameLength > 25) fontSize = "text-[10px]";
+      else if (nameLength > 20) fontSize = "text-xs";
+      name.className = `${fontSize} font-black text-white uppercase tracking-tight px-1 text-center truncate w-full`;
+      name.textContent = bp.name;
+
+      tab.appendChild(name);
+      frame.appendChild(tab);
+
+      miniCard.appendChild(frame);
+      highlightsWrap.appendChild(miniCard);
+    });
+
+    // Show custom gamertag modal first
+    const gamertagModal = document.getElementById("gamertagModal");
+    const gamertagInput = document.getElementById("gamertagInput");
+    const skipBtn = document.getElementById("skipGamertagBtn");
+    const confirmBtn = document.getElementById("confirmGamertagBtn");
+
+    // Clear previous input
+    gamertagInput.value = "";
+
+    // Function to proceed to Wrapped modal with optional gamertag
+    const proceedToWrapped = (gamertag) => {
+      gamertagModal.classList.add("hidden");
+      gamertagModal.classList.remove("flex");
+
+      // Add gamertag to preview if provided
+      const node = document.getElementById("wrappedContent");
+      // Remove any existing gamertag element first
+      const existingGT = document.getElementById("wrappedGamertag");
+      if (existingGT) existingGT.remove();
+
+      if (gamertag && gamertag.trim()) {
+        // Wrapper for shimmer border effect
+        const gamertagWrapper = document.createElement("div");
+        gamertagWrapper.id = "wrappedGamertag";
+        gamertagWrapper.className = "absolute top-4 right-4 p-[2px] rounded-full z-50";
+        gamertagWrapper.style.background = "linear-gradient(135deg, rgba(16,185,129,0.6) 0%, rgba(255,255,255,0.3) 50%, rgba(16,185,129,0.6) 100%)";
+        gamertagWrapper.style.boxShadow = "0 0 20px rgba(16,185,129,0.4)";
+
+        const gamertagInner = document.createElement("div");
+        gamertagInner.className = "bg-black/50 backdrop-blur-xl px-6 py-2.5 rounded-full text-white font-bold text-lg";
+        gamertagInner.textContent = "@" + gamertag.trim();
+
+        gamertagWrapper.appendChild(gamertagInner);
+        node.appendChild(gamertagWrapper);
+      }
+
+      // Show Wrapped Modal
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    };
+
+    // Wire up buttons
+    skipBtn.onclick = () => proceedToWrapped("");
+    confirmBtn.onclick = () => proceedToWrapped(gamertagInput.value);
+    gamertagInput.onkeydown = (e) => {
+      if (e.key === "Enter") proceedToWrapped(gamertagInput.value);
+    };
+
+    // Show gamertag modal
+    gamertagModal.classList.remove("hidden");
+    gamertagModal.classList.add("flex");
+    gamertagInput.focus();
+  };
+
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      document.body.style.overflow = "";
+    };
+  }
+
+  if (downloadBtn) {
+    downloadBtn.onclick = async () => {
+      const node = document.getElementById("wrappedContent");
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = "Generating...";
+
+      try {
+        // Capture at native size - matches preview exactly
+        const dataUrl = await htmlToImage.toPng(node, {
+          pixelRatio: 2,
+          backgroundColor: "#09090b"
+        });
+
+        const link = document.createElement('a');
+        link.download = `arc-raiders-wrapped-2025.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (error) {
+        console.error('oops, something went wrong!', error);
+        alert("Failed to generate image. Try again?");
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = "Download Square";
+      }
+    };
+  }
 }
 
 function showCollectToast(blueprintName) {
@@ -968,6 +1274,10 @@ const state = {
     conds: [],
     confs: [],
   },
+  wrappedData: {
+    contributionCount: 0,
+    loading: false
+  }
 };
 
 function getCsvUrl() {
