@@ -731,81 +731,83 @@
   </div>
 
   <!-- 2025 Wrapped Modal -->
-  <div id="wrappedModal"
-    class="fixed inset-0 z-[300] hidden items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-2xl overflow-auto">
-    <div class="flex flex-col items-center gap-6 w-[896px] shrink-0">
-      <!-- Square Preview Container with Shimmer Border -->
-      <div
-        class="relative w-full aspect-square rounded-3xl p-[2px] bg-gradient-to-br from-emerald-400/50 via-white/20 to-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
+  <div id="wrappedModal" class="fixed inset-0 z-[300] hidden bg-black/95 backdrop-blur-2xl overflow-auto p-4 md:p-8">
+    <div class="min-h-full flex flex-col items-center justify-center">
+      <div class="flex flex-col items-center gap-6 w-[896px] shrink-0">
+        <!-- Square Preview Container with Shimmer Border -->
         <div
-          class="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-400/30 via-transparent to-emerald-400/30 animate-pulse pointer-events-none">
-        </div>
+          class="relative w-full aspect-square rounded-3xl p-[2px] bg-gradient-to-br from-emerald-400/50 via-white/20 to-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
+          <div
+            class="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-400/30 via-transparent to-emerald-400/30 animate-pulse pointer-events-none">
+          </div>
 
-        <!-- Wrapped Content (to be rendered to canvas) -->
-        <div id="wrappedContent"
-          class="w-full h-full relative overflow-hidden rounded-[22px] flex flex-col items-center text-center"
-          style="background: radial-gradient(circle at center, rgba(16,185,129,0.15) 0%, transparent 70%), linear-gradient(to bottom right, rgba(9,9,11,0.9) 0%, rgba(6,78,59,0.85) 50%, rgba(9,9,11,0.9) 100%), url('Background/Arc BP Image Background.webp'); background-size: cover, cover, cover; background-position: center, center, center;">
+          <!-- Wrapped Content (to be rendered to canvas) -->
+          <div id="wrappedContent"
+            class="w-full h-full relative overflow-hidden rounded-[22px] flex flex-col items-center text-center"
+            style="background: radial-gradient(circle at center, rgba(16,185,129,0.15) 0%, transparent 70%), linear-gradient(to bottom right, rgba(9,9,11,0.9) 0%, rgba(6,78,59,0.85) 50%, rgba(9,9,11,0.9) 100%), url('Background/Arc BP Image Background.webp'); background-size: cover, cover, cover; background-position: center, center, center;">
 
-          <!-- UI Elements -->
-          <div class="relative z-10 w-full flex flex-col h-full items-center justify-between gap-1 p-6">
-            <div class="w-full">
-              <img src="Background/Arc BP Tracker Logo White Small.webp" alt="Arc Blueprint Tracker"
-                class="h-10 mx-auto mb-1">
-              <div class="text-white text-xs uppercase tracking-[0.4em] font-black opacity-90">2025 BLUEPRINT WRAPPED
-              </div>
-            </div>
-
-            <div class="flex flex-col items-center">
-              <div id="wrappedPercent"
-                class="text-[80px] font-black italic tracking-tighter text-white drop-shadow-[0_0_40px_rgba(16,185,129,0.5)] leading-none">
-                0%</div>
-              <div class="text-white/90 text-sm font-black uppercase tracking-[0.2em] mt-1 shadow-black drop-shadow-sm">
-                Collection Complete</div>
-              <!-- Progress Bar -->
-              <div
-                class="w-[28rem] mt-3 p-[1.5px] rounded-full bg-gradient-to-r from-emerald-500/30 via-white/10 to-emerald-500/30 shadow-lg">
-                <div class="w-full h-3 bg-zinc-950/80 rounded-full overflow-hidden relative">
-                  <div id="wrappedProgressBar"
-                    class="h-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] rounded-full transition-all duration-1000 ease-out"
-                    style="width: 0%"></div>
+            <!-- UI Elements -->
+            <div class="relative z-10 w-full flex flex-col h-full items-center justify-between gap-1 p-6">
+              <div class="w-full">
+                <img src="Background/Arc BP Tracker Logo White Small.webp" alt="Arc Blueprint Tracker"
+                  class="h-10 mx-auto mb-1">
+                <div class="text-white text-xs uppercase tracking-[0.4em] font-black opacity-90">2025 BLUEPRINT WRAPPED
                 </div>
               </div>
-            </div>
 
-            <!-- Stats Grid - Dynamically populated -->
-            <div id="wrappedStatsGrid" class="flex justify-center gap-3 w-full px-2 mb-1 mt-3">
-              <!-- Stats will be injected by JS -->
-            </div>
-
-            <!-- Highlights Header -->
-            <div class="w-full text-center mt-2 mb-2">
-              <div class="text-white text-lg font-black uppercase tracking-[0.4em] opacity-90">
-                Top Discoveries
+              <div class="flex flex-col items-center">
+                <div id="wrappedPercent"
+                  class="text-[80px] font-black italic tracking-tighter text-white drop-shadow-[0_0_40px_rgba(16,185,129,0.5)] leading-none">
+                  0%</div>
+                <div
+                  class="text-white/90 text-sm font-black uppercase tracking-[0.2em] mt-1 shadow-black drop-shadow-sm">
+                  Collection Complete</div>
+                <!-- Progress Bar -->
+                <div
+                  class="w-[28rem] mt-3 p-[1.5px] rounded-full bg-gradient-to-r from-emerald-500/30 via-white/10 to-emerald-500/30 shadow-lg">
+                  <div class="w-full h-3 bg-zinc-950/80 rounded-full overflow-hidden relative">
+                    <div id="wrappedProgressBar"
+                      class="h-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] rounded-full transition-all duration-1000 ease-out"
+                      style="width: 0%"></div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div class="w-full px-4">
-              <div id="wrappedHighlights" class="grid grid-cols-4 gap-2 w-full mx-auto">
-                <!-- Mini cards go here -->
+              <!-- Stats Grid - Dynamically populated -->
+              <div id="wrappedStatsGrid" class="flex justify-center gap-3 w-full px-2 mb-1 mt-3">
+                <!-- Stats will be injected by JS -->
               </div>
-            </div>
 
-            <div class="w-full flex justify-center pb-4 pt-[20px]">
-              <div
-                class="px-8 py-2 rounded-full border border-white/10 bg-zinc-950/40 backdrop-blur-md text-white/90 text-sm font-black tracking-[0.3em] uppercase">
-                arcblueprinttracker.web.app
+              <!-- Highlights Header -->
+              <div class="w-full text-center mt-2 mb-2">
+                <div class="text-white text-lg font-black uppercase tracking-[0.4em] opacity-90">
+                  Top Discoveries
+                </div>
+              </div>
+
+              <div class="w-full px-4">
+                <div id="wrappedHighlights" class="grid grid-cols-4 gap-2 w-full mx-auto">
+                  <!-- Mini cards go here -->
+                </div>
+              </div>
+
+              <div class="w-full flex justify-center pb-4 pt-[20px]">
+                <div
+                  class="px-8 py-2 rounded-full border border-white/10 bg-zinc-950/40 backdrop-blur-md text-white/90 text-sm font-black tracking-[0.3em] uppercase">
+                  arcblueprinttracker.web.app
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Floating Pill Buttons -->
-      <div class="flex gap-4 justify-center w-full px-4">
-        <button id="closeWrappedBtn"
-          class="flex-1 md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold transition-all border border-white/10 backdrop-blur-xl">Close</button>
-        <button id="downloadWrappedBtn"
-          class="flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30">Download</button>
+        <!-- Floating Pill Buttons -->
+        <div class="flex gap-4 justify-center w-full px-4">
+          <button id="closeWrappedBtn"
+            class="flex-1 md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold transition-all border border-white/10 backdrop-blur-xl">Close</button>
+          <button id="downloadWrappedBtn"
+            class="flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30">Download</button>
+        </div>
       </div>
     </div>
   </div>
@@ -853,6 +855,66 @@
 
       <!-- Content Feed -->
       <div class="flex-1 overflow-y-auto p-4 space-y-3" id="announcementsFeed">
+        <!-- Post 0: Update v1.5 -->
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-emerald-500/30 transition-colors cursor-pointer announcement-card"
+          data-id="update-v1-5">
+          <!-- Header -->
+          <div class="p-4 flex items-start gap-4 relative">
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]">
+            </div>
+
+            <div
+              class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-500">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-0.5">
+                <h3 class="text-zinc-100 font-bold text-sm">Update v1.5: The Wrapped Update</h3>
+                <span class="text-[10px] text-zinc-500 font-medium">NEW</span>
+              </div>
+              <p class="text-[11px] text-zinc-400 line-clamp-1 group-hover:text-zinc-300 transition-colors">
+                Wrapped 2025, Spares Tracking & UI Refinements!
+              </p>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-1 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800/50">
+              <ul class="list-disc list-inside space-y-2 mb-4 mt-3 ml-1">
+                <li><strong>Blueprint Wrapped 2025:</strong> View a personalized summary of your collection progress,
+                  top categories, and completion percentages with a sharable card.</li>
+                <li><strong>Spares Tracking:</strong> You can now track and manage extra blueprints in your
+                  inventory—perfect for knowing exactly what you have available to trade or give away.</li>
+                <li><strong>Universal UI Refinements:</strong> Standardized circular navigation buttons for a cleaner,
+                  more premium look across both mobile and desktop views.</li>
+                <li><strong>Improved Mobile Layout:</strong> Optimized header spacing and better scaling for
+                  collection
+                  statistics to ensure everything fits perfectly on smaller screens.</li>
+                <li><strong>Enhanced Data Sync:</strong> Improved reliability for cloud synchronization of your
+                  collection, wishlists, and spares data across all devices.</li>
+              </ul>
+
+              <div class="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-800/50">
+                <div class="flex gap-2">
+                  <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener noreferrer"
+                    class="flex-1 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[10px] font-bold transition-all text-center border border-indigo-500/30">
+                    Join Discord
+                  </a>
+                  <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener noreferrer"
+                    class="flex-1 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white text-[10px] font-bold transition-all text-center border border-rose-500/30">
+                    Support on Ko-fi
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
         <!-- Post 1: Wrapped Announcement -->
         <article
           class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-zinc-700 transition-colors cursor-pointer announcement-card"
@@ -872,7 +934,8 @@
             </div>
             <div>
               <h3 class="text-zinc-100 font-bold text-sm leading-tight mb-1">2025 Blueprint Wrapped</h3>
-              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">See your stats &
+              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">See your stats
+                &
                 sharing card!</p>
             </div>
           </div>
@@ -946,6 +1009,7 @@
             </div>
           </div>
         </article>
+
         <!-- Post 3: Discord Invite -->
         <article
           class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-indigo-500/30 transition-colors cursor-pointer announcement-card"
