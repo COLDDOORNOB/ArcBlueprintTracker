@@ -13,19 +13,29 @@ window.setGridSize = setGridSize;
 
 // We will kick off loadData when the DOM is ready.
 document.addEventListener("DOMContentLoaded", () => {
-  loadCollectionState();
-  loadSpares(); // Load spares data
-  loadFilters(); // Load persisted filters
-  initTabNavigation();
-  switchTab(state.currentTab); // Ensure initial UI reflects the current tab
-  initCollectionFilters();
-  initAuth(); // Initialize Firebase Auth
-  initEventBanner(); // Initialize Event Banner
-  initBlueprintSubmission(); // Initialize Blueprint Submission UI
-  initWrapped(); // Initialize Wrapped feature
-  initAnnouncements(); // Initialize Announcements feature
-  initContextMenu(); // Initialize Context Menu for My Collection
-  loadData();
+  const safeInit = (name, fn) => {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`Initialization failed for ${name}:`, e);
+    }
+  };
+
+  safeInit("Collection State", loadCollectionState);
+  safeInit("Spares", loadSpares);
+  safeInit("Filters", loadFilters);
+  safeInit("Tab Navigation", initTabNavigation);
+  safeInit("Switch Tab", () => switchTab(state.currentTab));
+  safeInit("Collection Filters", initCollectionFilters);
+  safeInit("Auth", initAuth);
+  safeInit("Event Banner", initEventBanner);
+  safeInit("Blueprint Submission", initBlueprintSubmission);
+  safeInit("Wrapped", initWrapped);
+  safeInit("Announcements", initAnnouncements);
+  safeInit("Context Menu", initContextMenu);
+
+  // loadData is core, but we wrap it too just in case
+  safeInit("Data Loading", loadData);
 });
 
 
@@ -1003,7 +1013,7 @@ function initWrapped() {
 
       // Show Wrapped Modal
       modal.classList.remove("hidden");
-      modal.classList.add("flex");
+      modal.classList.add("flex", "items-center", "justify-center");
       document.body.style.overflow = "hidden";
     };
 
@@ -1016,14 +1026,14 @@ function initWrapped() {
 
     // Show gamertag modal
     gamertagModal.classList.remove("hidden");
-    gamertagModal.classList.add("flex");
+    gamertagModal.classList.add("flex", "items-center", "justify-center");
     gamertagInput.focus();
   };
 
   if (closeBtn) {
     closeBtn.onclick = () => {
       modal.classList.add("hidden");
-      modal.classList.remove("flex");
+      modal.classList.remove("flex", "items-center", "justify-center");
       document.body.style.overflow = "";
     };
 
@@ -1036,42 +1046,156 @@ function initWrapped() {
   }
 
   if (downloadBtn) {
-    downloadBtn.onclick = async () => {
-      const node = document.getElementById("wrappedContent");
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = "Generating...";
-
+    // Helper to convert an image to data URL via canvas
+    const getBase64Image = (img) => {
       try {
-        // Force Square Aspect Ratio
-        const width = node.offsetWidth;
-        const height = node.offsetHeight;
-        const size = Math.max(width, height);
-
-        // Capture with forced square dimensions
-        const dataUrl = await htmlToImage.toPng(node, {
-          width: size,
-          height: size,
-          pixelRatio: 2,
-          backgroundColor: "#09090b",
-          style: {
-            borderRadius: '0', // Override rounded corners
-            width: `${size}px`, // Explicitly set size to ensure background covers
-            height: `${size}px`
-          }
-        });
-
-        const link = document.createElement('a');
-        link.download = `arc-raiders-wrapped-2025.png`;
-        link.href = dataUrl;
-        link.click();
-      } catch (error) {
-        console.error('oops, something went wrong!', error);
-        alert("Failed to generate image. Try again?");
-      } finally {
-        downloadBtn.disabled = false;
-        downloadBtn.textContent = "Download";
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return canvas.toDataURL("image/png");
+      } catch (e) {
+        console.warn("Canvas base64 failed", e);
+        return null;
       }
     };
+
+    // Helper to fetch and convert to data URL (for background images)
+    const fetchAsDataURL = async (url) => {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.error("Fetch base64 failed", e);
+        return url;
+      }
+    };
+
+    // Mobile Detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (isMobile) {
+      // Mobile: Replace button with screenshot prompt
+      const newBtn = downloadBtn.cloneNode(true);
+      downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+
+      newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Screenshot to share!`;
+      newBtn.className = "flex-[2] md:flex-none px-6 py-3 h-14 md:h-auto text-lg md:text-base rounded-full bg-zinc-800 text-emerald-400 font-bold border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default select-none pointer-events-none shadow-lg";
+    } else {
+      downloadBtn.onclick = async () => {
+        const originalNode = document.getElementById("wrappedContent");
+        if (!originalNode) return;
+
+        const originalText = downloadBtn.textContent;
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = "Baking...";
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        // Create a clone that is rendered but hidden from user view
+        const node = originalNode.cloneNode(true);
+        node.style.position = "fixed";
+        node.style.top = "0";
+        node.style.left = "0";
+        node.style.width = originalNode.offsetWidth + "px";
+        node.style.height = originalNode.offsetHeight + "px";
+        node.style.zIndex = "-9999";
+        node.style.opacity = "1";
+        node.style.pointerEvents = "none";
+        node.style.transform = "none";
+        node.style.margin = "0";
+        node.style.backgroundColor = "#09090b"; // Force solid background on node
+        document.body.appendChild(node);
+
+        try {
+          console.group("iOS Robust Baking");
+
+          // Ensure all images in clone are baked
+          const images = node.querySelectorAll("img");
+          for (let img of images) {
+            if (img.src && !img.src.startsWith("data:")) {
+              // Find corresponding original
+              const originalImg = Array.from(originalNode.querySelectorAll("img")).find(i => i.src === img.src);
+              if (originalImg && originalImg.complete) {
+                const b64 = getBase64Image(originalImg);
+                if (b64) img.src = b64;
+              } else if (originalImg) {
+                // Wait for it if not ready
+                await new Promise(r => {
+                  originalImg.onload = r;
+                  originalImg.onerror = r;
+                });
+                const b64 = getBase64Image(originalImg);
+                if (b64) img.src = b64;
+              }
+            }
+          }
+
+          // Bake background surgically with robust URL matching
+          const bgFileName = 'Arc BP Image Background.webp';
+          const bgDataUrl = await fetchAsDataURL('Background/' + bgFileName);
+          const allWithBg = [node, ...Array.from(node.querySelectorAll('*'))];
+          allWithBg.forEach(el => {
+            const computedBg = window.getComputedStyle(el).backgroundImage;
+            if (computedBg && computedBg.toLowerCase().includes(bgFileName.toLowerCase())) {
+              // Find the specific url(...) part that contains our background file
+              // Matches url("path/to/file.webp"), url('file.webp'), etc.
+              const regex = new RegExp(`url\\((['"]?)([^'"\\)]*?${bgFileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(\\1)\\)`, 'gi');
+              el.style.backgroundImage = computedBg.replace(regex, `url("${bgDataUrl}")`);
+              el.style.backgroundSize = "cover";
+              el.style.backgroundPosition = "center";
+            }
+          });
+
+          console.info("Baking complete. Starting capture...");
+          console.groupEnd();
+
+          downloadBtn.textContent = isIOS ? "Processing..." : "Generating...";
+
+          const size = Math.max(originalNode.offsetWidth, originalNode.offsetHeight);
+          const options = {
+            width: size,
+            height: size,
+            pixelRatio: 2,
+            // node has its own background color now
+            cacheBust: true,
+            style: { borderRadius: '0', width: `${size}px`, height: `${size}px`, transform: 'none' }
+          };
+
+          // iOS needs longer delays and sometimes a "prime" call to toCanvas
+          if (isIOS) {
+            try { await htmlToImage.toCanvas(node, options); } catch (e) { }
+          }
+
+          await htmlToImage.toSvg(node, options);
+          await new Promise(r => setTimeout(r, isIOS ? 3000 : 1000));
+
+          const dataUrl = await htmlToImage.toPng(node, options);
+
+          if (!dataUrl || dataUrl.length < 50000) {
+            throw new Error("Captured image is too small or black.");
+          }
+
+          const link = document.createElement('a');
+          link.download = `arc-raiders-wrapped-2025.png`;
+          link.href = dataUrl;
+          link.click();
+        } catch (error) {
+          console.error('Capture error:', error);
+          alert("Download failed on this device. Please take a screenshot instead - sorry!");
+        } finally {
+          if (node.parentNode) node.parentNode.removeChild(node);
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = originalText;
+        }
+      };
+    }
   }
 
   // 5. Dynamic Scaling Logic for 1080p/Small Screens
@@ -2691,11 +2815,36 @@ function initContextMenu() {
   let longPressTimer = null;
   const LONG_PRESS_DURATION = 500; // ms
 
-  // Show menu at position
-  const showMenu = (x, y, card) => {
+  // Show menu beneath the card
+  const showMenu = (card) => {
     activeCard = card;
-    menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
-    menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
+    if (!card) return;
+
+    const cardRect = card.getBoundingClientRect();
+    const menuWidth = 200; // Expected max width
+
+    // Position menu centered below card
+    let left = cardRect.left + (cardRect.width / 2) - (menuWidth / 2);
+    let top = cardRect.bottom + 8; // 8px gap
+
+    // Screen edge safety checks (horizontal)
+    const margin = 12;
+    if (left < margin) {
+      left = margin;
+    } else if (left + menuWidth > window.innerWidth - margin) {
+      left = window.innerWidth - menuWidth - margin;
+    }
+
+    // Vertical safety check: if it would go off the bottom, show it above the item instead
+    const estimatedHeight = 240; // Approx height including all options and stepper
+    if (top + estimatedHeight > window.innerHeight - margin) {
+      top = cardRect.top - estimatedHeight - 8;
+      // Ensure it doesn't go off the top either
+      if (top < margin) top = margin;
+    }
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
     menu.classList.remove("hidden");
     requestAnimationFrame(() => menu.classList.remove("opacity-0"));
 
@@ -2721,7 +2870,7 @@ function initContextMenu() {
     const card = e.target.closest(".card-compact");
     if (!card) return;
     e.preventDefault();
-    showMenu(e.clientX, e.clientY, card);
+    showMenu(card);
   });
 
   // Long-press handlers (Mobile) - Only for Collection tab
@@ -2731,8 +2880,7 @@ function initContextMenu() {
     if (!card) return;
 
     longPressTimer = setTimeout(() => {
-      const touch = e.touches[0];
-      showMenu(touch.clientX, touch.clientY, card);
+      showMenu(card);
       // Vibrate if supported
       if (navigator.vibrate) navigator.vibrate(50);
     }, LONG_PRESS_DURATION);
@@ -2758,8 +2906,7 @@ function initContextMenu() {
     e.stopPropagation();
     const card = pill.closest(".card-compact");
     if (card) {
-      const rect = pill.getBoundingClientRect();
-      showMenu(rect.left, rect.bottom + 4, card);
+      showMenu(card);
     }
   });
 

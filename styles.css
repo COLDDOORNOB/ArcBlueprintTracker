@@ -75,6 +75,11 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Card Styles */
 .card-compact {
   container-type: inline-size;
+  -webkit-touch-callout: none;
+  /* Disable iOS context menu/preview */
+  -webkit-user-select: none;
+  /* Disable text selection */
+  user-select: none;
 }
 
 .rarity-frame {
