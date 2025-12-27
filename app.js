@@ -1076,14 +1076,15 @@ function initWrapped() {
 
   // 5. Dynamic Scaling Logic for 1080p/Small Screens
   const scaleContent = () => {
-    // The first child div is the wrapper we want to scale (flex-col container)
-    const modalContent = modal.querySelector(":scope > div");
+    // Target the actual card container
+    const modalContent = modal.querySelector(".w-\\[896px\\]");
     if (!modalContent || modal.classList.contains("hidden")) return;
 
     // Reset to measure natural size
     modalContent.style.transform = "none";
+    modalContent.style.margin = "0";
 
-    // Safety buffer (buttons + margins)
+    // Safety buffer
     const padding = 40;
     const availableHeight = window.innerHeight - padding;
     const availableWidth = window.innerWidth - padding;
@@ -1093,17 +1094,27 @@ function initWrapped() {
 
     const scaleY = availableHeight / naturalHeight;
     const scaleX = availableWidth / naturalWidth;
-
-    // Use the smaller scale to fit BOTH width and height
-    const scale = Math.min(scaleX, scaleY, 1); // Never scale UP, only down
+    const scale = Math.min(scaleX, scaleY, 1);
 
     if (scale < 1) {
-      // Use ZOOM for sharp text rendering (Transform causes blur)
-      modalContent.style.zoom = scale;
-      modalContent.style.transform = "none";
+      modalContent.style.transformOrigin = "center center";
+      modalContent.style.transform = `scale(${scale})`;
+
+      // Counter-act the layout footprint using negative margins
+      // This "shrinks" the space the element takes in the document flow
+      const widthDiff = naturalWidth * (1 - scale);
+      const heightDiff = naturalHeight * (1 - scale);
+
+      modalContent.style.marginLeft = `-${widthDiff / 2}px`;
+      modalContent.style.marginRight = `-${widthDiff / 2}px`;
+      modalContent.style.marginTop = `-${heightDiff / 2}px`;
+      modalContent.style.marginBottom = `-${heightDiff / 2}px`;
+
+      modalContent.style.willChange = "transform";
     } else {
-      modalContent.style.zoom = "1";
       modalContent.style.transform = "none";
+      modalContent.style.margin = "0";
+      modalContent.style.willChange = "auto";
     }
   };
 
@@ -1211,20 +1222,22 @@ function initAnnouncements() {
   }
 
   // Generate Wrapped from News
-  const wrappedFromNewsBtn = document.getElementById("generateWrappedFromNews");
-  if (wrappedFromNewsBtn) {
-    wrappedFromNewsBtn.onclick = (e) => {
-      e.stopPropagation();
-      closeDrawer(); // Close announcements
+  const handleWrappedClick = (e) => {
+    e.stopPropagation();
+    closeDrawer(); // Close announcements
 
-      // Switch to My Collection tab first
-      const myCollTab = document.querySelector('[onclick*="switchTab(\'myCollection\')"]');
-      if (myCollTab) myCollTab.click();
+    // Switch to My Collection tab first
+    const myCollTab = document.querySelector('[onclick*="switchTab(\'myCollection\')"]');
+    if (myCollTab) myCollTab.click();
 
-      // Trigger the main Wrapped button
-      const showWrappedBtn = document.getElementById("showWrappedBtn");
-      if (showWrappedBtn) showWrappedBtn.click();
-    };
+    // Trigger the main Wrapped button
+    const showWrappedBtn = document.getElementById("showWrappedBtn");
+    if (showWrappedBtn) showWrappedBtn.click();
+  };
+
+  const wrappedBtnLegacy = document.getElementById("generateWrappedFromNews");
+  if (wrappedBtnLegacy) {
+    wrappedBtnLegacy.onclick = handleWrappedClick;
   }
 
   // Initial UI Check
