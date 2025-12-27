@@ -1077,113 +1077,125 @@ function initWrapped() {
       }
     };
 
-    downloadBtn.onclick = async () => {
-      const originalNode = document.getElementById("wrappedContent");
-      if (!originalNode) return;
+    // Mobile Detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-      const originalText = downloadBtn.textContent;
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = "Baking...";
+    if (isMobile) {
+      // Mobile: Replace button with screenshot prompt
+      const newBtn = downloadBtn.cloneNode(true);
+      downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
 
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Screenshot to share!`;
+      newBtn.className = "flex-[2] md:flex-none px-6 py-3 h-14 md:h-auto text-lg md:text-base rounded-full bg-zinc-800 text-emerald-400 font-bold border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default select-none pointer-events-none shadow-lg";
+    } else {
+      downloadBtn.onclick = async () => {
+        const originalNode = document.getElementById("wrappedContent");
+        if (!originalNode) return;
 
-      // Create a clone that is rendered but hidden from user view
-      const node = originalNode.cloneNode(true);
-      node.style.position = "fixed";
-      node.style.top = "0";
-      node.style.left = "0";
-      node.style.width = originalNode.offsetWidth + "px";
-      node.style.height = originalNode.offsetHeight + "px";
-      node.style.zIndex = "-9999";
-      node.style.opacity = "1";
-      node.style.pointerEvents = "none";
-      node.style.transform = "none";
-      node.style.margin = "0";
-      node.style.backgroundColor = "#09090b"; // Force solid background on node
-      document.body.appendChild(node);
+        const originalText = downloadBtn.textContent;
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = "Baking...";
 
-      try {
-        console.group("iOS Robust Baking");
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-        // Ensure all images in clone are baked
-        const images = node.querySelectorAll("img");
-        for (let img of images) {
-          if (img.src && !img.src.startsWith("data:")) {
-            // Find corresponding original
-            const originalImg = Array.from(originalNode.querySelectorAll("img")).find(i => i.src === img.src);
-            if (originalImg && originalImg.complete) {
-              const b64 = getBase64Image(originalImg);
-              if (b64) img.src = b64;
-            } else if (originalImg) {
-              // Wait for it if not ready
-              await new Promise(r => {
-                originalImg.onload = r;
-                originalImg.onerror = r;
-              });
-              const b64 = getBase64Image(originalImg);
-              if (b64) img.src = b64;
+        // Create a clone that is rendered but hidden from user view
+        const node = originalNode.cloneNode(true);
+        node.style.position = "fixed";
+        node.style.top = "0";
+        node.style.left = "0";
+        node.style.width = originalNode.offsetWidth + "px";
+        node.style.height = originalNode.offsetHeight + "px";
+        node.style.zIndex = "-9999";
+        node.style.opacity = "1";
+        node.style.pointerEvents = "none";
+        node.style.transform = "none";
+        node.style.margin = "0";
+        node.style.backgroundColor = "#09090b"; // Force solid background on node
+        document.body.appendChild(node);
+
+        try {
+          console.group("iOS Robust Baking");
+
+          // Ensure all images in clone are baked
+          const images = node.querySelectorAll("img");
+          for (let img of images) {
+            if (img.src && !img.src.startsWith("data:")) {
+              // Find corresponding original
+              const originalImg = Array.from(originalNode.querySelectorAll("img")).find(i => i.src === img.src);
+              if (originalImg && originalImg.complete) {
+                const b64 = getBase64Image(originalImg);
+                if (b64) img.src = b64;
+              } else if (originalImg) {
+                // Wait for it if not ready
+                await new Promise(r => {
+                  originalImg.onload = r;
+                  originalImg.onerror = r;
+                });
+                const b64 = getBase64Image(originalImg);
+                if (b64) img.src = b64;
+              }
             }
           }
-        }
 
-        // Bake background surgically with robust URL matching
-        const bgFileName = 'Arc BP Image Background.webp';
-        const bgDataUrl = await fetchAsDataURL('Background/' + bgFileName);
-        const allWithBg = [node, ...Array.from(node.querySelectorAll('*'))];
-        allWithBg.forEach(el => {
-          const computedBg = window.getComputedStyle(el).backgroundImage;
-          if (computedBg && computedBg.toLowerCase().includes(bgFileName.toLowerCase())) {
-            // Find the specific url(...) part that contains our background file
-            // Matches url("path/to/file.webp"), url('file.webp'), etc.
-            const regex = new RegExp(`url\\((['"]?)([^'"\\)]*?${bgFileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(\\1)\\)`, 'gi');
-            el.style.backgroundImage = computedBg.replace(regex, `url("${bgDataUrl}")`);
-            el.style.backgroundSize = "cover";
-            el.style.backgroundPosition = "center";
+          // Bake background surgically with robust URL matching
+          const bgFileName = 'Arc BP Image Background.webp';
+          const bgDataUrl = await fetchAsDataURL('Background/' + bgFileName);
+          const allWithBg = [node, ...Array.from(node.querySelectorAll('*'))];
+          allWithBg.forEach(el => {
+            const computedBg = window.getComputedStyle(el).backgroundImage;
+            if (computedBg && computedBg.toLowerCase().includes(bgFileName.toLowerCase())) {
+              // Find the specific url(...) part that contains our background file
+              // Matches url("path/to/file.webp"), url('file.webp'), etc.
+              const regex = new RegExp(`url\\((['"]?)([^'"\\)]*?${bgFileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(\\1)\\)`, 'gi');
+              el.style.backgroundImage = computedBg.replace(regex, `url("${bgDataUrl}")`);
+              el.style.backgroundSize = "cover";
+              el.style.backgroundPosition = "center";
+            }
+          });
+
+          console.info("Baking complete. Starting capture...");
+          console.groupEnd();
+
+          downloadBtn.textContent = isIOS ? "Processing..." : "Generating...";
+
+          const size = Math.max(originalNode.offsetWidth, originalNode.offsetHeight);
+          const options = {
+            width: size,
+            height: size,
+            pixelRatio: 2,
+            // node has its own background color now
+            cacheBust: true,
+            style: { borderRadius: '0', width: `${size}px`, height: `${size}px`, transform: 'none' }
+          };
+
+          // iOS needs longer delays and sometimes a "prime" call to toCanvas
+          if (isIOS) {
+            try { await htmlToImage.toCanvas(node, options); } catch (e) { }
           }
-        });
 
-        console.info("Baking complete. Starting capture...");
-        console.groupEnd();
+          await htmlToImage.toSvg(node, options);
+          await new Promise(r => setTimeout(r, isIOS ? 3000 : 1000));
 
-        downloadBtn.textContent = isIOS ? "Processing..." : "Generating...";
+          const dataUrl = await htmlToImage.toPng(node, options);
 
-        const size = Math.max(originalNode.offsetWidth, originalNode.offsetHeight);
-        const options = {
-          width: size,
-          height: size,
-          pixelRatio: 2,
-          // node has its own background color now
-          cacheBust: true,
-          style: { borderRadius: '0', width: `${size}px`, height: `${size}px`, transform: 'none' }
-        };
+          if (!dataUrl || dataUrl.length < 50000) {
+            throw new Error("Captured image is too small or black.");
+          }
 
-        // iOS needs longer delays and sometimes a "prime" call to toCanvas
-        if (isIOS) {
-          try { await htmlToImage.toCanvas(node, options); } catch (e) { }
+          const link = document.createElement('a');
+          link.download = `arc-raiders-wrapped-2025.png`;
+          link.href = dataUrl;
+          link.click();
+        } catch (error) {
+          console.error('Capture error:', error);
+          alert("Download failed on this device. Please take a screenshot instead - sorry!");
+        } finally {
+          if (node.parentNode) node.parentNode.removeChild(node);
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = originalText;
         }
-
-        await htmlToImage.toSvg(node, options);
-        await new Promise(r => setTimeout(r, isIOS ? 3000 : 1000));
-
-        const dataUrl = await htmlToImage.toPng(node, options);
-
-        if (!dataUrl || dataUrl.length < 50000) {
-          throw new Error("Captured image is too small or black.");
-        }
-
-        const link = document.createElement('a');
-        link.download = `arc-raiders-wrapped-2025.png`;
-        link.href = dataUrl;
-        link.click();
-      } catch (error) {
-        console.error('Capture error:', error);
-        alert("Download failed on this device. Please take a screenshot instead - sorry!");
-      } finally {
-        if (node.parentNode) node.parentNode.removeChild(node);
-        downloadBtn.disabled = false;
-        downloadBtn.textContent = originalText;
-      }
-    };
+      };
+    }
   }
 
   // 5. Dynamic Scaling Logic for 1080p/Small Screens
