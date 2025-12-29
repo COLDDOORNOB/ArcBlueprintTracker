@@ -932,7 +932,9 @@ function initWrapped() {
 
       // Allow max-width to expand slightly more
       tab.style.maxWidth = "96%";
-      tab.style.paddingRight = "8px"; // Standardize padding
+      tab.style.paddingRight = "10px"; // Increased padding to prevent clipping
+      tab.style.whiteSpace = "normal"; // Override CSS nowrap
+      tab.style.overflow = "visible"; // Prevent clipping
 
       let fontSize = "15px";
       let lineHeight = "normal";
@@ -947,6 +949,8 @@ function initWrapped() {
       tabText.style.fontSize = fontSize;
       tabText.style.lineHeight = lineHeight;
       tabText.style.whiteSpace = "normal";
+      tabText.style.textOverflow = "clip";
+      tabText.style.overflow = "visible";
 
       // Base classes without size
       tabText.className = `ml-1.5 font-black uppercase tracking-wide drop-shadow-lg text-white whitespace-normal break-words text-left`;
