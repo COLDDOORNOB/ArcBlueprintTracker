@@ -693,10 +693,102 @@ function initWrapped() {
   const modal = document.getElementById("wrappedModal");
   const closeBtn = document.getElementById("closeWrappedBtn");
   const downloadBtn = document.getElementById("downloadWrappedBtn");
-
   if (!showBtn || !modal) return;
 
+  const toggleCaptureMode = (active) => {
+    const outer = document.getElementById("wrappedOuterContainer");
+    const inner = document.getElementById("wrappedInner");
+    const content = document.getElementById("wrappedContent");
+    const shimmer = document.getElementById("wrappedShimmer");
+    const actions = document.getElementById("wrappedActions");
+    const captureActions = document.getElementById("captureModeActions");
+    const modal = document.getElementById("wrappedModal");
+
+    if (active) {
+      const scale = window.innerWidth / 896;
+      if (outer) {
+        outer.style.setProperty('background', 'none', 'important');
+        outer.style.setProperty('box-shadow', 'none', 'important');
+        outer.style.setProperty('padding', '0', 'important');
+        outer.style.setProperty('border-radius', '0', 'important');
+      }
+      if (inner) {
+        inner.style.setProperty('width', '896px', 'important');
+        inner.style.setProperty('transform', `scale(${scale})`, 'important');
+        inner.style.setProperty('transform-origin', 'top center', 'important');
+        inner.style.setProperty('gap', '0', 'important');
+        const heightAdjustment = 896 * (1 - scale);
+        inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+      }
+      if (content) content.style.setProperty('border-radius', '0', 'important');
+      if (shimmer) shimmer.classList.add("hidden");
+      if (actions) actions.classList.add("hidden");
+      if (captureActions) captureActions.classList.remove("hidden");
+
+      if (modal) {
+        modal.style.setProperty('padding', '0', 'important');
+        modal.style.setProperty('overflow-x', 'hidden', 'important');
+        modal.style.setProperty('overflow-y', 'hidden', 'important');
+        modal.scrollTo(0, 0);
+      }
+    } else {
+      const isMobileUI = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 800);
+      if (isMobileUI) {
+        const scale = (window.innerWidth - 32) / 896;
+        if (inner) {
+          inner.style.setProperty('width', '896px', 'important');
+          inner.style.setProperty('transform', `scale(${scale})`, 'important');
+          inner.style.setProperty('transform-origin', 'top center', 'important');
+          inner.style.removeProperty('gap');
+          const heightAdjustment = 896 * (1 - scale);
+          inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+        }
+      } else {
+        if (inner) {
+          inner.style.removeProperty('width');
+          inner.style.removeProperty('transform');
+          inner.style.removeProperty('transform-origin');
+          inner.style.removeProperty('gap');
+          inner.style.removeProperty('margin-bottom');
+        }
+      }
+      if (outer) {
+        outer.style.removeProperty('background');
+        outer.style.removeProperty('box-shadow');
+        outer.style.removeProperty('padding');
+        outer.style.removeProperty('border-radius');
+      }
+      if (content) content.style.removeProperty('border-radius');
+      if (shimmer) shimmer.classList.remove("hidden");
+      if (actions) actions.classList.remove("hidden");
+      if (captureActions) captureActions.classList.add("hidden");
+      if (modal) {
+        modal.style.removeProperty('padding');
+        modal.style.removeProperty('overflow-x');
+        modal.style.removeProperty('overflow-y');
+        setTimeout(() => modal.scrollTo(0, 0), 20);
+      }
+    }
+  };
+
+  const exitBtn = document.getElementById("exitCaptureBtn");
+  if (exitBtn) exitBtn.onclick = () => toggleCaptureMode(false);
+
+  // Mobile Screenshot button setup
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isMobile && downloadBtn) {
+    const newBtn = downloadBtn.cloneNode(true);
+    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+    newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Fullscreen for Screenshot`;
+    newBtn.className = "flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 text-white font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30 flex items-center justify-center gap-2 active:scale-95 transition-transform";
+    newBtn.onclick = () => toggleCaptureMode(true);
+  }
+
   showBtn.onclick = async () => {
+    // Hide Submit FAB while in Wrapped flow
+    const fab = document.getElementById("submitLocationFab");
+    if (fab) fab.classList.add("hidden");
+
     // 1. Fetch data
     if (auth.currentUser) {
       showBtn.disabled = true;
@@ -990,35 +1082,45 @@ function initWrapped() {
 
     // Function to proceed to Wrapped modal with optional gamertag
     const proceedToWrapped = (gamertag) => {
-      gamertagModal.classList.add("hidden");
-      gamertagModal.classList.remove("flex");
+      try {
+        console.log("[ProceedToWrapped] Starting...", gamertag);
+        gamertagModal.classList.add("hidden");
+        gamertagModal.classList.remove("flex");
 
-      // Add gamertag to preview if provided
-      const node = document.getElementById("wrappedContent");
-      // Remove any existing gamertag element first
-      const existingGT = document.getElementById("wrappedGamertag");
-      if (existingGT) existingGT.remove();
+        // Add gamertag to preview if provided
+        const node = document.getElementById("wrappedContent");
+        // Remove any existing gamertag element first
+        const existingGT = document.getElementById("wrappedGamertag");
+        if (existingGT) existingGT.remove();
 
-      if (gamertag && gamertag.trim()) {
-        // Wrapper for shimmer border effect
-        const gamertagWrapper = document.createElement("div");
-        gamertagWrapper.id = "wrappedGamertag";
-        gamertagWrapper.className = "absolute top-4 right-4 p-[2px] rounded-full z-50";
-        gamertagWrapper.style.background = "linear-gradient(135deg, rgba(16,185,129,0.6) 0%, rgba(255,255,255,0.3) 50%, rgba(16,185,129,0.6) 100%)";
-        gamertagWrapper.style.boxShadow = "0 0 20px rgba(16,185,129,0.4)";
+        if (gamertag && gamertag.trim()) {
+          // Wrapper for shimmer border effect
+          const gamertagWrapper = document.createElement("div");
+          gamertagWrapper.id = "wrappedGamertag";
+          gamertagWrapper.className = "absolute top-4 right-4 p-[2px] rounded-full z-50";
+          gamertagWrapper.style.background = "linear-gradient(135deg, rgba(16,185,129,0.6) 0%, rgba(255,255,255,0.3) 50%, rgba(16,185,129,0.6) 100%)";
+          gamertagWrapper.style.boxShadow = "0 0 20px rgba(16,185,129,0.4)";
 
-        const gamertagInner = document.createElement("div");
-        gamertagInner.className = "bg-black/50 backdrop-blur-xl px-6 py-2.5 rounded-full text-white font-bold text-lg";
-        gamertagInner.textContent = "@" + gamertag.trim();
+          const gamertagInner = document.createElement("div");
+          gamertagInner.className = "bg-black/50 backdrop-blur-xl px-6 py-2.5 rounded-full text-white font-bold text-lg";
+          gamertagInner.textContent = "@" + gamertag.trim();
 
-        gamertagWrapper.appendChild(gamertagInner);
-        node.appendChild(gamertagWrapper);
+          gamertagWrapper.appendChild(gamertagInner);
+          node.appendChild(gamertagWrapper);
+        }
+
+        // Show Wrapped Modal
+        console.log("[ProceedToWrapped] Calling toggleCaptureMode(false)...");
+        toggleCaptureMode(false);
+        console.log("[ProceedToWrapped] Showing modal...");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex", "items-center", "justify-center");
+        document.body.style.overflow = "hidden";
+        console.log("[ProceedToWrapped] Done!");
+      } catch (err) {
+        console.error("[ProceedToWrapped] CRITICAL ERROR:", err);
+        alert("Error loading wrapped view. Check console.");
       }
-
-      // Show Wrapped Modal
-      modal.classList.remove("hidden");
-      modal.classList.add("flex", "items-center", "justify-center");
-      document.body.style.overflow = "hidden";
     };
 
     // Wire up buttons
@@ -1036,9 +1138,16 @@ function initWrapped() {
 
   if (closeBtn) {
     closeBtn.onclick = () => {
+      toggleCaptureMode(false);
       modal.classList.add("hidden");
       modal.classList.remove("flex", "items-center", "justify-center");
       document.body.style.overflow = "";
+
+      // Restore Submit FAB if on collection tab
+      const fab = document.getElementById("submitLocationFab");
+      if (fab && state.currentTab === "collection") {
+        fab.classList.remove("hidden");
+      }
     };
 
     // Close on ESC
@@ -1080,18 +1189,7 @@ function initWrapped() {
         return url;
       }
     };
-
-    // Mobile Detection
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    if (isMobile) {
-      // Mobile: Replace button with screenshot prompt
-      const newBtn = downloadBtn.cloneNode(true);
-      downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
-
-      newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Screenshot to share!`;
-      newBtn.className = "flex-[2] md:flex-none px-6 py-3 h-14 md:h-auto text-lg md:text-base rounded-full bg-zinc-800 text-emerald-400 font-bold border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default select-none pointer-events-none shadow-lg";
-    } else {
+    if (!isMobile) {
       downloadBtn.onclick = async () => {
         const originalNode = document.getElementById("wrappedContent");
         if (!originalNode) return;
@@ -1355,8 +1453,8 @@ function initAnnouncements() {
     closeDrawer(); // Close announcements
 
     // Switch to My Collection tab first
-    const myCollTab = document.querySelector('[onclick*="switchTab(\'myCollection\')"]');
-    if (myCollTab) myCollTab.click();
+    const myCollBtn = document.getElementById("tabCollection");
+    if (myCollBtn) myCollBtn.click();
 
     // Trigger the main Wrapped button
     const showWrappedBtn = document.getElementById("showWrappedBtn");

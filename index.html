@@ -733,11 +733,11 @@
   <!-- 2025 Wrapped Modal -->
   <div id="wrappedModal" class="fixed inset-0 z-[300] hidden bg-black/95 backdrop-blur-2xl overflow-auto p-4 md:p-8">
     <div class="w-full min-h-full flex flex-col items-center justify-center">
-      <div class="flex flex-col items-center gap-6 w-[896px] shrink-0">
+      <div id="wrappedInner" class="flex flex-col items-center gap-6 w-full max-w-[896px] shrink-0">
         <!-- Square Preview Container with Shimmer Border -->
-        <div
+        <div id="wrappedOuterContainer"
           class="relative w-full aspect-square rounded-3xl p-[2px] bg-gradient-to-br from-emerald-400/50 via-white/20 to-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
-          <div
+          <div id="wrappedShimmer"
             class="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-400/30 via-transparent to-emerald-400/30 animate-pulse pointer-events-none">
           </div>
 
@@ -802,12 +802,31 @@
         </div>
 
         <!-- Floating Pill Buttons -->
-        <div class="flex gap-4 justify-center w-full px-4">
+        <div id="wrappedActions" class="flex gap-4 justify-center w-full px-4">
           <button id="closeWrappedBtn"
             class="flex-1 md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold transition-all border border-white/10 backdrop-blur-xl">Close</button>
           <button id="downloadWrappedBtn"
             class="flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30">Download</button>
         </div>
+      </div>
+
+      <!-- Capture Mode Close Button (Fixed at bottom for reliability) -->
+      <div id="captureModeActions"
+        class="hidden fixed bottom-10 left-0 right-0 z-[10001] px-8 flex flex-col items-center gap-4 pointer-events-none">
+
+        <!-- Informational Pill (Compact) -->
+        <div
+          class="px-5 py-2 rounded-full bg-emerald-600/95 border border-emerald-400/30 text-white shadow-2xl backdrop-blur-xl flex items-center gap-3">
+          <span class="text-sm font-black whitespace-nowrap">Screenshot to Share!</span>
+          <div class="w-px h-3 bg-white/20"></div>
+          <span class="text-[10px] opacity-90 font-bold uppercase tracking-wider whitespace-nowrap">Desktop for
+            download</span>
+        </div>
+
+        <button id="exitCaptureBtn"
+          class="w-full max-w-sm py-4 rounded-full bg-zinc-900 border border-emerald-500/30 text-emerald-400 font-bold text-lg backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] active:scale-95 transition-transform pointer-events-auto">
+          Back
+        </button>
       </div>
     </div>
   </div>
