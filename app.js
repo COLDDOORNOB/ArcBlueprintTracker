@@ -269,7 +269,9 @@ function updateProgress() {
   if (!container) return;
 
   const total = state.all.length;
-  const collected = state.collectedItems.size;
+  // Only count collected items that exist in state.all (excludes inactive items)
+  const activeItemNames = new Set(state.all.map(item => item.name));
+  const collected = [...state.collectedItems].filter(name => activeItemNames.has(name)).length;
   const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
 
   // Update text
@@ -320,7 +322,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Get target values
       const total = state.all.length;
-      const collected = state.collectedItems.size;
+      // Only count collected items that exist in state.all (excludes inactive items)
+      const activeItemNames = new Set(state.all.map(item => item.name));
+      const collected = [...state.collectedItems].filter(name => activeItemNames.has(name)).length;
       const targetPercent = total > 0 ? Math.round((collected / total) * 100) : 0;
 
       if (bar) {
@@ -1109,7 +1113,9 @@ function initWrapped() {
 
     // 2. Populate UI
     const total = state.all.length;
-    const collected = state.collectedItems.size;
+    // Only count collected items that exist in state.all (excludes inactive items)
+    const activeItemNames = new Set(state.all.map(item => item.name));
+    const collected = [...state.collectedItems].filter(name => activeItemNames.has(name)).length;
     const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
 
     // Update Percentage and Progress Bar
@@ -2387,6 +2393,7 @@ async function loadData() {
       const colTrialsReward = findHeader(headers, ["Trials Reward", "Trial Reward", "Trials"]) || headers[9];
       const colQuestReward = findHeader(headers, ["Quest Reward", "Quest"]) || headers[10];
       const colDescription = findHeader(headers, ["Description", "Desc", "Flavor Text"]) || headers[11];
+      const colActive = findHeader(headers, ["Active", "Is Active", "Enabled"]) || headers[12];
 
       // Helper to parse boolean checkbox values from CSV
       const parseBoolField = (val) => {
@@ -2417,10 +2424,12 @@ async function loadData() {
         const trialsReward = colTrialsReward ? parseBoolField(r[colTrialsReward]) : false;
         const questReward = colQuestReward ? parseBoolField(r[colQuestReward]) : false;
         const description = colDescription ? norm(r[colDescription]) : "";
-        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description });
+        const active = colActive ? parseBoolField(r[colActive]) : true; // Default to true if column missing
+        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description, active });
       }
 
-      state.all = items;
+      // Filter out inactive items from state - they won't appear anywhere on the site
+      state.all = items.filter(item => item.active !== false);
       buildFacets();
       initUI();
       applyFilters();
