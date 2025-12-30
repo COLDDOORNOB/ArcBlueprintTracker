@@ -534,68 +534,65 @@ function renderProgression() {
   const countLabel = document.getElementById("progressionCount");
   const totalLabel = document.getElementById("progressionTotal");
 
-  // Animate Percentage Hero
-  if (sign) {
-    if (typeof animateNumber === "function") {
-      animateNumber(sign, 0, percent, 1500);
-    } else {
-      sign.textContent = `${percent}%`;
-    }
-  }
+  // Animate Percentage Hero - will be synced with bar below
+  // Set total immediately
   if (totalLabel) totalLabel.textContent = total;
 
-  // Animate Count (Restored)
-  if (countLabel) {
-    if (typeof animateNumber === "function") {
-      // Use animateNumber without % suffix for count?
-      // animateNumber uses textContent = `${current}%`.
-      // I need to check animateNumber. If it forces %, I can't use it for count.
-      // I'll assume I need to fix animateNumber or use a custom loop here.
-      // For now, I'll use it but I suspect it will add %.
-      // Wait, I see animateNumber definition in Step 1148:
-      // element.textContent = `${current}%`;
-      // It DOES force %.
-
-      // I will implement a custom simple animation for Count here.
-      let startTimestamp = null;
-      const duration = 1500;
-      const step = (timestamp) => {
-        if (!startTimestamp) startTimestamp = timestamp;
-        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        const current = Math.floor(progress * collected);
-        countLabel.textContent = current;
-        if (progress < 1) {
-          window.requestAnimationFrame(step);
-        } else {
-          countLabel.textContent = collected;
-        }
-      };
-      window.requestAnimationFrame(step);
-    } else {
-      countLabel.textContent = collected;
-    }
-  }
-
-  // Animate Bar "Shooting Up" with Dynamic Color
+  // Unified Animation: Bar + Percentage + Count all in sync
   if (bar) {
-    // Reset to 0 without transition to prepare for animation
+    // Reset bar
     bar.style.transition = "none";
     bar.style.width = "0%";
+    bar.style.backgroundImage = "none";
+    bar.style.backgroundColor = "hsl(340, 80%, 50%)"; // Start red-purple
+    void bar.offsetWidth; // Force reflow
 
-    // Force reflow
-    void bar.offsetWidth;
+    // JS Animation - all elements synced
+    // Duration scaled by percentage: 0% = 0s, 100% = 2.5s
+    const duration = (percent / 100) * 2500;
+    let startTime = null;
 
-    // Apply animation
-    // cubic-bezier(0.25, 1, 0.5, 1) gives a nice "shoot" effect
-    bar.style.transition = "width 1500ms cubic-bezier(0.22, 1, 0.36, 1), background-color 1500ms";
-    bar.style.width = `${percent}%`;
+    const animateAll = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
 
-    // Dynamic Color: Red (0) -> Green (120)
-    const hue = Math.floor(percent * 1.2);
-    bar.style.backgroundImage = "none"; // Remove gradient
-    bar.style.backgroundColor = `hsl(${hue}, 80%, 50%)`;
-    // Add a shadow matching the color
-    bar.style.boxShadow = `0 0 15px hsl(${hue}, 80%, 40%)`;
+      // Ease-out: fast start, slows down at end (quadratic - faster ramp down)
+      let progress = Math.min(elapsed / duration, 1);
+      progress = 1 - Math.pow(1 - progress, 2); // Quadratic ease-out (faster ramp down)
+
+      const currentPercent = progress * percent;
+      const currentCount = Math.floor(progress * collected);
+
+      // Update bar width
+      bar.style.width = `${currentPercent}%`;
+
+      // Update percentage display (synced)
+      if (sign) sign.textContent = `${Math.floor(currentPercent)}%`;
+
+      // Update count display (synced)
+      if (countLabel) countLabel.textContent = currentCount;
+
+      // Smooth Color: Red-purple (340) -> Green (120)
+      // Linear interpolation through the hue wheel (going backwards: 340 -> 0 -> 120 would wrap)
+      // Instead, go 340 -> 360/0 -> 60 -> 120 smoothly
+      // Total hue distance: 340 to 0 = 20, then 0 to 120 = 120, total = 140 degrees
+      const hueProgress = currentPercent / 100;
+      // Map: 0% = 340, 100% = 120 (going 340 -> 480, then wrap 480 to 120)
+      let hue = 340 + (hueProgress * 140);
+      if (hue >= 360) hue -= 360;
+
+      bar.style.backgroundColor = `hsl(${hue}, 80%, 50%)`;
+      bar.style.boxShadow = `0 0 20px hsl(${hue}, 80%, 40%)`;
+
+      if (progress < 1) {
+        requestAnimationFrame(animateAll);
+      } else {
+        // Final values
+        if (sign) sign.textContent = `${percent}%`;
+        if (countLabel) countLabel.textContent = collected;
+      }
+    };
+    requestAnimationFrame(animateAll);
   }
 
   // Update Category Grid
