@@ -27,6 +27,27 @@ body::before {
   backface-visibility: hidden;
 }
 
+/* Desktop only: Mirrored background on right side */
+@media (min-width: 768px) {
+  body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100vh;
+    background-image: url("/Background/stripes.webp");
+    background-repeat: no-repeat;
+    background-position: right top;
+    background-size: auto 100vh;
+    z-index: -1;
+    pointer-events: none;
+    transform: scaleX(-1) rotate(180deg) translateZ(0);
+    backface-visibility: hidden;
+    opacity: 1;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -109,9 +130,9 @@ input[type=range]::-webkit-slider-runnable-track {
   pointer-events: none;
 }
 
-.card-compact:hover .rarity-frame {
+/* .card-compact:hover .rarity-frame {
   box-shadow: 0 0 12px var(--glow-color);
-}
+} */
 
 /* Type Pill - Responsive Scaling */
 .type-tab {
@@ -707,4 +728,17 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 5;
   pointer-events: none;
   border-radius: 16px;
+}
+
+/* Selected State */
+.card-selected .rarity-frame {
+  border-color: var(--glow-color) !important;
+  box-shadow: 0 0 15px var(--glow-color);
+  transform: scale(1.02);
+  z-index: 40;
+}
+
+/* Ensure the details overlay is above */
+.card-selected .details-overlay {
+  z-index: 50;
 }

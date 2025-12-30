@@ -1,0 +1,12 @@
+/* Selected State */
+.card-selected .rarity-frame {
+    box-shadow: 0 0 16px var(--glow-color), 0 0 30px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5) !important;
+    transform: scale(1.02);
+    z-index: 40;
+}
+
+/* Ensure the details overlay is above */
+.card-selected .details-overlay {
+    z-index: 50;
+}

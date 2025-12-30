@@ -502,47 +502,304 @@ function initAuth() {
   });
 }
 
-function switchTab(tabName) {
-  state.currentTab = tabName;
 
-  // Scroll to top when switching tabs (instant for mobile compatibility)
-  window.scrollTo(0, 0);
+function renderProgression() {
+  const container = document.getElementById("progressionTab");
+  const sidebar = document.getElementById("filtersSidebar");
 
-  // Update tab button states
-  const blueprintsBtn = document.getElementById("tabBlueprints");
-  const collectionBtn = document.getElementById("tabCollection");
-  const collectionOnlyElements = document.querySelectorAll(".collection-only");
-  const blueprintsOnlyElements = document.querySelectorAll(".blueprints-only:not(#eventBanner)");
-  const eventBanner = document.getElementById("eventBanner");
-
-  if (tabName === "blueprints") {
-    blueprintsBtn.classList.add("tab-button-active");
-    collectionBtn.classList.remove("tab-button-active");
-    document.body.classList.remove("collection-mode");
-    collectionOnlyElements.forEach(el => el.classList.add("hidden"));
-    blueprintsOnlyElements.forEach(el => el.classList.remove("hidden"));
-    if (!eventBannerDismissed && eventBanner && eventBanner.classList.contains("banner-active")) eventBanner.classList.remove("hidden");
-  } else {
-    blueprintsBtn.classList.remove("tab-button-active");
-    collectionBtn.classList.add("tab-button-active");
-    document.body.classList.add("collection-mode");
-    collectionOnlyElements.forEach(el => el.classList.remove("hidden"));
-    blueprintsOnlyElements.forEach(el => el.classList.add("hidden"));
-    if (eventBanner) eventBanner.classList.add("hidden");
+  // Hide sidebar on desktop when progression tab is shown
+  if (sidebar) {
+    if (container && !container.classList.contains("hidden")) {
+      sidebar.classList.add("md:hidden");
+      sidebar.classList.remove("md:block");
+    } else {
+      sidebar.classList.remove("md:hidden");
+      sidebar.classList.add("md:block");
+    }
   }
 
-  applyFilters();
+  if (!container || container.classList.contains("hidden")) return;
+
+  const total = state.all.length;
+  // Use correct state variable for collected items
+  const collected = state.collectedItems ? state.collectedItems.size : 0;
+
+  if (total === 0) return;
+
+  const percent = Math.round((collected / total) * 100);
+
+  // Update Big Linear Bar
+  const bar = document.getElementById("progressionBarMain");
+  const sign = document.getElementById("progressionSign");
+  const countLabel = document.getElementById("progressionCount");
+  const totalLabel = document.getElementById("progressionTotal");
+
+  // Animate Percentage Hero
+  if (sign) {
+    if (typeof animateNumber === "function") {
+      animateNumber(sign, 0, percent, 1500);
+    } else {
+      sign.textContent = `${percent}%`;
+    }
+  }
+  if (totalLabel) totalLabel.textContent = total;
+
+  // Animate Count (Restored)
+  if (countLabel) {
+    if (typeof animateNumber === "function") {
+      // Use animateNumber without % suffix for count?
+      // animateNumber uses textContent = `${current}%`.
+      // I need to check animateNumber. If it forces %, I can't use it for count.
+      // I'll assume I need to fix animateNumber or use a custom loop here.
+      // For now, I'll use it but I suspect it will add %.
+      // Wait, I see animateNumber definition in Step 1148:
+      // element.textContent = `${current}%`;
+      // It DOES force %.
+
+      // I will implement a custom simple animation for Count here.
+      let startTimestamp = null;
+      const duration = 1500;
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const current = Math.floor(progress * collected);
+        countLabel.textContent = current;
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+        } else {
+          countLabel.textContent = collected;
+        }
+      };
+      window.requestAnimationFrame(step);
+    } else {
+      countLabel.textContent = collected;
+    }
+  }
+
+  // Animate Bar "Shooting Up" with Dynamic Color
+  if (bar) {
+    // Reset to 0 without transition to prepare for animation
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+
+    // Force reflow
+    void bar.offsetWidth;
+
+    // Apply animation
+    // cubic-bezier(0.25, 1, 0.5, 1) gives a nice "shoot" effect
+    bar.style.transition = "width 1500ms cubic-bezier(0.22, 1, 0.36, 1), background-color 1500ms";
+    bar.style.width = `${percent}%`;
+
+    // Dynamic Color: Red (0) -> Green (120)
+    const hue = Math.floor(percent * 1.2);
+    bar.style.backgroundImage = "none"; // Remove gradient
+    bar.style.backgroundColor = `hsl(${hue}, 80%, 50%)`;
+    // Add a shadow matching the color
+    bar.style.boxShadow = `0 0 15px hsl(${hue}, 80%, 40%)`;
+  }
+
+  // Update Category Grid
+  const grid = document.getElementById("progressionCategories");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  // Color Mapping for Item Types (Custom Order: Augment, Weapon, Quick Use, Grenade, Mod, Material)
+  // Colors left to right: Gold, Pink, Cyan, Green, Grey, White
+  const typeColors = {
+    "Augment": { border: "rgba(251,199,0,0.5)", bg: "rgba(251,199,0,0.1)", barFrom: "#FBC700", barTo: "#f59e0b", icon: "rgba(251,199,0,0.2)", text: "#FBC700" },         // Gold
+    "Weapon": { border: "rgba(216,41,155,0.5)", bg: "rgba(216,41,155,0.1)", barFrom: "#D8299B", barTo: "#ec4899", icon: "rgba(216,41,155,0.2)", text: "#D8299B" },       // Pink
+    "Quick Use": { border: "rgba(30,203,252,0.5)", bg: "rgba(30,203,252,0.1)", barFrom: "#1ECBFC", barTo: "#06b6d4", icon: "rgba(30,203,252,0.2)", text: "#1ECBFC" },    // Cyan
+    "Grenade": { border: "rgba(65,235,106,0.5)", bg: "rgba(65,235,106,0.1)", barFrom: "#41EB6A", barTo: "#34d399", icon: "rgba(65,235,106,0.2)", text: "#41EB6A" },      // Green
+    "Mod": { border: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.05)", barFrom: "#ffffff", barTo: "#d4d4d8", icon: "rgba(255,255,255,0.15)", text: "#ffffff" },        // White
+    "Material": { border: "rgba(113,116,113,0.5)", bg: "rgba(113,116,113,0.1)", barFrom: "#717471", barTo: "#a1a1aa", icon: "rgba(113,116,113,0.2)", text: "#a1a1aa" }, // Grey
+    // Default fallback
+    "default": { border: "rgba(255,255,255,0.3)", bg: "rgba(255,255,255,0.05)", barFrom: "#52525b", barTo: "#a1a1aa", icon: "rgba(255,255,255,0.1)", text: "#d4d4d8" }
+  };
+
+  // Group items by Type
+  const typeCounts = {};
+  state.all.forEach(item => {
+    const t = item.type || "Unknown";
+    // Ensure structure exists
+    if (!typeCounts[t]) typeCounts[t] = { total: 0, collected: 0, icon: item.typeIcon };
+
+    typeCounts[t].total++;
+    // Check main collection
+    if (state.collectedItems && state.collectedItems.has(item.name)) {
+      typeCounts[t].collected++;
+    }
+  });
+
+  // Custom sort order
+  const typeOrder = ["Augment", "Weapon", "Quick Use", "Grenade", "Mod", "Material"];
+  const types = Object.keys(typeCounts).sort((a, b) => {
+    const aIndex = typeOrder.indexOf(a);
+    const bIndex = typeOrder.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
+
+  types.forEach(type => {
+    const data = typeCounts[type];
+    const p = Math.round((data.collected / data.total) * 100);
+
+    // DEBUG: Log the type being used
+    console.log("Category type:", type, "Has color?", !!typeColors[type]);
+
+    // Get color theme or default
+    const theme = typeColors[type] || typeColors["default"];
+
+    const card = document.createElement("div");
+    // Glassy Card Style with Colored Border and Background Tint (Inline Styles)
+    card.className = "relative overflow-hidden rounded-2xl backdrop-blur-xl p-4 flex flex-col gap-3 shadow-xl hover:brightness-110 transition-all duration-300 group";
+    card.style.border = `2px solid ${theme.border}`;
+    card.style.backgroundColor = theme.bg;
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "flex items-center gap-4 z-10";
+
+    const iconBox = document.createElement("div");
+    iconBox.className = "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border border-white/5 shadow-inner";
+    iconBox.style.backgroundColor = theme.icon;
+    if (data.icon) {
+      const img = document.createElement("img");
+      img.src = data.icon;
+      img.className = "w-7 h-7 opacity-90 drop-shadow-md";
+      iconBox.appendChild(img);
+    }
+
+    const textGroup = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "text-base font-bold tracking-wide";
+    title.style.color = theme.text;
+    title.textContent = type;
+    const sub = document.createElement("div");
+    sub.className = "text-sm text-zinc-500 font-mono";
+    sub.textContent = `${data.collected} / ${data.total}`;
+
+    textGroup.appendChild(title);
+    textGroup.appendChild(sub);
+    header.appendChild(iconBox);
+    header.appendChild(textGroup);
+
+    // Progress Bar (Pill Container)
+    const barWrap = document.createElement("div");
+    barWrap.className = "relative h-4 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 z-10";
+
+    // Colored Bar (Inline gradient)
+    const subBar = document.createElement("div");
+    subBar.className = "h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all duration-1000 ease-out";
+    subBar.style.background = `linear-gradient(to right, ${theme.barFrom}, ${theme.barTo})`;
+    subBar.style.width = "0%";
+
+    // Trigger animation next frame
+    requestAnimationFrame(() => {
+      subBar.style.width = `${p}%`;
+    });
+
+    barWrap.appendChild(subBar);
+
+    card.appendChild(header);
+    card.appendChild(barWrap);
+
+    // Add subtle gradient glow in background
+    const bgGlow = document.createElement("div");
+    bgGlow.className = `absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${theme.bar} opacity-5 blur-3xl rounded-full group-hover:opacity-10 transition-opacity pointer-events-none`;
+    card.appendChild(bgGlow);
+
+    grid.appendChild(card);
+  });
+}
+
+function switchTab(tabName) {
+  state.currentTab = tabName;
+  window.scrollTo(0, 0);
+
+  // Tab Buttons
+  const blueprintsBtn = document.getElementById("tabBlueprints");
+  const progressionBtn = document.getElementById("tabProgression");
+  const dataBtn = document.getElementById("tabData");
+
+  // Reset all active states
+  [blueprintsBtn, progressionBtn, dataBtn].forEach(btn => {
+    if (btn) btn.classList.remove("tab-button-active");
+  });
+
+  // Highlight active
+  if (tabName === "blueprints" && blueprintsBtn) blueprintsBtn.classList.add("tab-button-active");
+  if (tabName === "progression" && progressionBtn) progressionBtn.classList.add("tab-button-active");
+  if (tabName === "data" && dataBtn) dataBtn.classList.add("tab-button-active");
+
+  // View Containers
+  const gridSection = document.getElementById("gridSection"); // We might need to wrap the grid+filters in a div or manage visibility of elements
+  // simpler for now: toggle visibility of main interactive elements
+
+  // NOTE: For now, 'blueprints' is the only grid view. 
+  // We need to hide/show the Grid vs Progression Container vs Data Container.
+  // Since we haven't wrapped the grid yet, let's control the grid and filters visibility directly later.
+  // For this step, I will assume we are HIDING the Grid when NOT on blueprints.
+
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("emptyState");
+  const filtersDesktop = document.querySelectorAll(".filter-section-desktop"); // Pseudo-selector for desktop sidebars? No, they are in aside.
+  // Actually, the ASIDE is always visible on desktop?
+
+  // Let's control the "Main Content Area" visibility
+  // Current structure: <main> -> [Banner, Progress, Chips, Help, Grid/Empty]
+
+  // Create references to the new tab containers (will be added in index.html in next steps if not already)
+  const progressionTab = document.getElementById("progressionTab");
+  const dataTab = document.getElementById("dataTab");
+
+  // Toggle Grid View Visibility
+  const showGrid = (tabName === "blueprints");
+
+  if (grid) {
+    if (showGrid) {
+      // Grid visibility is also handled by renderGrid based on filters, 
+      // but we force hide it if not on blueprints tab
+      applyFilters(); // Re-apply to show correct items
+      grid.classList.remove("hidden");
+    } else {
+      grid.classList.add("hidden");
+      if (empty) empty.classList.add("hidden");
+    }
+  }
+
+  // Toggle Progression Tab
+  if (progressionTab) {
+    if (tabName === "progression") {
+      progressionTab.classList.remove("hidden");
+      renderProgression();
+    } else {
+      progressionTab.classList.add("hidden");
+    }
+  }
+
+  // Toggle Data Tab
+  if (dataTab) {
+    if (tabName === "data") {
+      dataTab.classList.remove("hidden");
+    } else {
+      dataTab.classList.add("hidden");
+    }
+  }
 }
 
 // Initialize tab navigation
 function initTabNavigation() {
   const blueprintsBtn = document.getElementById("tabBlueprints");
-  const collectionBtn = document.getElementById("tabCollection");
+  const progressionBtn = document.getElementById("tabProgression");
+  const dataBtn = document.getElementById("tabData");
   const logoHome = document.getElementById("logoHome");
   const logoHomeMobile = document.getElementById("logoHomeMobile");
 
   if (blueprintsBtn) blueprintsBtn.onclick = () => switchTab("blueprints");
-  if (collectionBtn) collectionBtn.onclick = () => switchTab("collection");
+  if (progressionBtn) progressionBtn.onclick = () => switchTab("progression");
+  if (dataBtn) dataBtn.onclick = () => switchTab("data");
 
   // Logo home navigation
   if (logoHome) logoHome.onclick = () => switchTab("blueprints");
@@ -551,6 +808,59 @@ function initTabNavigation() {
 
 // Event Banner Management (Dynamic from Firestore)
 let eventBannerDismissed = false; // Temporary state, clears on refresh
+window.menuCloseTimer = null;
+
+// Helper to clear all selection states (Details & Context Menu)
+function deselectAll() {
+  // Close Details Overlays
+  document.querySelectorAll(".details-overlay:not(.hidden)").forEach(d => {
+    d.classList.add("hidden");
+    d.style.transform = "";
+  });
+
+  // Reset Card States
+  document.querySelectorAll(".card-open").forEach(c => {
+    c.classList.remove("card-open");
+    c.style.zIndex = "";
+  });
+
+  document.querySelectorAll(".card-selected").forEach(c => {
+    c.classList.remove("card-selected");
+  });
+
+  const menu = document.getElementById("itemContextMenu");
+  if (menu && !menu.classList.contains("hidden")) {
+    menu.classList.add("opacity-0");
+    if (window.menuCloseTimer) clearTimeout(window.menuCloseTimer);
+    window.menuCloseTimer = setTimeout(() => {
+      menu.classList.add("hidden");
+      window.menuCloseTimer = null;
+    }, 150);
+  }
+}
+
+// Helper to set selection state (Status = Banner + Glow)
+function selectCard(card, type = "details") {
+  // 1. Clear everything first
+  deselectAll();
+
+  if (!card) return;
+
+  // 2. Apply "Selected" status
+  card.classList.add("card-selected");
+
+  // 3. Show appropriate banner
+  if (type === "details") {
+    const details = card.querySelector(".details-overlay");
+    if (details) {
+      details.classList.remove("hidden");
+      card.classList.add("card-open");
+      card.style.zIndex = "50";
+    }
+  }
+  // Note: Context menu positioning logic is handled by showMenu, 
+  // so showMenu will call selectCard(card, "menu") just to set the state.
+}
 
 function initEventBanner() {
   const banner = document.getElementById("eventBanner");
@@ -2407,6 +2717,7 @@ function renderGrid() {
     card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2 opacity-0"; // Start invisible
     card.style.position = "relative";
     card.style.overflow = "visible";
+    card.style.setProperty("--glow-color", rarityColor(it.rarity));
     card.dataset.name = it.name; // For context menu
     // Reuse style settings
 
@@ -2632,33 +2943,16 @@ function renderGrid() {
 
     frame.style.cursor = "pointer";
     frame.onclick = (e) => {
-      // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
       e.stopPropagation();
 
       const isOpen = !details.classList.contains("hidden");
 
-      // close any other open overlays
-      document.querySelectorAll(".details-overlay").forEach(d => {
-        if (d !== details) {
-          d.classList.add("hidden");
-          d.style.transform = ""; // reset shift
-          const parent = d.closest(".card-compact");
-          if (parent) {
-            parent.classList.remove("card-open");
-            parent.style.zIndex = ""; // Reset z-index
-          }
-        }
-      });
-
       if (isOpen) {
-        details.classList.add("hidden");
-        details.style.transform = "";
-        card.classList.remove("card-open");
-        card.style.zIndex = "";
+        deselectAll();
       } else {
-        details.classList.remove("hidden");
-        card.classList.add("card-open");
-        card.style.zIndex = "50"; // Bring to front
+        selectCard(card, "details");
+
+        // Overflow check
 
         // Overflow check
         requestAnimationFrame(() => {
@@ -2692,68 +2986,6 @@ function renderGrid() {
       pill.innerHTML = `Spares: <span class="font-bold">${sparesCount}</span>`;
       pill.dataset.itemName = it.name;
       frame.appendChild(pill);
-    }
-
-    // Different click behavior based on tab
-    if (state.currentTab === "collection") {
-      // Collection mode: Click entire card to cycle state
-      frame.style.cursor = "pointer";
-      frame.onclick = (e) => {
-        e.stopPropagation();
-        cycleItemStatus(it.name, frame);
-        // UI update is handled by applyFilters() called inside cycleItemStatus
-      };
-    } else {
-      // Blueprint mode: Click to show details
-      frame.style.cursor = "pointer";
-      frame.onclick = (e) => {
-        // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
-        e.stopPropagation();
-
-        const isOpen = !details.classList.contains("hidden");
-
-        // close any other open overlays
-        document.querySelectorAll(".details-overlay").forEach(d => {
-          if (d !== details) {
-            d.classList.add("hidden");
-            d.style.transform = ""; // reset shift
-            const parent = d.closest(".card-compact");
-            if (parent) {
-              parent.classList.remove("card-open");
-              parent.style.zIndex = ""; // Reset z-index
-            }
-          }
-        });
-
-        if (isOpen) {
-          details.classList.add("hidden");
-          details.style.transform = "";
-          card.classList.remove("card-open");
-          card.style.zIndex = "";
-        } else {
-          details.classList.remove("hidden");
-          card.classList.add("card-open");
-          card.style.zIndex = "50"; // Bring to front
-
-          // Overflow check
-          requestAnimationFrame(() => {
-            const rect = details.getBoundingClientRect();
-            const margin = 12; // padding from screen edge
-
-            let shiftX = 0;
-            if (rect.left < margin) {
-              shiftX = (margin - rect.left);
-            } else if (rect.right > window.innerWidth - margin) {
-              shiftX = (window.innerWidth - margin - rect.right);
-            }
-
-            if (shiftX !== 0) {
-              // Apply shift on top of the existing centering (-50%)
-              details.style.transform = `translateX(calc(-50% + ${shiftX}px))`;
-            }
-          });
-        }
-      };
     }
 
     card.appendChild(frame);
@@ -2822,83 +3054,41 @@ function initCollectionFilter() {
 
 
 // Update initCollectionFilters to handle both tabs
+// Update initCollectionFilters to handle unified grid
 function initCollectionFilters() {
-  // Collection tab filters
   const allBtn = document.getElementById("collectedAll");
   const yesBtn = document.getElementById("collectedYes");
+  const wishlistBtn = document.getElementById("collectedWish");
   const noBtn = document.getElementById("collectedNo");
-
-  // Blueprints tab filters
-  const allBtnBP = document.getElementById("collectedAllBlueprints");
-  const yesBtnBP = document.getElementById("collectedYesBlueprints");
-  const wishlistBtnBP = document.getElementById("collectedWishBlueprints");
-  const noBtnBP = document.getElementById("collectedNoBlueprints");
-  const sparesBtnBP = document.getElementById("collectedSparesBlueprints");
-
-  // Mobile filters
-  const allBtnMob = document.getElementById("collectedAllMobile");
-  const yesBtnMob = document.getElementById("collectedYesMobile");
-  const wishlistBtnMob = document.getElementById("collectedWishMobile");
-  const noBtnMob = document.getElementById("collectedNoMobile");
-  const sparesBtnMob = document.getElementById("collectedSparesMobile");
+  const sparesBtn = document.getElementById("collectedSpares");
 
   const setFilter = (value) => {
     state.filters.collected = value;
 
-    // Synchronize all instances of these buttons
-    const allSets = [
-      [allBtn, yesBtn, null, noBtn, null],
-      [allBtnBP, yesBtnBP, wishlistBtnBP, noBtnBP, sparesBtnBP],
-      [allBtnMob, yesBtnMob, wishlistBtnMob, noBtnMob, sparesBtnMob]
-    ];
+    // Synchronize buttons
+    const buttons = {
+      all: allBtn,
+      collected: yesBtn,
+      wishlist: wishlistBtn,
+      "not-collected": noBtn,
+      "spares": sparesBtn
+    };
 
-    allSets.forEach(set => {
-      const [a, y, w, n, s] = set;
-      if (a) {
-        a.classList.remove("chip-active");
-        if (value === "all") a.classList.add("chip-active");
-      }
-      if (y) {
-        y.classList.remove("chip-active");
-        if (value === "collected") y.classList.add("chip-active");
-      }
-      if (w) {
-        w.classList.remove("chip-active");
-        if (value === "wishlist") w.classList.add("chip-active");
-      }
-      if (n) {
-        n.classList.remove("chip-active");
-        if (value === "not-collected") n.classList.add("chip-active");
-      }
-      if (s) {
-        s.classList.remove("chip-active");
-        if (value === "spares") s.classList.add("chip-active");
-      }
-    });
+    Object.values(buttons).forEach(btn => btn?.classList.remove("chip-active"));
+
+    // Activate correct button
+    if (buttons[value]) buttons[value].classList.add("chip-active");
 
     applyFilters();
     renderFacets(); // To update the chips
     saveFilters();
   };
 
-  // Collection tab (No wishlist button here yet, or standard 3-set)
-  // Actually, UI has 3 buttons. Let's assume standard behavior.
   if (allBtn) allBtn.onclick = () => setFilter("all");
   if (yesBtn) yesBtn.onclick = () => setFilter("collected");
+  if (wishlistBtn) wishlistBtn.onclick = () => setFilter("wishlist");
   if (noBtn) noBtn.onclick = () => setFilter("not-collected");
-
-  // Blueprints tab
-  if (allBtnBP) allBtnBP.onclick = () => setFilter("all");
-  if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected");
-  if (wishlistBtnBP) wishlistBtnBP.onclick = () => setFilter("wishlist");
-  if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected");
-  if (sparesBtnBP) sparesBtnBP.onclick = () => setFilter("spares");
-
-  if (allBtnMob) allBtnMob.onclick = () => setFilter("all");
-  if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected");
-  if (wishlistBtnMob) wishlistBtnMob.onclick = () => setFilter("wishlist");
-  if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected");
-  if (sparesBtnMob) sparesBtnMob.onclick = () => setFilter("spares");
+  if (sparesBtn) sparesBtn.onclick = () => setFilter("spares");
 
   // Initial sync on load
   setFilter(state.filters.collected);
@@ -2919,6 +3109,14 @@ function initContextMenu() {
 
   // Show menu beneath the card
   const showMenu = (card) => {
+    selectCard(card, "menu");
+
+    // Stop any pending close since we are showing it now
+    if (window.menuCloseTimer) {
+      clearTimeout(window.menuCloseTimer);
+      window.menuCloseTimer = null;
+    }
+
     activeCard = card;
     if (!card) return;
 
@@ -2963,21 +3161,22 @@ function initContextMenu() {
   const hideMenu = () => {
     menu.classList.add("opacity-0");
     setTimeout(() => menu.classList.add("hidden"), 150);
+    if (activeCard) activeCard.classList.remove("card-selected");
     activeCard = null;
   };
 
-  // Right-click handler (Desktop) - Only for Collection tab
+  // Right-click handler (Desktop) - Global on Grid
   grid.addEventListener("contextmenu", (e) => {
-    if (state.currentTab !== "collection") return; // Only on Collection tab
+    // if (state.currentTab !== "collection") return; // Enabled globally now
     const card = e.target.closest(".card-compact");
     if (!card) return;
     e.preventDefault();
     showMenu(card);
   });
 
-  // Long-press handlers (Mobile) - Only for Collection tab
+  // Long-press handlers (Mobile) - Global on Grid
   grid.addEventListener("touchstart", (e) => {
-    if (state.currentTab !== "collection") return; // Only on Collection tab
+    // if (state.currentTab !== "collection") return; // Enabled globally now
     const card = e.target.closest(".card-compact");
     if (!card) return;
 
@@ -2996,9 +3195,11 @@ function initContextMenu() {
     clearTimeout(longPressTimer);
   }, { passive: true });
 
-  // Hide menu on click outside
+  // Hide menu/details on click outside
   document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target)) hideMenu();
+    if (!menu.contains(e.target)) {
+      deselectAll();
+    }
   });
 
   // Spares pill click handler (event delegation) - open context menu
