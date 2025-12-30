@@ -1,74 +1,74 @@
-Blueprint Name,Most Likely Container,Most Likely Map,Most Likely Condition,Most Likely Location,Item Type,Rarity,Item URL,Amount of Data/Confidence,Trials Reward,Quest Reward,Description
-Angled Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Angled_Grip_II,Very High,FALSE,FALSE,
-Angled Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Angled_Grip_III,Very High,FALSE,FALSE,
-Anvil,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Anvil,Very High,FALSE,FALSE,
-Aphelion,Any,Stella Montis,Any,Any,Weapon,legendary,https://arcraiders.wiki/wiki/Aphelion,Very High,FALSE,FALSE,
-Barricade Kit,"Server Cabinet, but can spawn anywhere",Any,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Barricade_Kit,Confident,FALSE,FALSE,
-Bettina,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,epic,https://arcraiders.wiki/wiki/Bettina,Very High,FALSE,FALSE,
-Blaze Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Blaze_Grenade,Low,FALSE,FALSE,
-Bobcat,Any,Blue Gate,Locked Gate,Any,Weapon,epic,https://arcraiders.wiki/wiki/Bobcat,Confirmed,TRUE,FALSE,
-Burletta,N/A,N/A,N/A,N/A,Weapon,uncommon,https://arcraiders.wiki/wiki/Burletta,Confirmed,FALSE,TRUE,Quest Name | Industrial Espionage
-Combat Mk. 3 (Aggressive),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Combat_Mk._3_(Aggressive),Very High,TRUE,FALSE,
-Combat Mk. 3 (Flanking),Any,Stella Montis,Any,Any,Augment,epic,https://arcraiders.wiki/wiki/Combat_Mk._3_(Flanking),Low,FALSE,FALSE,
-Compensator II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Compensator_II,Very High,FALSE,FALSE,
-Compensator III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Compensator_III,Very High,FALSE,FALSE,
-Complex Gun Parts,Metal Lockers and black boxes in Blue Gate security wing,Any,Any,Security Wing,Material,epic,https://arcraiders.wiki/wiki/Complex_Gun_Parts,Very High,FALSE,FALSE,
-Deadline,Any,Stella Montis,Any,Any,Quick Use,Epic,https://arcraiders.wiki/wiki/Deadline,Low,FALSE,FALSE,
-Defibrillator,Medical Containers or medical loot zones,Dam Battlegrounds,Any,Testing Annex,Quick Use,rare,https://arcraiders.wiki/wiki/Defibrillator,Low,FALSE,FALSE,
-Equalizer,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Equalizer,Confirmed,FALSE,FALSE,
-Explosive Mine,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Explosive_Mine,Low,FALSE,FALSE,
-Extended Barrel,Any,Any,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Extended_Barrel,Low,FALSE,FALSE,
-Extended Light Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Light_Magazine_II,Low,FALSE,FALSE,
-Extended Light Magazine III,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Extended_Light_Magazine_III,Very High,FALSE,FALSE,
-Extended Medium Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_II,Very High,FALSE,FALSE,
-Extended Medium Magazine III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_III,Very High,FALSE,FALSE,
-Extended Shotgun Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_II,Very High,FALSE,FALSE,
-Extended Shotgun Magazine III,Any,Any,Night or Storm,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_III,Low,FALSE,FALSE,
-Fireworks Box,Any,Any,Cold Snap,Any,Quick Use,rare,https://arcraiders.wiki/wiki/Fireworks_Box,Very High,FALSE,FALSE,
-Gas Mine,Any,Any,Stella Montis,Any,Grenade,common,https://arcraiders.wiki/wiki/Gas_Mine,Not Enough Data,FALSE,FALSE,
-Heavy Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Heavy_Gun_Parts,Very High,FALSE,FALSE,
-Horizontal Grip,N/A,Any,Any,N/A,Mod,epic,https://arcraiders.wiki/wiki/Horizontal_Grip,Not Enough Data,FALSE,FALSE,
-Hullcracker,N/A,N/A,N/A,N/A,Weapon,epic,https://arcraiders.wiki/wiki/Hullcracker,Confirmed,FALSE,TRUE,Quest Name | Major's Footlocker
-Il Toro,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Il_Toro,Very High,FALSE,FALSE,
-Jolt Mine,"Rusty Breachable Raider Box, Red Locker",Dam Battlegrounds,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Jolt_Mine,Very High,FALSE,FALSE,
-Jupiter,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Jupiter,Confirmed,FALSE,FALSE,
-Light Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Light_Gun_Parts,Very High,FALSE,FALSE,
-Light Stick (Blue),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,
-Light Stick (Green),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,
-Light Stick (Red),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,
-Light Stick (Yellow),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,
-Lightweight Stock,Any,Dam Battlegrounds,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Lightweight_Stock,Low,FALSE,FALSE,
-Looting Mk. 3 (Survivor),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Looting_Mk._3_(Survivor),Very High,FALSE,FALSE,
-Lure Grenade,N/A,N/A,N/A,N/A,Grenade,uncommon,https://arcraiders.wiki/wiki/Lure_Grenade,Confirmed,FALSE,TRUE,Quest Name | Greasing Her Palms
-Medium Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Medium_Gun_Parts,Very High,FALSE,FALSE,
-Muzzle Brake II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Muzzle_Brake_II,Very High,FALSE,FALSE,
-Muzzle Brake III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Muzzle_Brake_III,Low,FALSE,FALSE,
-Osprey,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Osprey,Very High,FALSE,FALSE,
-Padded Stock,"Residential Containers (wardrobes, drawers, etc)",Any,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Padded_Stock,Low,FALSE,FALSE,
-Pulse Mine,Any,Stella Montis,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Pulse_Mine,Very High,FALSE,FALSE,
-Remote Raider Flare,"Not enough data, N/A","Not enough data, N/A","Not enough data, N/A","Not enough data, N/A",Quick Use,uncommon,https://arcraiders.wiki/wiki/Remote_Raider_Flare,Low,FALSE,FALSE,
-Seeker Grenade,Any,Stella Montis,Any,Any,Grenade,uncommon,https://arcraiders.wiki/wiki/Seeker_Grenade,Low,FALSE,FALSE,
-Shotgun Choke II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,Any,Mod,uncommon,https://arcraiders.wiki/wiki/Shotgun_Choke_II,Low,FALSE,FALSE,
-Shotgun Choke III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Shotgun_Choke_III,Low,FALSE,FALSE,
-Shotgun Silencer,"Rusty Breachable Raider Box, Red Locker",Any,Any,Any,Mod,epic,https://arcraiders.wiki/wiki/Shotgun_Silencer,Low,FALSE,FALSE,
-Showstopper,"Rusty Breachable Raider Box, Red Locker",Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Showstopper,Confident,FALSE,FALSE,
-Silencer I,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Silencer_I,Very High,FALSE,FALSE,
-Silencer II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Silencer_II,Very High,FALSE,FALSE,
-Smoke Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Smoke_Grenade,Confident,FALSE,FALSE,
-Snap Hook,Any,"Dam Battlegrounds, Any","Storm, Night",Any,Quick Use,legendary,https://arcraiders.wiki/wiki/Snap_Hook,Very High,FALSE,FALSE,
-Stable Stock II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Stable_Stock_II,Very High,FALSE,FALSE,
-Stable Stock III,"Residential Containers (wardrobes, drawers, etc)",Any,"Night, Storm or Hidden Bunker","Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Stable_Stock_III,Low,FALSE,FALSE,
-Tactical Mk. 3 (Defensive),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Defensive),Very High,FALSE,FALSE,
-Tactical Mk. 3 (Healing),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Healing),Very High,FALSE,FALSE,
-Tagging Grenade,Rusty Breachable Raider Box,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Tagging_Grenade,Low,FALSE,FALSE,
-Tempest,Any,Buried City,Night,Any,Weapon,epic,https://arcraiders.wiki/wiki/Tempest,Confirmed,FALSE,FALSE,
-Torrente,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Torrente,Very High,FALSE,FALSE,
-Trailblazer,Any,Stella Montis,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Trailblazer,Low,FALSE,FALSE,
-Trigger 'Nade,N/A,N/A,N/A,N/A,Grenade,rare,https://arcraiders.wiki/wiki/Trigger_%27Nade,Confirmed,FALSE,TRUE,Quest Name | Sparks Fly
-Venator,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Venator,Very High,FALSE,FALSE,
-Vertical Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Vertical_Grip_II,Very High,FALSE,FALSE,
-Vertical Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Vertical_Grip_III,Very High,FALSE,FALSE,
-Vita Shot,Medical Containers or medical loot zones OR Surveyors,Any,Any,Hospital,Quick Use,rare,https://arcraiders.wiki/wiki/Vita_Shot,Low,FALSE,FALSE,
-Vita Spray,Surveyors or very low drop chance,Any,Any,Any,Quick Use,epic,https://arcraiders.wiki/wiki/Vita_Spray,Low,FALSE,FALSE,
-Vulcano,Any,Spaceport,Hidden Bunker,Any,Weapon,epic,https://arcraiders.wiki/wiki/Vulcano,Confirmed,FALSE,FALSE,
-Wolfpack,Any,Any,Night,Any,Grenade,epic,https://arcraiders.wiki/wiki/Wolfpack,Very High,FALSE,FALSE,
+Blueprint Name,Most Likely Container,Most Likely Map,Most Likely Condition,Most Likely Location,Item Type,Rarity,Item URL,Amount of Data/Confidence,Trials Reward,Quest Reward,Description,Active
+Angled Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Angled_Grip_II,Very High,FALSE,FALSE,,TRUE
+Angled Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Angled_Grip_III,Very High,FALSE,FALSE,,TRUE
+Anvil,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Anvil,Very High,FALSE,FALSE,,TRUE
+Aphelion,Any,Stella Montis,Any,Any,Weapon,legendary,https://arcraiders.wiki/wiki/Aphelion,Very High,FALSE,FALSE,,TRUE
+Barricade Kit,"Server Cabinet, but can spawn anywhere",Any,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Barricade_Kit,Confident,FALSE,FALSE,,TRUE
+Bettina,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,epic,https://arcraiders.wiki/wiki/Bettina,Very High,FALSE,FALSE,,TRUE
+Blaze Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Blaze_Grenade,Low,FALSE,FALSE,,TRUE
+Bobcat,Any,Blue Gate,Locked Gate,Any,Weapon,epic,https://arcraiders.wiki/wiki/Bobcat,Confirmed,TRUE,FALSE,,TRUE
+Burletta,N/A,N/A,N/A,N/A,Weapon,uncommon,https://arcraiders.wiki/wiki/Burletta,Confirmed,FALSE,TRUE,Quest Name | Industrial Espionage,TRUE
+Combat Mk. 3 (Aggressive),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Combat_Mk._3_(Aggressive),Very High,TRUE,FALSE,,TRUE
+Combat Mk. 3 (Flanking),Any,Stella Montis,Any,Any,Augment,epic,https://arcraiders.wiki/wiki/Combat_Mk._3_(Flanking),Low,FALSE,FALSE,,TRUE
+Compensator II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Compensator_II,Very High,FALSE,FALSE,,TRUE
+Compensator III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Compensator_III,Very High,FALSE,FALSE,,TRUE
+Complex Gun Parts,Metal Lockers and black boxes in Blue Gate security wing,Any,Any,Security Wing,Material,epic,https://arcraiders.wiki/wiki/Complex_Gun_Parts,Very High,FALSE,FALSE,,TRUE
+Deadline,Any,Stella Montis,Any,Any,Quick Use,Epic,https://arcraiders.wiki/wiki/Deadline,Low,FALSE,FALSE,,TRUE
+Defibrillator,Medical Containers or medical loot zones,Dam Battlegrounds,Any,Testing Annex,Quick Use,rare,https://arcraiders.wiki/wiki/Defibrillator,Low,FALSE,FALSE,,TRUE
+Equalizer,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Equalizer,Confirmed,FALSE,FALSE,,TRUE
+Explosive Mine,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Explosive_Mine,Low,FALSE,FALSE,,TRUE
+Extended Barrel,Any,Any,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Extended_Barrel,Low,FALSE,FALSE,,TRUE
+Extended Light Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Light_Magazine_II,Low,FALSE,FALSE,,TRUE
+Extended Light Magazine III,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Extended_Light_Magazine_III,Very High,FALSE,FALSE,,TRUE
+Extended Medium Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_II,Very High,FALSE,FALSE,,TRUE
+Extended Medium Magazine III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_III,Very High,FALSE,FALSE,,TRUE
+Extended Shotgun Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_II,Very High,FALSE,FALSE,,TRUE
+Extended Shotgun Magazine III,Any,Any,Night or Storm,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_III,Low,FALSE,FALSE,,TRUE
+Fireworks Box,Any,Any,Cold Snap,Any,Quick Use,rare,https://arcraiders.wiki/wiki/Fireworks_Box,Very High,FALSE,FALSE,,TRUE
+Gas Mine,Any,Any,Stella Montis,Any,Grenade,common,https://arcraiders.wiki/wiki/Gas_Mine,Not Enough Data,FALSE,FALSE,,TRUE
+Heavy Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Heavy_Gun_Parts,Very High,FALSE,FALSE,,TRUE
+Horizontal Grip,N/A,Any,Any,N/A,Mod,epic,https://arcraiders.wiki/wiki/Horizontal_Grip,Not Enough Data,FALSE,FALSE,,FALSE
+Hullcracker,N/A,N/A,N/A,N/A,Weapon,epic,https://arcraiders.wiki/wiki/Hullcracker,Confirmed,FALSE,TRUE,Quest Name | Major's Footlocker,TRUE
+Il Toro,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Il_Toro,Very High,FALSE,FALSE,,TRUE
+Jolt Mine,"Rusty Breachable Raider Box, Red Locker",Dam Battlegrounds,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Jolt_Mine,Very High,FALSE,FALSE,,TRUE
+Jupiter,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Jupiter,Confirmed,FALSE,FALSE,,TRUE
+Light Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Light_Gun_Parts,Very High,FALSE,FALSE,,TRUE
+Light Stick (Blue),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
+Light Stick (Green),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
+Light Stick (Red),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
+Light Stick (Yellow),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
+Lightweight Stock,Any,Dam Battlegrounds,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Lightweight_Stock,Low,FALSE,FALSE,,TRUE
+Looting Mk. 3 (Survivor),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Looting_Mk._3_(Survivor),Very High,FALSE,FALSE,,TRUE
+Lure Grenade,N/A,N/A,N/A,N/A,Grenade,uncommon,https://arcraiders.wiki/wiki/Lure_Grenade,Confirmed,FALSE,TRUE,Quest Name | Greasing Her Palms,TRUE
+Medium Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Medium_Gun_Parts,Very High,FALSE,FALSE,,TRUE
+Muzzle Brake II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Muzzle_Brake_II,Very High,FALSE,FALSE,,TRUE
+Muzzle Brake III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Muzzle_Brake_III,Low,FALSE,FALSE,,TRUE
+Osprey,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Osprey,Very High,FALSE,FALSE,,TRUE
+Padded Stock,"Residential Containers (wardrobes, drawers, etc)",Any,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Padded_Stock,Low,FALSE,FALSE,,TRUE
+Pulse Mine,Any,Stella Montis,Any,Any,Quick Use,uncommon,https://arcraiders.wiki/wiki/Pulse_Mine,Very High,FALSE,FALSE,,TRUE
+Remote Raider Flare,"Not enough data, N/A","Not enough data, N/A","Not enough data, N/A","Not enough data, N/A",Quick Use,uncommon,https://arcraiders.wiki/wiki/Remote_Raider_Flare,Low,FALSE,FALSE,,TRUE
+Seeker Grenade,Any,Stella Montis,Any,Any,Grenade,uncommon,https://arcraiders.wiki/wiki/Seeker_Grenade,Low,FALSE,FALSE,,TRUE
+Shotgun Choke II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,Any,Mod,uncommon,https://arcraiders.wiki/wiki/Shotgun_Choke_II,Low,FALSE,FALSE,,TRUE
+Shotgun Choke III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Shotgun_Choke_III,Low,FALSE,FALSE,,TRUE
+Shotgun Silencer,"Rusty Breachable Raider Box, Red Locker",Any,Any,Any,Mod,epic,https://arcraiders.wiki/wiki/Shotgun_Silencer,Low,FALSE,FALSE,,TRUE
+Showstopper,"Rusty Breachable Raider Box, Red Locker",Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Showstopper,Confident,FALSE,FALSE,,TRUE
+Silencer I,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Silencer_I,Very High,FALSE,FALSE,,TRUE
+Silencer II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Silencer_II,Very High,FALSE,FALSE,,TRUE
+Smoke Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Smoke_Grenade,Confident,FALSE,FALSE,,TRUE
+Snap Hook,Any,"Dam Battlegrounds, Any","Storm, Night",Any,Quick Use,legendary,https://arcraiders.wiki/wiki/Snap_Hook,Very High,FALSE,FALSE,,TRUE
+Stable Stock II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Stable_Stock_II,Very High,FALSE,FALSE,,TRUE
+Stable Stock III,"Residential Containers (wardrobes, drawers, etc)",Any,"Night, Storm or Hidden Bunker","Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Stable_Stock_III,Low,FALSE,FALSE,,TRUE
+Tactical Mk. 3 (Defensive),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Defensive),Very High,FALSE,FALSE,,TRUE
+Tactical Mk. 3 (Healing),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Healing),Very High,FALSE,FALSE,,TRUE
+Tagging Grenade,Rusty Breachable Raider Box,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Tagging_Grenade,Low,FALSE,FALSE,,TRUE
+Tempest,Any,Buried City,Night,Any,Weapon,epic,https://arcraiders.wiki/wiki/Tempest,Confirmed,FALSE,FALSE,,TRUE
+Torrente,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Torrente,Very High,FALSE,FALSE,,TRUE
+Trailblazer,Any,Stella Montis,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Trailblazer,Low,FALSE,FALSE,,TRUE
+Trigger 'Nade,N/A,N/A,N/A,N/A,Grenade,rare,https://arcraiders.wiki/wiki/Trigger_%27Nade,Confirmed,FALSE,TRUE,Quest Name | Sparks Fly,TRUE
+Venator,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,rare,https://arcraiders.wiki/wiki/Venator,Very High,FALSE,FALSE,,TRUE
+Vertical Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Vertical_Grip_II,Very High,FALSE,FALSE,,TRUE
+Vertical Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Vertical_Grip_III,Very High,FALSE,FALSE,,TRUE
+Vita Shot,Medical Containers or medical loot zones OR Surveyors,Any,Any,Hospital,Quick Use,rare,https://arcraiders.wiki/wiki/Vita_Shot,Low,FALSE,FALSE,,TRUE
+Vita Spray,Surveyors or very low drop chance,Any,Any,Any,Quick Use,epic,https://arcraiders.wiki/wiki/Vita_Spray,Low,FALSE,FALSE,,TRUE
+Vulcano,Any,Spaceport,Hidden Bunker,Any,Weapon,epic,https://arcraiders.wiki/wiki/Vulcano,Confirmed,FALSE,FALSE,,TRUE
+Wolfpack,Any,Any,Night,Any,Grenade,epic,https://arcraiders.wiki/wiki/Wolfpack,Very High,FALSE,FALSE,,TRUE
