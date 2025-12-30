@@ -69,6 +69,6 @@ Venator,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,r
 Vertical Grip II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Vertical_Grip_II,Very High,FALSE,FALSE,,TRUE
 Vertical Grip III,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Vertical_Grip_III,Very High,FALSE,FALSE,,TRUE
 Vita Shot,Medical Containers or medical loot zones OR Surveyors,Any,Any,Hospital,Quick Use,rare,https://arcraiders.wiki/wiki/Vita_Shot,Low,FALSE,FALSE,,TRUE
-Vita Spray,Surveyors or very low drop chance,Any,Any,Any,Quick Use,epic,https://arcraiders.wiki/wiki/Vita_Spray,Low,FALSE,FALSE,,TRUE
+Vita Spray,Surveyors or Medical Containers,"Buried City, Any",Any,"Hospital, Any",Quick Use,epic,https://arcraiders.wiki/wiki/Vita_Spray,Low,FALSE,FALSE,,TRUE
 Vulcano,Any,Spaceport,Hidden Bunker,Any,Weapon,epic,https://arcraiders.wiki/wiki/Vulcano,Confirmed,FALSE,FALSE,,TRUE
 Wolfpack,Any,Any,Night,Any,Grenade,epic,https://arcraiders.wiki/wiki/Wolfpack,Very High,FALSE,FALSE,,TRUE
