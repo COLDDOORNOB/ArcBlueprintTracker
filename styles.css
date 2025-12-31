@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --cardSize: 170px;
 }
@@ -92,10 +96,11 @@ input[type=range]::-webkit-slider-runnable-track {
   border-radius: 2px;
 }
 
-/* Card Styles */
-/* Card Styles */
+/* Card Styles - Optimized */
 .card-compact {
   container-type: inline-size;
+
+  /* Estimate height to prevent scrollbar jumpiness */
   -webkit-touch-callout: none;
   /* Disable iOS context menu/preview */
   -webkit-user-select: none;
@@ -133,6 +138,17 @@ input[type=range]::-webkit-slider-runnable-track {
 /* .card-compact:hover .rarity-frame {
   box-shadow: 0 0 12px var(--glow-color);
 } */
+
+.rarity-corner {
+  position: absolute;
+  top: 17px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  pointer-events: none;
+  border-top-right-radius: inherit;
+}
 
 /* Type Pill - Responsive Scaling */
 .type-tab {
@@ -180,11 +196,8 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 2000;
   border-radius: 16px;
   padding: 14px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  background: rgba(24, 24, 27, 0.40);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
 }
+
 
 .details-row {
   display: grid;
@@ -453,6 +466,13 @@ input[type=range]::-webkit-slider-runnable-track {
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   justify-content: center;
+}
+
+/* Force hide desktop toggle on mobile (Specificity Fix) */
+@media (max-width: 767px) {
+  #desktopFilterBtn {
+    display: none !important;
+  }
 }
 
 .tab-button {
@@ -741,4 +761,90 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Ensure the details overlay is above */
 .card-selected .details-overlay {
   z-index: 50;
+}
+
+/* === Mass Collection Mode === */
+.mass-collect-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(9, 9, 11, 0.2);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 17px;
+  /* Match card radius */
+  pointer-events: none;
+  /* Clicks passed via JS logic on card, but visual layer */
+  transition: all 0.2s ease;
+}
+
+/* Show overlays when mode is active */
+.mass-collect-mode .mass-collect-overlay {
+  display: flex;
+}
+
+.mass-collect-text {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #e4e4e7;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.mass-collect-mode .card-compact {
+  cursor: pointer !important;
+}
+
+/* Icon Container for overlapping transitions */
+.mass-collect-icons {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.mass-collect-icon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Bouncy spin */
+}
+
+/* Uncollected State (Default) */
+.mass-collect-overlay .icon-plus {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: #e4e4e7;
+}
+
+.mass-collect-overlay .icon-check {
+  opacity: 0;
+  transform: rotate(180deg) scale(0.5);
+  color: #22c55e;
+}
+
+/* Collected State */
+.overlay-collected {
+  background: rgba(9, 9, 11, 0.5) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.overlay-collected .mass-collect-text {
+  color: #22c55e;
+}
+
+.overlay-collected .icon-plus {
+  opacity: 0;
+  transform: rotate(-180deg) scale(0.5);
+}
+
+.overlay-collected .icon-check {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
 }

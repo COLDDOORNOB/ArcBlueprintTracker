@@ -89,6 +89,11 @@ function loadCollectionState() {
       } else {
         if (parsed.collected) state.collectedItems = new Set(parsed.collected);
         if (parsed.wishlist) state.wishlistedItems = new Set(parsed.wishlist);
+
+        // Cleanup inconsistencies (Mutually exclusive: Collected trumps Wishlist)
+        state.collectedItems.forEach(item => {
+          if (state.wishlistedItems.has(item)) state.wishlistedItems.delete(item);
+        });
       }
     }
   } catch (e) {
@@ -229,6 +234,19 @@ function updateCardVisuals(frame, itemName) {
       frame.appendChild(hint);
     }
   }
+
+  // Mass Collect Overlay Logic
+  // Overlay is now inside the frame (image/border area) so we query frame directly
+  let overlay = frame.querySelector(".mass-collect-overlay");
+  if (overlay) {
+    if (isCollected) {
+      overlay.classList.add("overlay-collected");
+      overlay.querySelector(".mass-collect-text").textContent = "Collected";
+    } else {
+      overlay.classList.remove("overlay-collected");
+      overlay.querySelector(".mass-collect-text").innerHTML = "Click to<br>Collect";
+    }
+  }
 }
 
 function cycleItemStatus(itemName, frame) {
@@ -343,12 +361,12 @@ document.addEventListener("DOMContentLoaded", () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (bar) {
-            // Slower animation: 2.5s
-            bar.style.transition = "width 2.5s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 2.5s linear";
+            // Slower animation: 1.75s
+            bar.style.transition = "width 1.75s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 1.75s linear";
             updateProgress(); // Sets width and final color
           }
           if (pctEl) {
-            animateNumber(pctEl, 0, targetPercent, 2500);
+            animateNumber(pctEl, 0, targetPercent, 1750);
           }
         });
       });
@@ -393,7 +411,10 @@ async function loadFromCloud(user) {
         // MERGE logic for Collected
         const cloudCollected = new Set(data.collectedItems);
         const preSize = state.collectedItems.size;
-        cloudCollected.forEach(item => state.collectedItems.add(item));
+        cloudCollected.forEach(item => {
+          state.collectedItems.add(item);
+          state.wishlistedItems.delete(item); // Enforce exclusivity
+        });
         if (state.collectedItems.size > preSize) changed = true;
       }
 
@@ -401,7 +422,12 @@ async function loadFromCloud(user) {
         // MERGE logic for Wishlist
         const cloudWish = new Set(data.wishlistedItems);
         const preSize = state.wishlistedItems.size;
-        cloudWish.forEach(item => state.wishlistedItems.add(item));
+        cloudWish.forEach(item => {
+          // Only add if not collected (Collected trumps Wishlist)
+          if (!state.collectedItems.has(item)) {
+            state.wishlistedItems.add(item);
+          }
+        });
         if (state.wishlistedItems.size > preSize) changed = true;
       }
 
@@ -511,22 +537,17 @@ function renderProgression() {
   const container = document.getElementById("progressionTab");
   const sidebar = document.getElementById("filtersSidebar");
 
-  // Hide sidebar on desktop when progression tab is shown
-  if (sidebar) {
-    if (container && !container.classList.contains("hidden")) {
-      sidebar.classList.add("md:hidden");
-      sidebar.classList.remove("md:block");
-    } else {
-      sidebar.classList.remove("md:hidden");
-      sidebar.classList.add("md:block");
-    }
-  }
+
+  // Hide sidebar logic moved to switchTab
+  // Old logic removed to prevent conflict with desktop toggle
+
 
   if (!container || container.classList.contains("hidden")) return;
 
   const total = state.all.length;
-  // Use correct state variable for collected items
-  const collected = state.collectedItems ? state.collectedItems.size : 0;
+  // Only count collected items that exist in state.all (excludes inactive items)
+  const activeItemNames = new Set(state.all.map(item => item.name));
+  const collected = state.collectedItems ? [...state.collectedItems].filter(name => activeItemNames.has(name)).length : 0;
 
   if (total === 0) return;
 
@@ -552,8 +573,8 @@ function renderProgression() {
     void bar.offsetWidth; // Force reflow
 
     // JS Animation - all elements synced
-    // Duration scaled by percentage: 0% = 0s, 100% = 2.5s
-    const duration = (percent / 100) * 2500;
+    // Duration scaled by percentage: 0% = 0s, 100% = 1.75s
+    const duration = (percent / 100) * 1750;
     let startTime = null;
 
     const animateAll = (timestamp) => {
@@ -788,7 +809,38 @@ function switchTab(tabName) {
       dataTab.classList.add("hidden");
     }
   }
+
+  // Desktop Filter Logic - Auto-hide on non-blueprints tabs
+  const desktopFilterBtn = document.getElementById("desktopFilterBtn");
+  const sidebar = document.getElementById("filtersSidebar");
+
+  if (sidebar && desktopFilterBtn) {
+    if (tabName === "blueprints") {
+      // Enable button
+      desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+      desktopFilterBtn.classList.add("cursor-pointer");
+
+      // Restore state
+      if (state.filtersOpen) {
+        sidebar.classList.remove("hidden");
+        desktopFilterBtn.classList.add("opacity-100");
+        desktopFilterBtn.classList.remove("opacity-50");
+      } else {
+        sidebar.classList.add("hidden");
+        desktopFilterBtn.classList.remove("opacity-100");
+        desktopFilterBtn.classList.add("opacity-50");
+      }
+    } else {
+      // Disable button
+      desktopFilterBtn.classList.add("opacity-50", "pointer-events-none");
+      desktopFilterBtn.classList.remove("cursor-pointer", "opacity-100");
+
+      // Force hide sidebar
+      sidebar.classList.add("hidden");
+    }
+  }
 }
+
 
 // Initialize tab navigation
 function initTabNavigation() {
@@ -2183,7 +2235,8 @@ const state = {
     contributionCount: 0,
     loading: false
   },
-  spares: {} // Item name -> count of spare blueprints
+  spares: {}, // Item name -> count of spare blueprints
+  massCollectMode: false,
 };
 
 function getCsvUrl() {
@@ -2196,6 +2249,54 @@ function setMetaLine(text) {
   const elM = document.getElementById("metaLineMobile");
   if (el) el.textContent = text;
   if (elM) elM.textContent = text;
+}
+
+function toggleMassCollectMode() {
+  state.massCollectMode = !state.massCollectMode;
+  const btn = document.getElementById("toggleMassCollectBtn");
+  const grid = document.getElementById("grid");
+
+  if (state.massCollectMode) {
+    if (btn) {
+      btn.innerHTML = `
+        <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <div class="flex flex-col text-left leading-none text-emerald-400 whitespace-nowrap">
+          <span>Done</span>
+          <span>Collecting</span>
+        </div>
+      `;
+      btn.classList.add("bg-emerald-500/10", "border-emerald-500/50");
+      btn.classList.remove("bg-zinc-900/80", "border-zinc-800", "hover:bg-zinc-800");
+    }
+    if (grid) grid.classList.add("mass-collect-mode");
+    // Force re-render visuals to show overlays
+    document.querySelectorAll(".card-compact .rarity-frame").forEach(frame => {
+      const name = frame.parentNode.dataset.name;
+      if (name) updateCardVisuals(frame, name);
+    });
+  } else {
+    if (btn) {
+      btn.innerHTML = `
+        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+        <div class="flex flex-col text-left leading-none whitespace-nowrap">
+          <span>Mark items</span>
+          <span>as Collected</span>
+        </div>
+      `;
+      btn.classList.remove("bg-emerald-500/10", "border-emerald-500/50");
+      btn.classList.add("bg-zinc-900/80", "border-zinc-800", "hover:bg-zinc-800");
+    }
+    if (grid) grid.classList.remove("mass-collect-mode");
+    // Force re-render to hide overlays
+    document.querySelectorAll(".card-compact .rarity-frame").forEach(frame => {
+      const name = frame.parentNode.dataset.name;
+      if (name) updateCardVisuals(frame, name);
+    });
+  }
 }
 
 function initUI() {
@@ -2223,6 +2324,52 @@ function initUI() {
   if (openBtn) openBtn.onclick = openDrawer;
   const mobileFilterBtn = document.getElementById("mobileFilterBtn");
   if (mobileFilterBtn) mobileFilterBtn.onclick = toggleDrawer;
+
+  const toggleMassCollectBtn = document.getElementById("toggleMassCollectBtn");
+  if (toggleMassCollectBtn) toggleMassCollectBtn.onclick = toggleMassCollectMode;
+
+  // Desktop Filter Sidebar Logic
+  const desktopFilterBtn = document.getElementById("desktopFilterBtn");
+  const sidebar = document.getElementById("filtersSidebar");
+
+  // Initialize state (default true)
+  if (typeof state.filtersOpen === 'undefined') {
+    state.filtersOpen = sessionStorage.getItem("filtersOpen") !== "false";
+  }
+
+  const updateSidebarVisibility = () => {
+    if (!sidebar) return;
+    sidebar.classList.add("hidden"); // Ensure base hidden state (for mobile)
+
+    if (state.filtersOpen) {
+      sidebar.classList.add("md:block"); // Show on desktop
+      if (desktopFilterBtn) {
+        desktopFilterBtn.classList.add("opacity-100");
+        desktopFilterBtn.classList.remove("opacity-50");
+      }
+    } else {
+      sidebar.classList.remove("md:block"); // Hide on desktop
+      if (desktopFilterBtn) {
+        desktopFilterBtn.classList.remove("opacity-100");
+        desktopFilterBtn.classList.add("opacity-50");
+      }
+    }
+  };
+
+  // Initial check (only if on desktop, or relying on CSS media queries hiding it on mobile anyway)
+  // We only run this if we are NOT on a tab that force-hides it. 
+  // Initial load is likely Blueprints tab.
+  updateSidebarVisibility();
+
+  if (desktopFilterBtn) {
+    desktopFilterBtn.onclick = () => {
+      // Toggle state
+      state.filtersOpen = !state.filtersOpen;
+      sessionStorage.setItem("filtersOpen", state.filtersOpen);
+      updateSidebarVisibility();
+    };
+  }
+
   if (closeBtn) closeBtn.onclick = closeDrawer;
   if (backdrop) backdrop.onclick = closeDrawer;
 
@@ -2720,7 +2867,7 @@ function renderGrid() {
 
   for (const it of state.filtered) {
     const card = document.createElement("div");
-    card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2 opacity-0"; // Start invisible
+    card.className = "card-compact bg-zinc-950 border border-zinc-800/50 rounded-2xl p-2 opacity-0"; // Start invisible
     card.style.position = "relative";
     card.style.overflow = "visible";
     card.style.setProperty("--glow-color", rarityColor(it.rarity));
@@ -2750,17 +2897,19 @@ function renderGrid() {
     const img = document.createElement("img");
     img.src = it.img || "";
     img.alt = it.name;
-    img.className = "w-full h-full object-contain p-2 relative z-10";
+    img.className = "w-full h-full object-contain p-2 relative z-10 pointer-events-none select-none";
     img.style.width = "100%";
     img.style.height = "100%";
     img.style.objectFit = "contain";
     img.style.padding = "8px";
     img.loading = "lazy";
+    img.draggable = false; // Disable native drag
+    img.style.webkitTouchCallout = "none"; // Disable iOS context menu
+    img.style.userSelect = "none";
 
-    // Hover effect: Expand image slightly when card is hovered
-    card.style.transition = "transform 0.2s"; // Ensure smooth scaling if using CSS, but here we use motion animate
-    card.addEventListener("mouseenter", () => animate(img, { scale: 1.1 }));
-    card.addEventListener("mouseleave", () => animate(img, { scale: 1 }));
+    // Hover effect: Expand image slightly when card is hovered (CSS handled)
+    img.classList.add("transition-transform", "duration-200", "ease-out", "group-hover:scale-110");
+    card.classList.add("group"); // Ensure card is group parent
 
     const corner = document.createElement("div");
     corner.className = "rarity-corner";
@@ -2796,7 +2945,8 @@ function renderGrid() {
     name.textContent = it.name;
     title.appendChild(name);
     const details = document.createElement("div");
-    details.className = "details-overlay hidden";
+    // Standard Glass Style (Works because parent card is opaque)
+    details.className = "details-overlay hidden backdrop-blur-md bg-zinc-900/40 border border-white/10 shadow-2xl rounded-2xl";
 
     // -- "Most Likely" Group Container --
     const spawnGroup = document.createElement("div");
@@ -2951,6 +3101,22 @@ function renderGrid() {
     frame.onclick = (e) => {
       e.stopPropagation();
 
+      if (state.massCollectMode) {
+        // Toggle Collected Status
+        if (state.collectedItems.has(it.name)) {
+          state.collectedItems.delete(it.name);
+        } else {
+          state.collectedItems.add(it.name);
+          state.wishlistedItems.delete(it.name);
+          // Don't show toast in mass mode
+        }
+        hideToast();
+        saveCollectionState();
+        updateCardVisuals(frame, it.name);
+        debouncedSyncToCloud();
+        return;
+      }
+
       const isOpen = !details.classList.contains("hidden");
 
       if (isOpen) {
@@ -2993,6 +3159,22 @@ function renderGrid() {
       pill.dataset.itemName = it.name;
       frame.appendChild(pill);
     }
+
+    // Inject Mass Collect Overlay - INSIDE THE FRAME
+    const overlay = document.createElement("div");
+    overlay.className = "mass-collect-overlay";
+    overlay.innerHTML = `
+      <span class="mass-collect-text">Click to<br>Collect</span>
+      <div class="mass-collect-icons">
+        <svg class="mass-collect-icon icon-plus w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        <svg class="mass-collect-icon icon-check w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+    `;
+    frame.appendChild(overlay);
 
     card.appendChild(frame);
     card.appendChild(title);
@@ -3111,6 +3293,7 @@ function initContextMenu() {
 
   let activeCard = null;
   let longPressTimer = null;
+  let contextMenuOpened = false;
   const LONG_PRESS_DURATION = 500; // ms
 
   // Show menu beneath the card
@@ -3187,15 +3370,20 @@ function initContextMenu() {
     if (!card) return;
 
     longPressTimer = setTimeout(() => {
+      contextMenuOpened = true;
       showMenu(card);
       // Vibrate if supported
       if (navigator.vibrate) navigator.vibrate(50);
     }, LONG_PRESS_DURATION);
   }, { passive: true });
 
-  grid.addEventListener("touchend", () => {
+  grid.addEventListener("touchend", (e) => {
     clearTimeout(longPressTimer);
-  }, { passive: true });
+    if (contextMenuOpened) {
+      if (e.cancelable) e.preventDefault();
+      contextMenuOpened = false;
+    }
+  }, { passive: false });
 
   grid.addEventListener("touchmove", () => {
     clearTimeout(longPressTimer);
