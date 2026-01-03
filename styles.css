@@ -6,9 +6,75 @@
   --cardSize: 170px;
 }
 
+/* =====================================================
+   Typography System
+   - Barlow: Body text, inputs, general content
+   - Urbanist: Tabs, navigation, section headings
+   - Prompt: Hero headings, large titles, emphasis
+   - JetBrains Mono: HUD elements, stats, counters
+   ===================================================== */
+
+/* Base body font - Barlow for readability */
 body {
+  font-family: 'Barlow', system-ui, sans-serif;
   overflow-y: scroll;
   /* Always show scrollbar to prevent layout shift */
+}
+
+/* Tab buttons and navigation - Urbanist for modern feel */
+.tab-button,
+.tab-nav,
+.chip,
+.context-menu-item,
+.nav-circle-btn {
+  font-family: 'Urbanist', system-ui, sans-serif;
+}
+
+/* Section headings and titles - Urbanist */
+h3,
+h4,
+h5,
+h6,
+.type-tab span,
+.details-label {
+  font-family: 'Urbanist', system-ui, sans-serif;
+}
+
+/* Large hero headings - Prompt for impact */
+h1,
+h2,
+.text-6xl,
+.text-7xl,
+.text-3xl,
+.text-2xl,
+.font-black {
+  font-family: 'Prompt', system-ui, sans-serif;
+}
+
+/* HUD elements - JetBrains Mono for technical feel */
+.font-mono,
+#progressPercent,
+#statSubmissionCount,
+#resultCount,
+#contextSparesCount,
+.spares-pill,
+.confidence-dot+span,
+.details-value {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Progression percentage - extra bold */
+#progressionSign {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 600;
+}
+
+/* Input fields - Barlow (inherited from body) */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
 }
 
 /* GPU-accelerated background on a separate layer that won't break fixed positioning */
@@ -196,6 +262,11 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 2000;
   border-radius: 16px;
   padding: 14px 14px;
+  -webkit-user-select: text;
+  /* Enable text selection */
+  user-select: text;
+  cursor: auto;
+  /* Default cursor for text selection */
 }
 
 
@@ -847,4 +918,15 @@ input[type=range]::-webkit-slider-runnable-track {
 .overlay-collected .icon-check {
   opacity: 1;
   transform: rotate(0deg) scale(1);
+}
+
+/* Shared Glass Panel Style */
+.glass-panel {
+  @apply backdrop-blur-md bg-zinc-900/40 border border-white/10 shadow-2xl rounded-2xl;
+  isolation: isolate;
+}
+
+/* Reusable Text Glow - Soft Emerald */
+.text-glow-soft {
+  text-shadow: 0 0 20px rgba(52, 211, 153, 0.13), 0 0 3px rgba(52, 211, 153, 0.38);
 }

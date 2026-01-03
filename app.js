@@ -1,4 +1,4 @@
-import { animate, stagger } from "motion";
+﻿import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
@@ -61,7 +61,7 @@ function normalizeWikiStem(stem) {
   // We match optional space before ( and inside the parentheses
   stem = stem.replace(/\s*\(/g, "_").replace(/\)/g, "_");
   // Trigger_'Nade -> Trigger_Nade
-  stem = stem.replace(/['’]/g, "");
+  stem = stem.replace(/['â€™]/g, "");
   // Spaces -> underscores (including non-breaking spaces)
   stem = stem.replace(/\s/g, "_");
   // Collapse multiple underscores into one
@@ -522,6 +522,11 @@ function initAuth() {
       if (nameMob) nameMob.textContent = user.displayName || "Explorer";
 
       loadFromCloud(user);
+
+      // Fetch user submission stats if on progression tab
+      if (state.currentTab === "progression") {
+        fetchUserStats();
+      }
     } else {
       // Logged out
       if (loginBtn) loginBtn.classList.remove("hidden");
@@ -532,6 +537,216 @@ function initAuth() {
   });
 }
 
+// =====================================================
+// Reusable Card Creation (for Recent Finds in Progression)
+// =====================================================
+function createCard(item, index) {
+  const card = document.createElement("div");
+  card.className = "card-compact bg-zinc-950 border border-zinc-800/50 rounded-2xl p-2";
+  card.style.position = "relative";
+  card.style.overflow = "visible";
+  card.style.setProperty("--glow-color", rarityColor(item.rarity));
+  card.dataset.name = item.name;
+
+  const frame = document.createElement("div");
+  frame.className = "rarity-frame rarity-glow relative overflow-hidden";
+  frame.style.borderColor = rarityColor(item.rarity);
+
+  const imgWrap = document.createElement("div");
+  imgWrap.className = "relative aspect-square rounded-[16px] flex items-center justify-center overflow-hidden";
+  imgWrap.style.background = `
+    linear-gradient(to top right, ${rarityColor(item.rarity)}44 0%, rgba(24,24,27,0.5) 75%),
+    linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
+    url('Background/Arc BP Image Background.webp')
+  `;
+  imgWrap.style.backgroundSize = "cover, cover, cover";
+  imgWrap.style.backgroundPosition = "center, center, center";
+  imgWrap.style.backgroundBlendMode = "normal, normal, normal";
+  imgWrap.style.aspectRatio = "1 / 1";
+  imgWrap.style.width = "100%";
+
+  const img = document.createElement("img");
+  img.src = item.img || "";
+  img.alt = item.name;
+  img.className = "w-full h-full object-contain p-2 relative z-10 pointer-events-none select-none";
+  img.style.width = "100%";
+  img.style.height = "100%";
+  img.style.objectFit = "contain";
+  img.style.padding = "8px";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitTouchCallout = "none";
+  img.style.userSelect = "none";
+
+  const corner = document.createElement("div");
+  corner.className = "rarity-corner";
+  corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${rarityColor(item.rarity)}66 60%, ${rarityColor(item.rarity)}cc 100%)`;
+
+  const tab = document.createElement("div");
+  tab.className = "type-tab";
+  tab.style.background = rarityColor(item.rarity) + "22";
+  tab.style.borderColor = rarityColor(item.rarity);
+
+  const tabIcon = document.createElement("img");
+  tabIcon.src = item.typeIcon;
+  tabIcon.alt = item.type;
+
+  const tabText = document.createElement("span");
+  tabText.textContent = item.type || "â€”";
+
+  tab.appendChild(tabIcon);
+  tab.appendChild(tabText);
+
+  imgWrap.appendChild(img);
+  imgWrap.appendChild(corner);
+  imgWrap.appendChild(tab);
+
+  const title = document.createElement("div");
+  title.className = "mt-2 px-1 pb-1";
+
+  const name = document.createElement("div");
+  name.className = "font-semibold leading-tight";
+  name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
+  name.textContent = item.name;
+  title.appendChild(name);
+
+  frame.appendChild(imgWrap);
+
+  // Add collected badge if collected
+  if (state.collectedItems.has(item.name)) {
+    const badge = document.createElement("div");
+    badge.className = "collected-badge";
+    badge.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    frame.appendChild(badge);
+
+    const glow = document.createElement("div");
+    glow.className = "collected-glow";
+    frame.appendChild(glow);
+  }
+
+  card.appendChild(frame);
+  card.appendChild(title);
+
+  return card;
+}
+
+// =====================================================
+// User Stats for Progression Page
+// =====================================================
+async function fetchUserStats() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.log("[UserStats] No user logged in, skipping fetch");
+    renderUserStats(0, "N/A", 0, []);
+    return;
+  }
+
+  try {
+    console.log("[UserStats] Fetching submissions for user:", user.uid);
+    const q = query(
+      collection(db, "blueprintSubmissions"),
+      where("userId", "==", user.uid)
+    );
+    const snapshot = await getDocs(q);
+
+    const submissions = [];
+    snapshot.forEach(doc => {
+      submissions.push({ id: doc.id, ...doc.data() });
+    });
+
+    console.log("[UserStats] Found", submissions.length, "submissions");
+
+    // Calculate stats
+    const count = submissions.length;
+
+    // Find best map (most submissions)
+    const mapCounts = {};
+    submissions.forEach(sub => {
+      if (sub.map && sub.map !== "N/A") {
+        mapCounts[sub.map] = (mapCounts[sub.map] || 0) + 1;
+      }
+    });
+
+    let bestMap = "N/A";
+    let bestMapCount = 0;
+    for (const [map, c] of Object.entries(mapCounts)) {
+      if (c > bestMapCount) {
+        bestMap = map;
+        bestMapCount = c;
+      }
+    }
+
+    // Get recent submissions (sorted by submittedAt, most recent first)
+    const sortedSubs = submissions
+      .filter(s => s.blueprintName) // Only include submissions with a blueprint name
+      .sort((a, b) => {
+        // Sort by submittedAt (ISO string) if available - newest first
+        if (a.submittedAt && b.submittedAt) {
+          return new Date(b.submittedAt) - new Date(a.submittedAt);
+        }
+        return 0;
+      })
+      .slice(0, 5);
+
+    console.log("[UserStats] sortedSubs:", sortedSubs.map(s => ({ name: s.blueprintName, date: s.submittedAt })));
+
+    // Auto-add submitted blueprints to collected
+    submissions.forEach(sub => {
+      if (sub.blueprintName) {
+        state.collectedItems.add(sub.blueprintName);
+      }
+    });
+    saveCollectionState();
+
+    renderUserStats(count, bestMap, bestMapCount, sortedSubs);
+
+  } catch (error) {
+    console.error("[UserStats] Error fetching user stats:", error);
+    renderUserStats(0, "N/A", 0, []);
+  }
+}
+
+function renderUserStats(count, bestMap, bestMapCount, recentItems) {
+  const section = document.getElementById("userStatsSection");
+  const countEl = document.getElementById("statSubmissionCount");
+  const mapEl = document.getElementById("statBestMap");
+  const mapCountEl = document.getElementById("statBestMapCount");
+  const grid = document.getElementById("recentFindsGrid");
+
+  if (!section || !countEl || !mapEl || !grid) return;
+
+  if (count === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  // Update Stats
+  countEl.textContent = count;
+  mapEl.textContent = bestMap;
+  if (mapCountEl) mapCountEl.textContent = `(${bestMapCount})`;
+  section.classList.remove("hidden");
+
+  // Render Recent Finds Grid
+  grid.innerHTML = "";
+
+  console.log("[UserStats] Rendering recent items:", recentItems.length);
+  console.log("[UserStats] state.all has", state.all.length, "items");
+
+  recentItems.forEach((sub, index) => {
+    // Find item data
+    const itemData = state.all.find(i => i.name === sub.blueprintName);
+    console.log(`[UserStats] Item ${index}: blueprintName="${sub.blueprintName}", found=${!!itemData}`);
+
+    // Only render if we have the full item data (needed for visuals)
+    if (itemData) {
+      // Use inline card creation (same as renderGrid)
+      const card = createCard(itemData, index);
+      grid.appendChild(card);
+    }
+  });
+
+  console.log("[UserStats] Grid now has", grid.children.length, "children");
+}
 
 function renderProgression() {
   const container = document.getElementById("progressionTab");
@@ -779,6 +994,20 @@ function switchTab(tabName) {
   // Toggle Grid View Visibility
   const showGrid = (tabName === "blueprints");
 
+  // Toggle Grid Header Visibility
+  const gridHeader = document.getElementById("gridHeader");
+  if (gridHeader) {
+    if (showGrid) {
+      gridHeader.classList.remove("hidden");
+      gridHeader.classList.add("flex");
+    } else {
+      gridHeader.classList.add("hidden");
+      gridHeader.classList.remove("flex");
+    }
+  }
+
+
+
   if (grid) {
     if (showGrid) {
       // Grid visibility is also handled by renderGrid based on filters, 
@@ -796,6 +1025,7 @@ function switchTab(tabName) {
     if (tabName === "progression") {
       progressionTab.classList.remove("hidden");
       renderProgression();
+      fetchUserStats();
     } else {
       progressionTab.classList.add("hidden");
     }
@@ -805,38 +1035,66 @@ function switchTab(tabName) {
   if (dataTab) {
     if (tabName === "data") {
       dataTab.classList.remove("hidden");
+      if (typeof fetchDetailedData === 'function' && (!state.detailedData || state.detailedData.length === 0)) {
+        fetchDetailedData();
+      } else if (typeof renderDataRegistry === 'function') {
+        renderDataRegistry();
+      }
     } else {
       dataTab.classList.add("hidden");
     }
   }
 
-  // Desktop Filter Logic - Auto-hide on non-blueprints tabs
+  // Filter Logic - Auto-hide on non-blueprints tabs
   const desktopFilterBtn = document.getElementById("desktopFilterBtn");
+  const mobileFilterBtn = document.getElementById("mobileFilterBtn");
   const sidebar = document.getElementById("filtersSidebar");
 
-  if (sidebar && desktopFilterBtn) {
+  if (sidebar) {
     if (tabName === "blueprints") {
-      // Enable button
-      desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
-      desktopFilterBtn.classList.add("cursor-pointer");
+      // Enable buttons
+      if (desktopFilterBtn) {
+        desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+        desktopFilterBtn.classList.add("cursor-pointer");
+      }
+      if (mobileFilterBtn) {
+        mobileFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+        mobileFilterBtn.classList.add("cursor-pointer");
+      }
 
       // Restore state
       if (state.filtersOpen) {
-        sidebar.classList.remove("hidden");
-        desktopFilterBtn.classList.add("opacity-100");
-        desktopFilterBtn.classList.remove("opacity-50");
+        // Fix: Ensure hidden on mobile, visible on desktop
+        sidebar.classList.add("hidden");
+        sidebar.classList.remove("md:hidden");
+        sidebar.classList.add("md:block");
+
+        if (desktopFilterBtn) {
+          desktopFilterBtn.classList.add("opacity-100");
+          desktopFilterBtn.classList.remove("opacity-50");
+        }
       } else {
         sidebar.classList.add("hidden");
-        desktopFilterBtn.classList.remove("opacity-100");
-        desktopFilterBtn.classList.add("opacity-50");
+        sidebar.classList.remove("md:block");
+        if (desktopFilterBtn) {
+          desktopFilterBtn.classList.remove("opacity-100");
+          desktopFilterBtn.classList.add("opacity-50");
+        }
       }
     } else {
-      // Disable button
-      desktopFilterBtn.classList.add("opacity-50", "pointer-events-none");
-      desktopFilterBtn.classList.remove("cursor-pointer", "opacity-100");
+      // Disable buttons
+      if (desktopFilterBtn) {
+        desktopFilterBtn.classList.add("opacity-50", "pointer-events-none");
+        desktopFilterBtn.classList.remove("cursor-pointer", "opacity-100");
+      }
+      if (mobileFilterBtn) {
+        mobileFilterBtn.classList.add("opacity-50", "pointer-events-none");
+        mobileFilterBtn.classList.remove("cursor-pointer");
+      }
 
       // Force hide sidebar
       sidebar.classList.add("hidden");
+      sidebar.classList.remove("md:block");
     }
   }
 }
@@ -1280,8 +1538,8 @@ function initWrapped() {
         <div class="${stat.color} mb-1 drop-shadow-md">
           ${largerIcon}
         </div>
-        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-black ${stat.color} drop-shadow-lg">${stat.value}</span>
-        <div class="text-xs text-zinc-300 uppercase font-black tracking-wider text-center leading-tight drop-shadow-md opacity-90">${stat.label}</div>
+        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-hud font-bold ${stat.color} drop-shadow-lg">${stat.value}</span>
+        <div class="text-xs text-zinc-300 uppercase font-tabs font-bold tracking-wider text-center leading-tight drop-shadow-md opacity-90">${stat.label}</div>
       `;
 
       statsGrid.appendChild(pill);
@@ -2088,7 +2346,7 @@ const CONFIDENCE_COLORS = {
   "Not Enough Data": "#E11D48" // Red
 };
 
-// Item Type → local icon filename mapping.
+// Item Type â†’ local icon filename mapping.
 // You provided these files:
 //   ItemCategory_Misc.png
 //   ItemCategory_Material.png
@@ -2545,7 +2803,7 @@ async function loadData() {
       // Helper to parse boolean checkbox values from CSV
       const parseBoolField = (val) => {
         const v = norm(val).toLowerCase();
-        return v === "true" || v === "yes" || v === "1" || v === "x" || v === "✓";
+        return v === "true" || v === "yes" || v === "1" || v === "x" || v === "âœ“";
       };
 
       state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, conf: colConf, wiki: colWiki };
@@ -2581,7 +2839,7 @@ async function loadData() {
       initUI();
       applyFilters();
       renderFacets();
-      setMetaLine(`${items.length} items • live from Sheets`);
+      setMetaLine(`${items.length} items â€¢ live from Sheets`);
     },
     error: (err) => {
       console.error(err);
@@ -2753,7 +3011,7 @@ function renderActiveChips() {
   const push = (label, clearFn) => {
     const b = document.createElement("button");
     b.className = "chip chip-active";
-    b.textContent = label + " ✕";
+    b.textContent = label + " âœ•";
     b.onclick = clearFn;
     wrap.appendChild(b);
   };
@@ -2927,7 +3185,7 @@ function renderGrid() {
 
     const tabText = document.createElement("span");
     tabText.className = "";
-    tabText.textContent = it.type || "—";
+    tabText.textContent = it.type || "â€”";
 
     tab.appendChild(tabIcon);
     tab.appendChild(tabText);
@@ -3060,6 +3318,22 @@ function renderGrid() {
       row.appendChild(val);
       details.appendChild(row);
     }
+
+    // -- Link to Data Registry (Detailed Data) --
+    const dataLink = document.createElement("div");
+    dataLink.className = "mt-3 pt-3 border-t border-white/10 flex items-center justify-between cursor-pointer group/link hover:bg-white/5 rounded-lg p-2 transition-colors";
+    dataLink.onclick = (e) => {
+      e.stopPropagation();
+      if (window.openDataDetail) window.openDataDetail(it.name);
+    };
+
+    dataLink.innerHTML = `
+      <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider group-hover/link:text-zinc-200 transition-colors">Detailed Data</span>
+      <svg class="w-4 h-4 text-zinc-500 group-hover/link:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+      </svg>
+    `;
+    details.appendChild(dataLink);
 
 
 
@@ -3325,7 +3599,7 @@ function initContextMenu() {
     }
 
     // Vertical safety check: if it would go off the bottom, show it above the item instead
-    const estimatedHeight = 240; // Approx height including all options and stepper
+    const estimatedHeight = 150; // Approx height including all options and stepper
     if (top + estimatedHeight > window.innerHeight - margin) {
       top = cardRect.top - estimatedHeight - 8;
       // Ensure it doesn't go off the top either
@@ -3334,7 +3608,7 @@ function initContextMenu() {
 
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    menu.classList.remove("hidden");
+    menu.classList.remove("hidden", "pointer-events-none");
     requestAnimationFrame(() => menu.classList.remove("opacity-0"));
 
     // Update spares count display for this item
@@ -3344,11 +3618,34 @@ function initContextMenu() {
       const count = state.spares[itemName] || 0;
       contextSparesCount.textContent = count;
     }
+
+    // Update collected/wishlisted button text & visual state based on item status
+    const itemName = card.dataset.name;
+    const collectedText = document.getElementById("contextCollectedText");
+    const wishlistText = document.getElementById("contextWishlistText");
+    const collectedBtn = document.getElementById("contextCollectedBtn");
+    const wishlistBtn = document.getElementById("contextWishlistBtn");
+
+    if (state.collectedItems.has(itemName)) {
+      if (collectedText) collectedText.textContent = "Mark as Uncollected";
+      if (collectedBtn) collectedBtn.classList.add("bg-emerald-500/20", "text-emerald-400");
+    } else {
+      if (collectedText) collectedText.textContent = "Mark as Collected";
+      if (collectedBtn) collectedBtn.classList.remove("bg-emerald-500/20", "text-emerald-400");
+    }
+
+    if (state.wishlistedItems.has(itemName)) {
+      if (wishlistText) wishlistText.textContent = "Remove from Wishlist";
+      if (wishlistBtn) wishlistBtn.classList.add("bg-amber-500/20", "text-amber-400");
+    } else {
+      if (wishlistText) wishlistText.textContent = "Add to Wishlist";
+      if (wishlistBtn) wishlistBtn.classList.remove("bg-amber-500/20", "text-amber-400");
+    }
   };
 
   // Hide menu
   const hideMenu = () => {
-    menu.classList.add("opacity-0");
+    menu.classList.add("opacity-0", "pointer-events-none");
     setTimeout(() => menu.classList.add("hidden"), 150);
     if (activeCard) activeCard.classList.remove("card-selected");
     activeCard = null;
@@ -3391,9 +3688,16 @@ function initContextMenu() {
 
   // Hide menu/details on click outside
   document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target)) {
-      deselectAll();
-    }
+    // Don't close if clicking inside the context menu
+    if (menu.contains(e.target)) return;
+
+    // Don't close if clicking inside a details overlay
+    if (e.target.closest(".details-overlay")) return;
+
+    // Don't close if clicking inside a selected card
+    if (e.target.closest(".card-selected")) return;
+
+    deselectAll();
   });
 
   // Spares pill click handler (event delegation) - open context menu
@@ -3530,6 +3834,397 @@ function initContextMenu() {
   });
 }
 
+// ==========================================
+// DATA REGISTRY & ANALYTICS
+// ==========================================
+
+const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVGhcLiin4Ke8anpTi8amSCsOF-ato3LUpG5eqHjOU_sH-70n4QfhpwToV4lZ2q5taM4xO-qWSldrH/pub?gid=1774944227&single=true&output=csv";
+
+state.detailedData = [];
+state.dataSort = { column: 'entries', direction: 'desc' }; // Default sort
+state.dataSearch = "";
+
+async function fetchDetailedData() {
+  const container = document.getElementById("dataRows");
+  if (!container) return;
+
+  // Show loading if empty
+  if (state.detailedData.length === 0) {
+    container.innerHTML = `
+      <div class="py-20 text-center">
+        <div class="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p class="text-zinc-500">Fetching live data...</p>
+      </div>`;
+  }
+
+  try {
+    const response = await fetch(DATA_CSV_URL);
+    const csvText = await response.text();
+
+    Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        processDataResults(results.data);
+      },
+      error: (err) => {
+        console.error("CSV Parse Error:", err);
+        container.innerHTML = `<div class="py-10 text-center text-red-500">Failed to load data.</div>`;
+      }
+    });
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    container.innerHTML = `<div class="py-10 text-center text-red-500">Network error.</div>`;
+  }
+}
+
+function processDataResults(rawData) {
+  // Map CSV fields to our internal structure
+  state.detailedData = rawData.map(row => {
+    // Normalize keys if needed, but CSV headers seem clean
+    // "Blueprint Name", "Most Likely Map", "Most Likely Condition", "Total Entries", "Data Confidence"
+
+    // Parse Maps
+    const maps = [
+      { name: "Spaceport", count: parseInt(row["Spaceport"] || 0) },
+      { name: "Stella Montis", count: parseInt(row["Stella Montis"] || 0) },
+      { name: "Blue Gate", count: parseInt(row["Blue Gate"] || 0) },
+      { name: "Dam Battlegrounds", count: parseInt(row["Dam Battlegrounds"] || 0) },
+      { name: "Buried City", count: parseInt(row["Buried City"] || 0) }
+    ].sort((a, b) => b.count - a.count);
+
+    // Parse Conditions
+    const conditions = [
+      { name: "Day", count: parseInt(row["Day"] || 0) },
+      { name: "Night", count: parseInt(row["Night"] || 0) },
+      { name: "Storm", count: parseInt(row["Storm"] || 0) },
+      { name: "Cold Snap", count: parseInt(row["Cold Snap"] || 0) },
+      { name: "Hidden Bunker", count: parseInt(row["Hidden Bunker"] || 0) },
+      { name: "Locked Gate", count: parseInt(row["Locked Gate"] || 0) }
+    ].sort((a, b) => b.count - a.count);
+
+    const totalEntries = parseInt(row["Total Entries"] || 0);
+
+    return {
+      name: row["Blueprint Name"],
+      confidence: row["Data Confidence"],
+      bestMap: row["Most Likely Map"],
+      bestCondition: row["Most Likely Condition"],
+      entries: totalEntries,
+      maps: maps,
+      conditions: conditions
+    };
+  });
+
+  renderDataRegistry();
+}
+
+function renderDataRegistry() {
+  const container = document.getElementById("dataRows");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Filter
+  let filtered = state.detailedData.filter(item => {
+    return item.name.toLowerCase().includes(state.dataSearch.toLowerCase());
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    const dir = state.dataSort.direction === 'asc' ? 1 : -1;
+    const col = state.dataSort.column;
+
+    if (col === 'entries') return (a.entries - b.entries) * dir;
+    if (col === 'name') return a.name.localeCompare(b.name) * dir;
+    // Simple string sorts for others
+    return String(a[col]).localeCompare(String(b[col])) * dir;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="py-10 text-center text-zinc-500">No matching records found.</div>`;
+    return;
+  }
+
+  filtered.forEach((item, index) => {
+    // Attempt to find matching blueprint in our local state to get image/rarity
+    let localBP = state.all.find(bp => bp.name === item.name);
+    // Fallback for Light Sticks (CSV often uses generic "Light Stick")
+    if (!localBP && item.name.includes("Light Stick")) {
+      localBP = state.all.find(bp => bp.name.includes("Light Stick"));
+    }
+    const rarity = localBP ? localBP.rarity : 'common';
+    const icon = localBP ? localBP.img : 'icons/ItemCategory_Weapon.webp'; // Fallback
+    const typeIcon = localBP ? localBP.typeIcon : '';
+
+    const row = document.createElement("div");
+    row.className = "group relative flex flex-col bg-zinc-900/70 border border-zinc-800/50 hover:border-zinc-700 rounded-xl overflow-hidden transition-all duration-200 backdrop-blur-md";
+
+    // Header (The Row itself)
+    const header = document.createElement("div");
+    // Responsive Grid: Col 1 fixed 90px. Added 20px col for Arrow on mobile.
+    header.className = "grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 gap-y-2 md:gap-4 px-3 md:px-4 py-2 items-center cursor-pointer hover:bg-white/5 transition-colors";
+
+    const miniCardId = `mini-card-${index}`;
+
+    header.innerHTML = `
+      <!-- Item Name & Icon (Col 1) -->
+      <div class="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4 overflow-hidden md:border-r border-white/5 pr-0 h-full min-w-0">
+        <div id="${miniCardId}" class="shrink-0 relative flex items-center justify-center">
+            ${!localBP ? `
+            <div class="w-10 h-10 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden" 
+                 style="border-color: ${rarityColor(rarity)}66">
+              <img src="${icon}" class="w-full h-full object-contain p-1" loading="lazy">
+              <div class="absolute inset-0 bg-${rarityColor(rarity)}/10"></div>
+            </div>` : ''}
+        </div>
+        <div class="flex flex-col min-w-0 w-full">
+          <!-- Text wrap enabled, sized down on mobile, type removed -->
+          <span class="font-bold text-sm text-zinc-200 break-words leading-tight group-hover:text-emerald-400 transition-colors">${item.name}</span>
+        </div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="border-r border-white/5 h-full flex items-center pl-0 pr-1 md:pl-2 overflow-hidden">${getConfidenceBadges(item.confidence)}</div>
+
+      <!-- Best Map -->
+      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestMap}</div>
+
+      <!-- Best Condition -->
+      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestCondition}</div>
+
+      <!-- Entries -->
+      <div class="text-right text-sm font-mono font-bold text-zinc-300 md:border-r border-white/5 h-full flex items-center justify-end pr-1 md:pr-2">${item.entries}</div>
+
+      <!-- Arrow (Grid Column) -->
+      <div class="flex justify-end items-center h-full text-zinc-600 group-hover:text-zinc-300">
+        <svg class="w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 transform expand-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    `;
+
+    // Inject Scaled Card logic
+    if (localBP) {
+      const wrapper = header.querySelector(`#${miniCardId}`);
+      if (wrapper) {
+        const scale = 0.42; // Middle ground size (approx 84px)
+        const baseW = 200;
+
+        // Adjust wrapper to fit
+        wrapper.style.width = (baseW * scale) + "px";
+        wrapper.style.height = (baseW * scale) + "px";
+
+        const card = createCard(localBP, 0);
+
+        // Custom styling for Mini-View: Remove container and name
+        card.className = ""; // Remove base styles (bg, border, p-2)
+        card.style.background = "transparent";
+        card.style.border = "none";
+        card.style.padding = "0";
+        // Restore container query support for rarity-corner
+        card.style.containerType = "inline-size";
+
+        if (card.lastChild) card.lastChild.remove(); // Remove title/name
+
+        // Remove Type Pill/Icon
+        const typeTab = card.querySelector(".type-tab");
+        if (typeTab) typeTab.remove();
+
+        const badges = card.querySelectorAll(".collected-badge, .wishlist-badge");
+        badges.forEach(b => {
+          b.style.transform = "scale(2.5) translateY(-12px)"; // Scale and nudge up significantly
+          b.style.transformOrigin = "top right";
+          b.style.zIndex = "50";
+        });
+
+        card.style.width = baseW + "px";
+        card.style.transform = `scale(${scale})`;
+        card.style.transformOrigin = "top left";
+        card.style.position = "absolute";
+        card.style.top = "0";
+        card.style.left = "0";
+        card.style.pointerEvents = "none";
+
+        wrapper.appendChild(card);
+      }
+    }
+
+    // Detail Section (Initially Hidden)
+    const detail = document.createElement("div");
+    detail.className = "hidden border-t border-zinc-800/50 bg-black/20";
+    detail.innerHTML = `
+      <div class="p-4 md:p-6">
+        <!-- Analytics Only -->
+        <div class="space-y-6 w-full min-w-0">
+          <!-- Maps Chart -->
+          <div>
+            <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Map Distribution</h4>
+            <div class="space-y-2">
+              ${renderDistBars(item.maps, item.entries)}
+            </div>
+          </div>
+          
+          <!-- Conditions Chart -->
+           <div>
+            <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Condition Distribution</h4>
+            <div class="space-y-2">
+              ${renderDistBars(item.conditions, item.entries)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Click to toggle
+    header.onclick = () => {
+      const isHidden = detail.classList.contains("hidden");
+
+      if (isHidden) {
+        detail.classList.remove("hidden");
+        header.querySelectorAll(".expand-arrow").forEach(el => el.classList.add("rotate-180"));
+        header.classList.add("bg-white/[0.02]"); // Active state
+      } else {
+        detail.classList.add("hidden");
+        header.querySelectorAll(".expand-arrow").forEach(el => el.classList.remove("rotate-180"));
+        header.classList.remove("bg-white/[0.02]");
+      }
+    };
+
+    header.dataset.itemName = item.name;
+    row.appendChild(header);
+    row.appendChild(detail);
+    container.appendChild(row);
+  });
+
+  // Handle Cross-Tab Linking (Detailed Data)
+  if (state.dataTabTarget) {
+    setTimeout(() => {
+      // Find the header element with the matching name
+      // Since header has the dataset, we query for that.
+      // Note: container contains 'row' divs. The 'header' is a child of 'row'.
+      // Querying container directly finds the header.
+      const targetHeader = container.querySelector(`div[data-item-name="${state.dataTabTarget}"]`);
+
+      if (targetHeader) {
+        targetHeader.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Trigger click to expand
+        targetHeader.click();
+        // Highlight
+        targetHeader.classList.add("bg-emerald-500/10");
+        setTimeout(() => targetHeader.classList.remove("bg-emerald-500/10"), 1500);
+      }
+      state.dataTabTarget = null;
+    }, 300); // Slight delay for render/tab switch
+  }
+}
+
+// Global function to link to Data Tab
+window.openDataDetail = function (itemName) {
+  state.dataTabTarget = itemName;
+
+  // Clear Data Registry filters to ensure visibility
+  state.dataSearch = "";
+  const searchInput = document.getElementById("dataSearch");
+  if (searchInput) searchInput.value = "";
+
+  switchTab('data');
+};
+
+function getConfidenceBadges(confidence) {
+  let color = "bg-zinc-800 text-zinc-400 border-zinc-700";
+  // "Low", "Medium", "High", "Very High", "Confirmed", "Confident"
+  // Map strings from CSV to styles
+  const c = confidence.toLowerCase();
+
+  // Color Mapping Per User Request:
+  // Gold = Confirmed
+  if (c.includes("confirmed")) color = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+  // Pink = Very High
+  else if (c.includes("very high")) color = "bg-pink-500/10 text-pink-400 border-pink-500/20";
+  // High -> Pink (Assumed)
+  else if (c.includes("high")) color = "bg-pink-500/10 text-pink-400 border-pink-500/20";
+  // Blue = Confident
+  else if (c.includes("confident")) color = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  // Medium -> Blue (Assumed)
+  else if (c.includes("medium")) color = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  // Emerald = Low
+  else if (c.includes("low")) color = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  // Grey = Not Enough Data / Default (handled by initial 'color' set to zinc)
+
+  return `<span class="flex flex-wrap justify-center text-center leading-none px-1 py-0.5 rounded-md text-[9px] md:text-[10px] font-bold border ${color} uppercase tracking-wide w-full h-auto break-words whitespace-normal">${confidence}</span>`;
+}
+
+function renderDistBars(data, total) {
+  // data is array of {name, count}
+  const max = Math.max(...data.map(d => d.count)) || 1;
+
+  // User-requested colors for Top 4, plus creative fillers (Darkened for readability)
+  const distColors = [
+    "#DC2626", // 1: Red (Darker)
+    "#D97706", // 2: Amber/Gold (Readable)
+    "#16A34A", // 3: Green (Darker)
+    "#0891B2", // 4: Cyan (Darker)
+    "#7E22CE", // 5: Purple (Darker)
+    "#BE185D", // 6: Pink (Darker)
+    "#1D4ED8"  // 7: Blue (Darker)
+  ];
+
+  return data.map((d, index) => {
+    if (d.count === 0) return ''; // Skip empty
+    const percent = Math.round((d.count / total) * 100);
+    const width = Math.max((d.count / max) * 100, 2); // Min width for visibility
+    const color = distColors[index] || "#3f3f46"; // Default Zinc-700
+
+    return `
+      <div class="flex items-center gap-3 text-xs">
+        <div class="w-24 shrink-0 text-zinc-300 text-right truncate" title="${d.name}">${d.name}</div>
+        <div class="flex-1 h-6 bg-zinc-900 rounded-md overflow-hidden relative group/bar">
+          <div class="absolute inset-y-0 left-0 rounded-md transition-all duration-200 opacity-90 group-hover/bar:opacity-100 group-hover/bar:brightness-110" 
+               style="width: ${width}%; background-color: ${color};"></div>
+          <div class="absolute inset-0 flex items-center px-2">
+             <span class="font-mono text-white z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] font-bold">${d.count} <span class="text-white/80 ml-1">(${percent}%)</span></span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
 
+// Event Listeners for Data Tab
+document.addEventListener("DOMContentLoaded", () => {
+  // Search
+  const searchInput = document.getElementById("dataSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      state.dataSearch = e.target.value;
+      renderDataRegistry();
+    });
+  }
 
+  // Sort Headers
+  document.querySelectorAll("[data-sort]").forEach(header => {
+    header.addEventListener("click", () => {
+      const col = header.dataset.sort;
+      if (state.dataSort.column === col) {
+        state.dataSort.direction = state.dataSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.dataSort.column = col;
+        state.dataSort.direction = 'asc'; // true? No, 'asc'
+      }
+      renderDataRegistry();
+
+      // Visual feedback could be added here (arrow icons)
+      document.querySelectorAll("[data-sort]").forEach(h => h.classList.remove("text-emerald-400"));
+      header.classList.add("text-emerald-400");
+    });
+  });
+
+  // Refresh Btn
+  const refreshBtn = document.getElementById("dataRefreshBtn");
+  if (refreshBtn) {
+    refreshBtn.onclick = () => {
+      fetchDetailedData();
+    };
+  }
+});
