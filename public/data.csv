@@ -15,7 +15,7 @@ Compensator III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Compensa
 Complex Gun Parts,Metal Lockers and black boxes in Blue Gate security wing,Any,Any,Security Wing,Material,epic,https://arcraiders.wiki/wiki/Complex_Gun_Parts,Very High,FALSE,FALSE,,TRUE
 Deadline,Any,Stella Montis,Any,Any,Quick Use,Epic,https://arcraiders.wiki/wiki/Deadline,Low,FALSE,FALSE,,TRUE
 Defibrillator,Medical Containers or medical loot zones,Dam Battlegrounds,Any,Testing Annex,Quick Use,rare,https://arcraiders.wiki/wiki/Defibrillator,Low,FALSE,FALSE,,TRUE
-Equalizer,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Equalizer,Confirmed,FALSE,FALSE,,TRUE
+Equalizer,Queen Harvester,Any,Harvester,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Equalizer,Confirmed,FALSE,FALSE,,TRUE
 Explosive Mine,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Explosive_Mine,Low,FALSE,FALSE,,TRUE
 Extended Barrel,Any,Any,Night,Any,Mod,epic,https://arcraiders.wiki/wiki/Extended_Barrel,Low,FALSE,FALSE,,TRUE
 Extended Light Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Light_Magazine_II,Low,FALSE,FALSE,,TRUE
@@ -23,15 +23,15 @@ Extended Light Magazine III,"Residential Containers (wardrobes, drawers, etc)",A
 Extended Medium Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_II,Very High,FALSE,FALSE,,TRUE
 Extended Medium Magazine III,Any,Any,Night,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Medium_Magazine_III,Very High,FALSE,FALSE,,TRUE
 Extended Shotgun Magazine II,"Residential Containers (wardrobes, drawers, etc)",Any,Night,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_II,Very High,FALSE,FALSE,,TRUE
-Extended Shotgun Magazine III,Any,Any,Night or Storm,Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_III,Low,FALSE,FALSE,,TRUE
+Extended Shotgun Magazine III,Any,Any,"Night, Storm",Any,Mod,rare,https://arcraiders.wiki/wiki/Extended_Shotgun_Magazine_III,Low,FALSE,FALSE,,TRUE
 Fireworks Box,Any,Any,Cold Snap,Any,Quick Use,rare,https://arcraiders.wiki/wiki/Fireworks_Box,Very High,FALSE,FALSE,,TRUE
-Gas Mine,Any,Any,Stella Montis,Any,Grenade,common,https://arcraiders.wiki/wiki/Gas_Mine,Not Enough Data,FALSE,FALSE,,TRUE
+Gas Mine,Any,Stella Montis,Any,Any,Grenade,common,https://arcraiders.wiki/wiki/Gas_Mine,Confident,FALSE,FALSE,,TRUE
 Heavy Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Heavy_Gun_Parts,Very High,FALSE,FALSE,,TRUE
 Horizontal Grip,N/A,Any,Any,N/A,Mod,epic,https://arcraiders.wiki/wiki/Horizontal_Grip,Not Enough Data,FALSE,FALSE,,FALSE
 Hullcracker,N/A,N/A,N/A,N/A,Weapon,epic,https://arcraiders.wiki/wiki/Hullcracker,Confirmed,FALSE,TRUE,Quest Name | Major's Footlocker,TRUE
 Il Toro,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Weapon,uncommon,https://arcraiders.wiki/wiki/Il_Toro,Very High,FALSE,FALSE,,TRUE
 Jolt Mine,"Rusty Breachable Raider Box, Red Locker",Dam Battlegrounds,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Jolt_Mine,Very High,FALSE,FALSE,,TRUE
-Jupiter,Queen Harvester,Any,Harvester Event,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Jupiter,Confirmed,FALSE,FALSE,,TRUE
+Jupiter,Queen Harvester,Any,Harvester,Harvester puzzle,Weapon,legendary,https://arcraiders.wiki/wiki/Jupiter,Confirmed,FALSE,FALSE,,TRUE
 Light Gun Parts,"Raider Cache, Weapon Box, Ammo Case, Grenade Case",Any,Any,Any,Material,rare,https://arcraiders.wiki/wiki/Light_Gun_Parts,Very High,FALSE,FALSE,,TRUE
 Light Stick (Blue),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
 Light Stick (Green),Any,Any,Day,Any,Quick Use,common,https://arcraiders.wiki/wiki/Light_StickÂ (Any_Color),Very High,FALSE,FALSE,,TRUE
@@ -57,7 +57,7 @@ Silencer II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village,
 Smoke Grenade,Any,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Smoke_Grenade,Confident,FALSE,FALSE,,TRUE
 Snap Hook,Any,"Dam Battlegrounds, Any","Storm, Night",Any,Quick Use,legendary,https://arcraiders.wiki/wiki/Snap_Hook,Very High,FALSE,FALSE,,TRUE
 Stable Stock II,"Residential Containers (wardrobes, drawers, etc)",Any,Any,"Village, Plaza Roza, Ruby Residence, etc",Mod,uncommon,https://arcraiders.wiki/wiki/Stable_Stock_II,Very High,FALSE,FALSE,,TRUE
-Stable Stock III,"Residential Containers (wardrobes, drawers, etc)",Any,"Night, Storm or Hidden Bunker","Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Stable_Stock_III,Low,FALSE,FALSE,,TRUE
+Stable Stock III,"Residential Containers (wardrobes, drawers, etc)",Any,"Night, Storm, Hidden Bunker","Village, Plaza Roza, Ruby Residence, etc",Mod,rare,https://arcraiders.wiki/wiki/Stable_Stock_III,Low,FALSE,FALSE,,TRUE
 Tactical Mk. 3 (Defensive),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Defensive),Very High,FALSE,FALSE,,TRUE
 Tactical Mk. 3 (Healing),Metal Lockers in Blue Gate security wing,"Stella Montis, Blue Gate",Any,Security Wing,Augment,epic,https://arcraiders.wiki/wiki/Tactical_Mk._3_(Healing),Very High,FALSE,FALSE,,TRUE
 Tagging Grenade,Rusty Breachable Raider Box,Any,Any,Any,Grenade,rare,https://arcraiders.wiki/wiki/Tagging_Grenade,Low,FALSE,FALSE,,TRUE
