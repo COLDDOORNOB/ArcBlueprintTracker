@@ -146,7 +146,9 @@ function saveFilters() {
       conds: Array.from(state.filters.conds),
       confs: Array.from(state.filters.confs),
       collected: state.filters.collected,
-      sort: state.filters.sort
+      sort: state.filters.sort, // Legacy fallback
+      sortBlueprints: state.filters.sortBlueprints,
+      sortData: state.filters.sortData
     };
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -165,7 +167,9 @@ function loadFilters() {
       if (parsed.conds) state.filters.conds = new Set(parsed.conds);
       if (parsed.confs) state.filters.confs = new Set(parsed.confs);
       if (parsed.collected) state.filters.collected = parsed.collected;
-      if (parsed.sort) state.filters.sort = parsed.sort;
+      if (parsed.sort) state.filters.sortBlueprints = parsed.sort; // Legacy migration
+      if (parsed.sortBlueprints) state.filters.sortBlueprints = parsed.sortBlueprints;
+      if (parsed.sortData) state.filters.sortData = parsed.sortData;
     }
   } catch (e) {
     console.error("Failed to load filters:", e);
@@ -951,9 +955,56 @@ function renderProgression() {
   });
 }
 
+// Helper to swap sort options based on tab
+function updateSortOptions(tab) {
+  const sort1 = document.getElementById("sortSelect");
+  const sort2 = document.getElementById("sortSelectMobile");
+
+  let html = "";
+  if (tab === "data") {
+    html = `
+      <option value="entries_desc">Submissions (High → Low)</option>
+      <option value="entries_asc">Submissions (Low → High)</option>
+      <option value="rarity_desc">Rarity (High → Low)</option>
+      <option value="rarity_asc">Rarity (Low → High)</option>
+      <option value="name_asc">Name (A → Z)</option>
+      <option value="name_desc">Name (Z → A)</option>
+    `;
+  } else {
+    // Default Blueprints options
+    html = `
+      <option value="rarity_desc">Rarity (High → Low)</option>
+      <option value="rarity_asc">Rarity (Low → High)</option>
+      <option value="name_asc">Name (A → Z)</option>
+      <option value="name_desc">Name (Z → A)</option>
+      <option value="type_asc">Type (A → Z)</option>
+    `;
+  }
+
+  if (sort1) {
+    sort1.innerHTML = html;
+    if (tab === "data") {
+      sort1.value = state.filters.sortData || "entries_desc";
+    } else {
+      sort1.value = state.filters.sortBlueprints || "rarity_desc";
+    }
+  }
+  if (sort2) {
+    sort2.innerHTML = html;
+    if (tab === "data") {
+      sort2.value = state.filters.sortData || "entries_desc";
+    } else {
+      sort2.value = state.filters.sortBlueprints || "rarity_desc";
+    }
+  }
+}
+
 function switchTab(tabName) {
   state.currentTab = tabName;
   window.scrollTo(0, 0);
+
+  // Update Sort Options logic
+  updateSortOptions(tabName === "data" ? "data" : "blueprints");
 
   // Tab Buttons
   const blueprintsBtn = document.getElementById("tabBlueprints");
@@ -1045,56 +1096,66 @@ function switchTab(tabName) {
     }
   }
 
-  // Filter Logic - Auto-hide on non-blueprints tabs
+  // Filter Logic - Sidebar enabled on all tabs, but filter options hidden on progression
   const desktopFilterBtn = document.getElementById("desktopFilterBtn");
   const mobileFilterBtn = document.getElementById("mobileFilterBtn");
   const sidebar = document.getElementById("filtersSidebar");
+  const drawer = document.getElementById("drawer");
+
+  // Toggle filter-options visibility based on tab
+  const hideFilters = tabName === "progression";
+
+  // Hide filter options in desktop sidebar
+  if (sidebar) {
+    sidebar.querySelectorAll(".filter-options").forEach(el => {
+      if (hideFilters) {
+        el.classList.add("hidden");
+      } else {
+        el.classList.remove("hidden");
+      }
+    });
+  }
+
+  // Hide filter options in mobile drawer
+  if (drawer) {
+    drawer.querySelectorAll(".filter-options").forEach(el => {
+      if (hideFilters) {
+        el.classList.add("hidden");
+      } else {
+        el.classList.remove("hidden");
+      }
+    });
+  }
 
   if (sidebar) {
-    if (tabName === "blueprints") {
-      // Enable buttons
+    // Enable filter buttons on all tabs (no greying)
+    if (desktopFilterBtn) {
+      desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+      desktopFilterBtn.classList.add("cursor-pointer");
+    }
+    if (mobileFilterBtn) {
+      mobileFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+      mobileFilterBtn.classList.add("cursor-pointer");
+    }
+
+    // Restore state based on user preference
+    if (state.filtersOpen) {
+      // Fix: Ensure hidden on mobile, visible on desktop
+      sidebar.classList.add("hidden");
+      sidebar.classList.remove("md:hidden");
+      sidebar.classList.add("md:block");
+
       if (desktopFilterBtn) {
-        desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
-        desktopFilterBtn.classList.add("cursor-pointer");
-      }
-      if (mobileFilterBtn) {
-        mobileFilterBtn.classList.remove("opacity-50", "pointer-events-none");
-        mobileFilterBtn.classList.add("cursor-pointer");
-      }
-
-      // Restore state
-      if (state.filtersOpen) {
-        // Fix: Ensure hidden on mobile, visible on desktop
-        sidebar.classList.add("hidden");
-        sidebar.classList.remove("md:hidden");
-        sidebar.classList.add("md:block");
-
-        if (desktopFilterBtn) {
-          desktopFilterBtn.classList.add("opacity-100");
-          desktopFilterBtn.classList.remove("opacity-50");
-        }
-      } else {
-        sidebar.classList.add("hidden");
-        sidebar.classList.remove("md:block");
-        if (desktopFilterBtn) {
-          desktopFilterBtn.classList.remove("opacity-100");
-          desktopFilterBtn.classList.add("opacity-50");
-        }
+        desktopFilterBtn.classList.add("opacity-100");
+        desktopFilterBtn.classList.remove("opacity-50");
       }
     } else {
-      // Disable buttons
-      if (desktopFilterBtn) {
-        desktopFilterBtn.classList.add("opacity-50", "pointer-events-none");
-        desktopFilterBtn.classList.remove("cursor-pointer", "opacity-100");
-      }
-      if (mobileFilterBtn) {
-        mobileFilterBtn.classList.add("opacity-50", "pointer-events-none");
-        mobileFilterBtn.classList.remove("cursor-pointer");
-      }
-
-      // Force hide sidebar
       sidebar.classList.add("hidden");
       sidebar.classList.remove("md:block");
+      if (desktopFilterBtn) {
+        desktopFilterBtn.classList.remove("opacity-100");
+        desktopFilterBtn.classList.add("opacity-50");
+      }
     }
   }
 }
@@ -2640,14 +2701,51 @@ function initUI() {
   const sort1 = document.getElementById("sortSelect");
   const sort2 = document.getElementById("sortSelectMobile");
   const onSort = (v) => {
-    state.filters.sort = v;
+    // state.filters.sort = v; // Deprecated single source
+
+    if (state.currentTab === "data") {
+      state.filters.sortData = v;
+      if (v === 'entries_asc') state.dataSort = { column: 'entries', direction: 'asc' };
+      if (v === 'entries_desc') state.dataSort = { column: 'entries', direction: 'desc' };
+      if (v === 'name_asc') state.dataSort = { column: 'name', direction: 'asc' };
+      if (v === 'name_desc') state.dataSort = { column: 'name', direction: 'desc' };
+
+      // New Rarity logic for Data Registry
+      if (v === 'rarity_asc') state.dataSort = { column: 'rarity', direction: 'asc' };
+      if (v === 'rarity_desc') state.dataSort = { column: 'rarity', direction: 'desc' };
+
+      renderDataRegistry();
+    } else {
+      state.filters.sortBlueprints = v;
+      applyFilters();
+    }
+
+    // Update dropdowns immediately? No, we might be switching logic. 
+    // Actually yes, the dropdown triggered this, so it should be fine.
     if (sort1) sort1.value = v;
     if (sort2) sort2.value = v;
-    applyFilters();
+
     saveFilters();
   };
   if (sort1) sort1.onchange = (e) => onSort(e.target.value);
   if (sort2) sort2.onchange = (e) => onSort(e.target.value);
+
+  // Correctly sync UI values with loaded state
+  if (state.filters.search) {
+    if (s1) s1.value = state.filters.search;
+    if (s2) s2.value = state.filters.search;
+  }
+  if (state.currentTab === "data") {
+    if (state.filters.sortData) {
+      if (sort1) sort1.value = state.filters.sortData;
+      if (sort2) sort2.value = state.filters.sortData;
+    }
+  } else {
+    if (state.filters.sortBlueprints) {
+      if (sort1) sort1.value = state.filters.sortBlueprints;
+      if (sort2) sort2.value = state.filters.sortBlueprints;
+    }
+  }
 
   const resetAll = () => {
     state.filters.rarities.clear();
@@ -2657,13 +2755,26 @@ function initUI() {
     state.filters.conds.clear();
     state.filters.confs.clear();
     state.filters.search = "";
-    state.filters.sort = "rarity_desc";
+    // state.filters.sort = "rarity_desc"; // Deprecated
+    state.filters.sortBlueprints = "rarity_desc";
+    state.filters.sortData = "entries_desc";
     if (s1) s1.value = "";
     if (s2) s2.value = "";
-    if (sort1) sort1.value = "rarity_desc";
-    if (sort2) sort2.value = "rarity_desc";
+
+    // Reset dropdown to current tab's default
+    const defaultSort = (state.currentTab === "data") ? "entries_desc" : "rarity_desc";
+    if (sort1) sort1.value = defaultSort;
+    if (sort2) sort2.value = defaultSort;
     state.filters.collected = "all";
-    applyFilters();
+
+    // Reset Data Sort
+    state.dataSort = { column: 'entries', direction: 'desc' };
+
+    if (state.currentTab === "data") {
+      renderDataRegistry();
+    } else {
+      applyFilters();
+    }
     renderFacets();
     // Re-sync collection buttons visually since they might be "collected" or "not-collected"
     initCollectionFilters(); // This re-binds but also re-syncs visual state based on state.filters.collected
@@ -2738,6 +2849,21 @@ function initUI() {
   setupCollapsible("toggleMapMobile", "mapFiltersMobile", "iconMapMobile");
   setupCollapsible("toggleCondMobile", "condFiltersMobile", "iconCondMobile");
   setupCollapsible("toggleConfMobile", "confFiltersMobile", "iconConfMobile");
+
+  // Data Registry Headers Sort
+  document.querySelectorAll('[data-sort]').forEach(el => {
+    el.onclick = () => {
+      const field = el.dataset.sort;
+      if (state.dataSort.column === field) {
+        state.dataSort.direction = state.dataSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.dataSort.column = field;
+        // Default sort direction for numbers (entries, confidence) is desc, text is asc
+        state.dataSort.direction = (field === 'entries' || field === 'confidence') ? 'desc' : 'asc';
+      }
+      renderDataRegistry();
+    };
+  });
 }
 
 async function loadData() {
@@ -2839,7 +2965,7 @@ async function loadData() {
       initUI();
       applyFilters();
       renderFacets();
-      setMetaLine(`${items.length} items â€¢ live from Sheets`);
+      setMetaLine("");
     },
     error: (err) => {
       console.error(err);
@@ -3004,16 +3130,22 @@ function renderFacets() {
 }
 
 function renderActiveChips() {
-  const wrap = document.getElementById("activeChips");
-  if (!wrap) return;
-  wrap.innerHTML = "";
+  // We now have TWO places for chips: Blueprints tab (#activeChips) and Data tab (#dataActiveChips)
+  const wraps = [
+    document.getElementById("activeChips"),
+    document.getElementById("dataActiveChips")
+  ].filter(el => !!el);
+
+  wraps.forEach(wrap => wrap.innerHTML = "");
 
   const push = (label, clearFn) => {
-    const b = document.createElement("button");
-    b.className = "chip chip-active";
-    b.textContent = label + " âœ•";
-    b.onclick = clearFn;
-    wrap.appendChild(b);
+    wraps.forEach(wrap => {
+      const b = document.createElement("button");
+      b.className = "chip chip-active";
+      b.textContent = label + " \u2715";
+      b.onclick = clearFn;
+      wrap.appendChild(b);
+    });
   };
 
   if (state.filters.rarities.size) push(`Rarity: ${Array.from(state.filters.rarities).join(", ")}`, () => { state.filters.rarities.clear(); applyFilters(); renderFacets(); saveFilters(); });
@@ -3088,18 +3220,23 @@ function applyFilters() {
     return true;
   });
 
-  const sort = state.filters.sort;
+  const sort = state.filters.sortBlueprints || "rarity_desc";
   out.sort((a, b) => {
     if (sort === "name_asc") return a.name.localeCompare(b.name);
     if (sort === "name_desc") return b.name.localeCompare(a.name);
     if (sort === "type_asc") return (a.type || "").localeCompare(b.type || "");
-    if (sort === "rarity_desc") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
     if (sort === "rarity_asc") return rarityRank(a.rarity) - rarityRank(b.rarity) || a.name.localeCompare(b.name);
-    return a.name.localeCompare(b.name);
+    // Default: rarity_desc
+    return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
   });
 
   state.filtered = out;
   renderGrid();
+
+  // Also update Data Registry if we are on that tab
+  if (state.currentTab === "data") {
+    renderDataRegistry();
+  }
 }
 
 function renderGrid() {
@@ -3111,9 +3248,9 @@ function renderGrid() {
   grid.innerHTML = "";
   if (count) count.textContent = `${state.filtered.length} / ${state.all.length}`;
 
-  if (!state.filtered.length) {
+  if (!state.filtered.length || state.currentTab !== "blueprints") {
     grid.classList.add("hidden");
-    if (empty) empty.classList.remove("hidden");
+    if (empty && state.currentTab === "blueprints") empty.classList.remove("hidden");
     return;
   } else {
     grid.classList.remove("hidden");
@@ -3321,14 +3458,15 @@ function renderGrid() {
 
     // -- Link to Data Registry (Detailed Data) --
     const dataLink = document.createElement("div");
-    dataLink.className = "mt-3 pt-3 border-t border-white/10 flex items-center justify-between cursor-pointer group/link hover:bg-white/5 rounded-lg p-2 transition-colors";
+    // Changed specific styling used to make it a distinct, visible button
+    dataLink.className = "mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800 rounded-lg cursor-pointer transition-all group/link shadow-sm";
     dataLink.onclick = (e) => {
       e.stopPropagation();
       if (window.openDataDetail) window.openDataDetail(it.name);
     };
 
     dataLink.innerHTML = `
-      <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider group-hover/link:text-zinc-200 transition-colors">Detailed Data</span>
+      <span class="text-xs font-bold text-zinc-300 group-hover/link:text-white uppercase tracking-wider">Detailed Data</span>
       <svg class="w-4 h-4 text-zinc-500 group-hover/link:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
       </svg>
@@ -3838,7 +3976,7 @@ function initContextMenu() {
 // DATA REGISTRY & ANALYTICS
 // ==========================================
 
-const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVGhcLiin4Ke8anpTi8amSCsOF-ato3LUpG5eqHjOU_sH-70n4QfhpwToV4lZ2q5taM4xO-qWSldrH/pub?gid=1774944227&single=true&output=csv";
+const DATA_CSV_URL = "./data_registry.csv";
 
 state.detailedData = [];
 state.dataSort = { column: 'entries', direction: 'desc' }; // Default sort
@@ -3925,8 +4063,54 @@ function renderDataRegistry() {
   container.innerHTML = "";
 
   // Filter
+  // Filter
   let filtered = state.detailedData.filter(item => {
-    return item.name.toLowerCase().includes(state.dataSearch.toLowerCase());
+    // Global text search (Main Search Bar)
+    const q = (state.filters.search || "").toLowerCase();
+
+    // Attempt to match with local blueprint data for robust filtering
+    let localBP = state.all.find(bp => bp.name === item.name);
+    // Fallback for naming mismatches (e.g. "Light Stick")
+    if (!localBP && item.name.includes("Light Stick")) {
+      localBP = state.all.find(bp => bp.name.includes("Light Stick"));
+    }
+
+    // USER REQUEST: Apply "Active Only" filter logic.
+    // Since state.all ONLY contains active items (filtered during load), 
+    // any item that does not resolve to a localBP should be hidden.
+    if (!localBP) return false;
+
+    // Default values if localBP not found
+    const rarity = localBP ? localBP.rarity : 'common';
+    const type = localBP ? localBP.type : 'Unknown';
+    const map = localBP ? localBP.map : '';
+    const cond = localBP ? localBP.cond : '';
+    const conf = item.confidence || (localBP ? localBP.conf : '');
+
+    // 1. Facet Filters
+    if (state.filters.rarities.size > 0 && !state.filters.rarities.has(rarity)) return false;
+    if (state.filters.types.size > 0 && !state.filters.types.has(type)) return false;
+    if (state.filters.maps.size > 0 && !state.filters.maps.has(map)) return false;
+    if (state.filters.conds.size > 0 && !state.filters.conds.has(cond)) return false;
+    if (state.filters.confs.size > 0 && !state.filters.confs.has(conf)) return false;
+
+    // 2. Collection Filters
+    const isCollected = state.collectedItems.has(item.name);
+    const isWishlisted = state.wishlistedItems.has(item.name);
+
+    if (state.filters.collected === "collected" && !isCollected) return false;
+    if (state.filters.collected === "wishlist" && !isWishlisted) return false;
+    if (state.filters.collected === "not-collected" && isCollected) return false;
+    if (state.filters.collected === "spares" && !(state.spares[item.name] > 0)) return false;
+
+    // 3. Search Query
+    if (q) {
+      // Search against Name, Best Map, Best Condition, Type
+      const doc = (item.name + " " + type + " " + item.bestMap + " " + item.bestCondition).toLowerCase();
+      if (!doc.includes(q)) return false;
+    }
+
+    return true;
   });
 
   // Sort
@@ -3936,6 +4120,18 @@ function renderDataRegistry() {
 
     if (col === 'entries') return (a.entries - b.entries) * dir;
     if (col === 'name') return a.name.localeCompare(b.name) * dir;
+
+    if (col === 'rarity') {
+      const getRarity = (item) => {
+        let bp = state.all.find(bi => bi.name === item.name);
+        if (!bp && item.name.includes("Light Stick")) bp = state.all.find(bi => bi.name.includes("Light Stick"));
+        return bp ? bp.rarity : 'common';
+      };
+      const rA = rarityRank(getRarity(a));
+      const rB = rarityRank(getRarity(b));
+      return (rA - rB) * dir;
+    }
+
     // Simple string sorts for others
     return String(a[col]).localeCompare(String(b[col])) * dir;
   });

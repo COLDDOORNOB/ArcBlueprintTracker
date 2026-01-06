@@ -120,7 +120,7 @@
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
         <button id="resetBtn"
-          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
+          class="filter-options text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
       </div>
 
       <div id="authSection" class="mt-6 border-y border-zinc-800/50 py-4">
@@ -155,7 +155,7 @@
         </div>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <div class="flex items-center justify-between">
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
@@ -163,13 +163,13 @@
         <input id="gridSize" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Search</label>
         <input id="searchInput" placeholder="Name, type, map…"
           class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Sort</label>
         <select id="sortSelect" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
           <option value="rarity_desc">Rarity (High → Low)</option>
@@ -180,7 +180,7 @@
         </select>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Collection Status</label>
         <div class="mt-2 grid grid-cols-3 gap-2">
           <button id="collectedAll" class="chip chip-active">All</button>
@@ -191,7 +191,7 @@
         </div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleRarity" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
@@ -205,7 +205,7 @@
         <div id="rarityFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleType" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
@@ -219,7 +219,7 @@
         <div id="typeFilters" class="mt-2 grid grid-cols-3 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleConf" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
@@ -233,7 +233,7 @@
         <div id="confFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleMap" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
@@ -247,7 +247,7 @@
         <div id="mapFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleCond" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
@@ -450,6 +450,10 @@
           </div>
 
 
+
+          <!-- Active Chips & Disclaimer -->
+          <div id="dataActiveChips" class="flex items-center gap-2 flex-wrap mb-4"></div>
+
           <!-- Disclaimer -->
           <div
             class="mb-4 p-4 rounded-xl bg-zinc-950/80 border border-amber-500/20 text-zinc-400 text-xs md:text-sm backdrop-blur-md">
@@ -474,10 +478,10 @@
             class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
             <div class="cursor-pointer hover:text-white transition-colors select-none" data-sort="name">Item</div>
             <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="confidence">
-              Conf</div>
+              Confidence</div>
             <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="map">Map</div>
             <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="condition">
-              Cond</div>
+              Condition</div>
             <div class="text-right pr-2 cursor-pointer hover:text-white transition-colors select-none"
               data-sort="entries">#</div>
             <div></div> <!-- Spacer for Arrow -->
@@ -606,7 +610,7 @@
         </div>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Sort</label>
         <select id="sortSelectMobile"
           class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
@@ -619,7 +623,7 @@
         </select>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Collection Status</label>
         <div class="mt-2 grid grid-cols-3 gap-2">
           <button id="collectedAllMobile" class="chip chip-active">All</button>
@@ -630,7 +634,7 @@
         </div>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <div class="flex items-center justify-between">
           <label class="text-xs text-zinc-400">Grid size</label>
           <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
@@ -638,7 +642,7 @@
         <input id="gridSizeMobile" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleRarityMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
@@ -652,7 +656,7 @@
         <div id="rarityFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleTypeMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
@@ -666,7 +670,7 @@
         <div id="typeFiltersMobile" class="mt-2 grid grid-cols-3 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleConfMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
@@ -680,7 +684,7 @@
         <div id="confFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleMapMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
@@ -694,7 +698,7 @@
         <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleCondMobile" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
@@ -708,7 +712,7 @@
         <div id="condFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <button id="resetBtnMobile"
           class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
           filters</button>
