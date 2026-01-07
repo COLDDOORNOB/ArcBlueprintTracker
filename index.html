@@ -55,6 +55,13 @@
     rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Leaflet.js for Interactive Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script type="importmap">
   {
@@ -455,35 +462,43 @@
           <div id="dataActiveChips" class="flex items-center gap-2 flex-wrap mb-4"></div>
 
           <!-- Disclaimer -->
-          <div
-            class="mb-4 p-4 rounded-xl bg-zinc-950/80 border border-amber-500/20 text-zinc-400 text-xs md:text-sm backdrop-blur-md">
-            <div class="flex items-start gap-3">
-              <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div class="space-y-1">
-                <p><strong class="text-zinc-300">Raw Data Disclaimer:</strong> Submissions are heavily biased towards
-                  <span class="text-zinc-300">Dam – Battlegrounds</span> and <span
-                    class="text-zinc-300">Day/Night</span> raids.
-                </p>
-                <p>The main Blueprints list uses assumptions to correct for this. If you have a different conclusion
-                  than I do, you may be right! Make of this data what you will.</p>
+          <!-- Disclaimer (Collapsible) -->
+          <div class="mb-4 rounded-xl bg-zinc-950/80 border border-amber-500/20 backdrop-blur-md overflow-hidden">
+            <button id="disclaimerHeader"
+              class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors group">
+              <div class="flex items-center gap-2.5">
+                <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">Raw Data
+                  Disclaimer</span>
               </div>
+              <svg id="disclaimerIcon" class="w-5 h-5 text-zinc-500 transition-transform duration-300" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div id="disclaimerContent" class="hidden px-4 pb-4 text-xs md:text-sm text-zinc-400 space-y-1">
+              <p><strong class="text-zinc-300">Some data may not match the Blueprints page.</strong><br>
+                This is all of the user submitted raw data. This data contains many biases, like the amount of
+                submissions for Dam Battlegrounds, lack of data on certain Blueprints, etc. The main Blueprints list
+                uses educated assumptions to correct for this. If you have a different conclusion than I do, you may be
+                right! Make of this data what you will.</p>
             </div>
           </div>
 
           <!-- Data Grid/Table Header -->
           <div
-            class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
+            class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-[10px] md:text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
             <div class="cursor-pointer hover:text-white transition-colors select-none" data-sort="name">Item</div>
             <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="confidence">
               Confidence</div>
-            <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="map">Map</div>
-            <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="condition">
+            <div class="md:pl-2 select-none opacity-80">Map</div>
+            <div class="md:pl-2 select-none opacity-80">
               Condition</div>
             <div class="text-right pr-2 cursor-pointer hover:text-white transition-colors select-none"
-              data-sort="entries">#</div>
+              data-sort="entries">Entries</div>
             <div></div> <!-- Spacer for Arrow -->
           </div>
 
@@ -516,7 +531,6 @@
               <span>as Collected</span>
             </div>
           </button>
-          <div class="flex items-center gap-2 flex-wrap" id="activeChips"></div>
         </div>
 
         <!-- Unified Help Banner -->
@@ -539,6 +553,8 @@
 
         <div class="text-xs text-zinc-500 font-medium whitespace-nowrap" id="resultCount"></div>
       </div>
+
+      <div id="activeChips" class="flex items-center gap-2 flex-wrap mb-4 px-1"></div>
 
       <div id="grid" class="grid gap-3"></div>
 
@@ -747,7 +763,7 @@
 
   <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
   <button id="submitLocationFab"
-    class="collection-only hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
+    class="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
     aria-label="Submit Blueprint Location">
     <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -761,7 +777,7 @@
   </button>
 
   <!-- Timed Toast Notification (My Collection Only) -->
-  <div id="collectToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden">
+  <div id="collectToast" class="fixed bottom-24 right-5 z-50 hidden">
     <div
       class="relative px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors">
       <p id="collectToastText" class="text-sm font-medium text-white"></p>
@@ -804,20 +820,6 @@
             <option value="">Select a Blueprint...</option>
           </select>
         </div>
-        <!-- Map -->
-        <div>
-          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
-          <select id="submitMap"
-            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-            <option value="">Select a Map...</option>
-            <option value="Dam Battlegrounds">Dam Battlegrounds</option>
-            <option value="Blue Gate">Blue Gate</option>
-            <option value="Spaceport">Spaceport</option>
-            <option value="Buried City">Buried City</option>
-            <option value="Stella Montis">Stella Montis</option>
-            <option value="N/A">N/A</option>
-          </select>
-        </div>
         <!-- Condition -->
         <div>
           <label for="submitCondition" class="block text-sm font-medium text-zinc-400 mb-1.5">What Condition was it
@@ -840,21 +842,97 @@
             <option value="N/A">N/A</option>
           </select>
         </div>
+        <!-- Map -->
+        <div>
+          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
+          <div class="flex gap-2">
+            <button type="button" id="openMapPickerBtn"
+              class="px-3 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:text-white text-zinc-400 transition-colors shrink-0"
+              title="Pin Location on Map">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+            <select id="submitMap"
+              class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+              <option value="">Select a Map...</option>
+              <option value="dam_battlegrounds">Dam Battlegrounds</option>
+              <option value="the_blue_gate">Blue Gate</option>
+              <option value="the_spaceport">Spaceport</option>
+              <option value="buried_city">Buried City</option>
+              <option value="stella_montis_upper">Stella Montis</option>
+              <option value="N/A">N/A</option>
+            </select>
+          </div>
+        </div>
         <!-- Location -->
         <div>
-          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What location on the map?
-            (e.g., Security Wing, Village)</label>
+          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What specific location?
+            (e.g., Security Wing)</label>
           <input type="text" id="submitLocation"
             class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            placeholder="Enter location...">
+            placeholder="Enter location detail..." autocomplete="off">
         </div>
-        <!-- Container -->
+        <!-- Container Picker -->
         <div>
-          <label for="submitContainer" class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?
-            (e.g., Breachable Rusty Metal Box)</label>
-          <input type="text" id="submitContainer"
-            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            placeholder="Enter container type...">
+          <label class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?</label>
+
+          <!-- Selected Container Display (shown when container is selected) -->
+          <div id="selectedContainerDisplay"
+            class="hidden items-center gap-3 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 cursor-pointer hover:border-zinc-600 transition-colors">
+            <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-zinc-700">
+              <img id="selectedContainerImg" src="" alt="" class="w-full h-full object-cover" />
+            </div>
+            <span id="selectedContainerName" class="flex-1 text-white font-medium truncate"></span>
+            <button type="button" id="clearContainerBtn"
+              class="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Open Picker Button (shown when no container selected) -->
+          <button type="button" id="openContainerPickerBtn"
+            class="w-full px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors flex items-center gap-3">
+            <svg class="w-5 h-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>Tap to select a container...</span>
+            <svg class="w-5 h-5 ml-auto text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <!-- Hidden input for form submission -->
+          <input type="hidden" id="submitContainer" name="container" value="" />
+        </div>
+
+        <!-- Custom Container Form (collapsible) -->
+        <div id="customContainerForm" class="hidden space-y-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold text-amber-400">Submit New Container</h4>
+            <button type="button" id="hideCustomContainerBtn" class="text-zinc-500 hover:text-white transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <input type="text" id="customContainerName"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+            placeholder="Container name (e.g., Yellow Breaker Box)" />
+          <input type="text" id="customContainerDescription"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+            placeholder="Brief description (e.g., Found in industrial areas)" />
+          <div>
+            <label class="block text-xs text-zinc-500 mb-1.5">Screenshot (optional)</label>
+            <input type="file" id="customContainerScreenshot" accept="image/*"
+              class="w-full text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:text-zinc-300 file:font-medium file:cursor-pointer hover:file:bg-zinc-700" />
+          </div>
         </div>
         <!-- Reward Type Checkboxes -->
         <div class="flex gap-6 pt-2">
@@ -876,6 +954,119 @@
           Submit Location Data
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- Container Picker Modal -->
+  <div id="containerPickerModal"
+    class="fixed inset-0 z-[10001] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <!-- ... Content of Container Picker ... -->
+    <div
+      class="relative w-full max-w-4xl max-h-[85vh] bg-zinc-900/95 backdrop-blur-xl rounded-2xl border border-zinc-700 shadow-2xl overflow-hidden flex flex-col">
+      <!-- ... (Kept existing content structure implied, but we are replacing the outer block closing to append) -->
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-5 border-b border-zinc-800">
+        <h2 class="text-lg font-semibold text-white">Select Container</h2>
+        <button id="closeContainerPickerBtn" class="text-zinc-500 hover:text-white transition-colors p-1"
+          aria-label="Close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="p-4 border-b border-zinc-800/50">
+        <div class="relative">
+          <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input type="text" id="containerPickerSearch"
+            class="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-base"
+            placeholder="Search containers..." autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Scrollable Container Grid -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <div id="containerPickerGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <!-- Container cards populated by JS -->
+        </div>
+
+        <!-- Submit New Container Button -->
+        <div class="mt-6">
+          <button type="button" id="containerPickerCustomBtn"
+            class="w-full px-4 py-4 flex items-center justify-center gap-3 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors">
+            <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div class="text-left">
+              <div class="text-sm font-semibold text-amber-400">Container not listed?</div>
+              <div class="text-xs text-zinc-500">Submit a new container type</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Picker Modal -->
+  <div id="mapPickerModal"
+    class="fixed inset-0 z-[10002] hidden items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div
+      class="relative w-full h-full max-w-[95vw] max-h-[95vh] bg-zinc-900 overflow-hidden flex flex-col md:rounded-2xl border border-zinc-800 shadow-2xl">
+
+      <!-- Map Header & Navigation -->
+      <div
+        class="z-20 bg-zinc-900/95 backdrop-blur-xl border-b border-zinc-800 p-4 flex flex-col md:flex-row gap-4 items-center justify-between shrink-0">
+        <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide pb-2 md:pb-0"
+          id="mapTabsContainer">
+          <!-- Populated by JS -->
+        </div>
+
+        <button id="closeMapPickerBtn"
+          class="absolute top-4 right-4 md:static p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors z-50">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Map Container -->
+      <div class="relative flex-1 overflow-hidden bg-zinc-950">
+        <div id="leafletMap" class="w-full h-full z-10 box-border border-none outline-none"></div>
+
+        <!-- Region Overlay (Bottom Left) -->
+        <div id="regionNameOverlay"
+          class="absolute bottom-6 left-6 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-lg text-white font-bold text-lg border border-white/10 pointer-events-none hidden">
+          Unknown Region
+        </div>
+
+        <!-- Instructions Overlay (Top Center) -->
+        <div id="mapInstructions"
+          class="absolute top-6 left-1/2 -translate-x-1/2 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-zinc-300 text-sm border border-white/10 pointer-events-none transition-opacity duration-300">
+          Click or tap anywhere to place a pin
+        </div>
+      </div>
+
+      <!-- Footer / Confirmation Panel -->
+      <div class="z-20 bg-zinc-900 p-4 border-t border-zinc-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <span id="coordinatesDisplay" class="text-zinc-400 font-mono text-sm">No location selected</span>
+        </div>
+        <button id="confirmPinBtn" disabled
+          class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+          <span>Confirm Location</span>
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 

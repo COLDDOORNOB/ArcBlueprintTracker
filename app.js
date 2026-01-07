@@ -4,6 +4,8 @@ import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLo
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
+let toastTimeout = null;
+let pendingBlueprintName = null;
 
 // Since we are now a module, we must attach global initialization to window if it's called from HTML
 // However, existing onclicks in HTML might break if functions aren't on window.
@@ -267,8 +269,8 @@ function cycleItemStatus(itemName, frame) {
   } else {
     // Was Uncollected -> Make Collected
     state.collectedItems.add(itemName);
-    // Show toast asking for location data (only on collection tab)
-    if (state.currentTab === "collection") {
+    // Show toast asking for location data (only on blueprints tab now)
+    if (state.currentTab === "blueprints") {
       showCollectToast(itemName);
     }
   }
@@ -963,10 +965,10 @@ function updateSortOptions(tab) {
   let html = "";
   if (tab === "data") {
     html = `
-      <option value="entries_desc">Submissions (High → Low)</option>
-      <option value="entries_asc">Submissions (Low → High)</option>
-      <option value="rarity_desc">Rarity (High → Low)</option>
-      <option value="rarity_asc">Rarity (Low → High)</option>
+      <option value="entries_desc">Entries (High → Low)</option>
+      <option value="entries_asc">Entries (Low → High)</option>
+      <option value="conf_desc">Confidence (High → Low)</option>
+      <option value="conf_asc">Confidence (Low → High)</option>
       <option value="name_asc">Name (A → Z)</option>
       <option value="name_desc">Name (Z → A)</option>
     `;
@@ -1041,6 +1043,16 @@ function switchTab(tabName) {
   // Create references to the new tab containers (will be added in index.html in next steps if not already)
   const progressionTab = document.getElementById("progressionTab");
   const dataTab = document.getElementById("dataTab");
+  const fab = document.getElementById("submitLocationFab");
+
+  // Toggle FAB Visibility
+  if (fab) {
+    if (tabName === "blueprints") {
+      fab.classList.remove("hidden");
+    } else {
+      fab.classList.add("hidden");
+    }
+  }
 
   // Toggle Grid View Visibility
   const showGrid = (tabName === "blueprints");
@@ -1125,6 +1137,40 @@ function switchTab(tabName) {
         el.classList.remove("hidden");
       }
     });
+  }
+
+  // Toggle Grid Size Visibility (Hide on Data tab)
+  const gridSizeContainer = document.getElementById("gridSize")?.closest(".filter-options");
+  // Assuming Mobile duplicated structure or unique ID. Let's try to target by input ID if unique.
+  // Actually, ID in DOM must be unique. The mobile drawer likely has a different ID or is generated.
+  // Looking at index.html, there might only be one gridSize input if the sidebar is shared?
+  // No, sidebar is likely cloned or separate. Let's check IDs.
+  // If IDs are duplicate (bad practice), getElementById gets first.
+  // Let's assume we need to target both containers if they exist.
+  // For now, let's target the known one and any sibling in drawer.
+
+  // Actually, simplest way without IDs:
+  // Find all inputs with type range or specific label?
+  // Let's settle for `gridSize` ID. If there's a mobile specific one, we need its ID.
+  // Based on reading: `gridSize` input is in the sidebar.
+
+  if (gridSizeContainer) {
+    if (tabName === "data") {
+      gridSizeContainer.classList.add("hidden");
+    } else if (!hideFilters) {
+      // Only show if NOT on progression (which hides all filters)
+      gridSizeContainer.classList.remove("hidden");
+    }
+  }
+
+  // Mobile Grid Size
+  const gridSizeContainerMobile = document.getElementById("gridSizeMobile")?.closest(".filter-options");
+  if (gridSizeContainerMobile) {
+    if (tabName === "data") {
+      gridSizeContainerMobile.classList.add("hidden");
+    } else if (!hideFilters) {
+      gridSizeContainerMobile.classList.remove("hidden");
+    }
   }
 
   if (sidebar) {
@@ -1265,9 +1311,6 @@ function initEventBanner() {
 }
 
 // Blueprint Submission System
-let toastTimeout = null;
-let pendingBlueprintName = null;
-
 function initBlueprintSubmission() {
   const fab = document.getElementById("submitLocationFab");
   const toast = document.getElementById("collectToast");
@@ -1312,6 +1355,12 @@ function initBlueprintSubmission() {
       await submitBlueprintLocation();
     };
   }
+
+  // Initialize container picker
+  initContainerPicker();
+
+  // Initialize map picker
+  initMapPicker();
 }
 
 function populateBlueprintPicklist() {
@@ -1368,6 +1417,306 @@ function closeSubmissionModal() {
     if (q) q.checked = false;
   }
   pendingBlueprintName = null;
+
+  // Reset container picker
+  clearContainerSelection();
+  hideCustomContainerForm();
+}
+
+// ==========================================
+// CONTAINER PICKER SYSTEM
+// ==========================================
+
+const CONTAINER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQbaBK3sAyL1kD1-NanKQgkyzerRXtQUReQu57W_xn68GxST_A4Ws1z3iwOAOZJ52-ZBztvGiDq16Go/pub?output=csv";
+const CONTAINER_IMAGE_BASE = "./images/Containers/";
+
+async function fetchContainers() {
+  // Initialize state properties lazily on first call
+  if (!state.containers) {
+    state.containers = [];
+    state.containersLoaded = false;
+  }
+
+  if (state.containersLoaded && state.containers.length > 0) return;
+
+  try {
+    const response = await fetch(CONTAINER_CSV_URL);
+    const text = await response.text();
+
+    // Parse CSV
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) return;
+
+    // Skip header row
+    state.containers = [];
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCSVRow(lines[i]);
+      if (row.length >= 4 && row[0]) {
+        state.containers.push({
+          name: row[0].trim(),
+          lootPool: row[1]?.trim() || "Standard",
+          tags: row[2]?.trim().toLowerCase() || "",
+          image: row[3]?.trim() || ""
+        });
+      }
+    }
+
+    state.containersLoaded = true;
+  } catch (error) {
+    console.error("Failed to fetch containers:", error);
+  }
+}
+
+// Simple CSV row parser that handles quoted fields
+function parseCSVRow(row) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function initContainerPicker() {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const clearBtn = document.getElementById("clearContainerBtn");
+  const pickerModal = document.getElementById("containerPickerModal");
+  const closePickerBtn = document.getElementById("closeContainerPickerBtn");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+  const pickerGrid = document.getElementById("containerPickerGrid");
+  const customBtn = document.getElementById("containerPickerCustomBtn");
+  const hideCustomBtn = document.getElementById("hideCustomContainerBtn");
+
+  // Open picker button
+  if (openBtn) {
+    openBtn.addEventListener("click", async () => {
+      await openContainerPicker();
+    });
+  }
+
+  // Selected display click - reopen picker
+  if (selectedDisplay) {
+    selectedDisplay.addEventListener("click", async (e) => {
+      // Don't open if clicking clear button
+      if (e.target.closest("#clearContainerBtn")) return;
+      await openContainerPicker();
+    });
+  }
+
+  // Close picker button
+  if (closePickerBtn) {
+    closePickerBtn.addEventListener("click", () => {
+      closeContainerPicker();
+    });
+  }
+
+  // Clear selection button
+  if (clearBtn) {
+    clearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearContainerSelection();
+    });
+  }
+
+  // Search input
+  if (pickerSearch) {
+    pickerSearch.addEventListener("input", (e) => {
+      renderContainerPickerGrid(e.target.value);
+    });
+  }
+
+  // Custom container button
+  if (customBtn) {
+    customBtn.addEventListener("click", () => {
+      closeContainerPicker();
+      showCustomContainerForm();
+    });
+  }
+
+  // Hide custom form button
+  if (hideCustomBtn) {
+    hideCustomBtn.addEventListener("click", () => {
+      hideCustomContainerForm();
+    });
+  }
+
+  // Close on escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && pickerModal && !pickerModal.classList.contains("hidden")) {
+      closeContainerPicker();
+    }
+  });
+}
+
+async function openContainerPicker() {
+  const pickerModal = document.getElementById("containerPickerModal");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+
+  if (!pickerModal) return;
+
+  // Load containers
+  await fetchContainers();
+
+  // Show modal (submission modal already has body overflow hidden)
+  pickerModal.classList.remove("hidden");
+  pickerModal.classList.add("flex");
+
+  // Render initial grid
+  renderContainerPickerGrid("");
+
+  // Focus search after short delay for animation
+  setTimeout(() => {
+    if (pickerSearch) pickerSearch.focus();
+  }, 100);
+}
+
+function closeContainerPicker() {
+  const pickerModal = document.getElementById("containerPickerModal");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+
+  if (!pickerModal) return;
+
+  pickerModal.classList.add("hidden");
+  pickerModal.classList.remove("flex");
+  // Don't reset body overflow since submission modal is still open
+
+  // Clear search
+  if (pickerSearch) pickerSearch.value = "";
+}
+
+function renderContainerPickerGrid(query) {
+  const grid = document.getElementById("containerPickerGrid");
+  if (!grid || !state.containers) return;
+
+  const q = query.toLowerCase().trim();
+
+  // Filter containers by name or tags
+  const filtered = state.containers.filter(c => {
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.tags.includes(q);
+  });
+
+  grid.innerHTML = "";
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full py-12 text-center text-zinc-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <p class="text-sm">No containers found for "${query}"</p>
+      </div>
+    `;
+    return;
+  }
+
+  for (const container of filtered) {
+    const card = document.createElement("div");
+    card.className = "container-picker-card";
+    card.innerHTML = `
+      <img src="${CONTAINER_IMAGE_BASE}${container.image}" alt="${container.name}" loading="lazy" />
+      <div class="card-name">${container.name}</div>
+      <div class="card-pool">${container.lootPool}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      selectContainerFromPicker(container);
+    });
+
+    grid.appendChild(card);
+  }
+}
+
+function selectContainerFromPicker(container) {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const selectedImg = document.getElementById("selectedContainerImg");
+  const selectedName = document.getElementById("selectedContainerName");
+  const hiddenInput = document.getElementById("submitContainer");
+
+  // Update UI
+  if (openBtn) openBtn.classList.add("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.remove("hidden");
+    selectedDisplay.classList.add("flex");
+  }
+
+  // Set selected container info
+  if (selectedImg) selectedImg.src = CONTAINER_IMAGE_BASE + container.image;
+  if (selectedName) selectedName.textContent = container.name;
+  if (hiddenInput) hiddenInput.value = container.name;
+
+  // Close picker
+  closeContainerPicker();
+
+  // Hide custom form if open
+  hideCustomContainerForm();
+}
+
+function clearContainerSelection() {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const hiddenInput = document.getElementById("submitContainer");
+
+  if (openBtn) openBtn.classList.remove("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.add("hidden");
+    selectedDisplay.classList.remove("flex");
+  }
+  if (hiddenInput) hiddenInput.value = "";
+}
+
+function showCustomContainerForm() {
+  const form = document.getElementById("customContainerForm");
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+
+  if (form) form.classList.remove("hidden");
+  if (openBtn) openBtn.classList.add("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.add("hidden");
+    selectedDisplay.classList.remove("flex");
+  }
+}
+
+function hideCustomContainerForm() {
+  const form = document.getElementById("customContainerForm");
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const customName = document.getElementById("customContainerName");
+  const customDesc = document.getElementById("customContainerDescription");
+  const customScreenshot = document.getElementById("customContainerScreenshot");
+
+  if (form) form.classList.add("hidden");
+  if (openBtn) openBtn.classList.remove("hidden");
+  if (customName) customName.value = "";
+  if (customDesc) customDesc.value = "";
+  if (customScreenshot) customScreenshot.value = "";
+}
+
+function getContainerValue() {
+  // Check if custom container form is visible and has a value
+  const customForm = document.getElementById("customContainerForm");
+  const customName = document.getElementById("customContainerName");
+
+  if (customForm && !customForm.classList.contains("hidden") && customName?.value.trim()) {
+    return `CUSTOM: ${customName.value.trim()}`;
+  }
+
+  // Otherwise return the selected container
+  const hiddenInput = document.getElementById("submitContainer");
+  return hiddenInput?.value || "";
 }
 
 function initWrapped() {
@@ -1400,7 +1749,7 @@ function initWrapped() {
         inner.style.setProperty('transform-origin', 'top center', 'important');
         inner.style.setProperty('gap', '0', 'important');
         const heightAdjustment = 896 * (1 - scale);
-        inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+        inner.style.setProperty('margin-bottom', `- ${heightAdjustment} px`, 'important');
       }
       if (content) content.style.setProperty('border-radius', '0', 'important');
       if (shimmer) shimmer.classList.add("hidden");
@@ -1423,7 +1772,7 @@ function initWrapped() {
           inner.style.setProperty('transform-origin', 'top center', 'important');
           inner.style.removeProperty('gap');
           const heightAdjustment = 896 * (1 - scale);
-          inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+          inner.style.setProperty('margin-bottom', `- ${heightAdjustment} px`, 'important');
         }
       } else {
         if (inner) {
@@ -1461,7 +1810,7 @@ function initWrapped() {
   if (isMobile && downloadBtn) {
     const newBtn = downloadBtn.cloneNode(true);
     downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
-    newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Fullscreen for Screenshot`;
+    newBtn.innerHTML = `< svg class="w-5 h-5" fill = "none" viewBox = "0 0 24 24" stroke = "currentColor" ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg > Fullscreen for Screenshot`;
     newBtn.className = "flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 text-white font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30 flex items-center justify-center gap-2 active:scale-95 transition-transform";
     newBtn.onclick = () => toggleCaptureMode(true);
   }
@@ -1477,7 +1826,7 @@ function initWrapped() {
       showBtn.textContent = "Loading Data...";
       await fetchUserContributions();
       showBtn.disabled = false;
-      showBtn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg> View My Blueprint Wrapped 2025`;
+      showBtn.innerHTML = `< svg class= "w-4 h-4" fill = "none" viewBox = "0 0 24 24" stroke = "currentColor" > <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg > View My Blueprint Wrapped 2025`;
       // Ensure the button keeps its responsive classes if modified by textContent earlier
       showBtn.className = "flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-[10px] sm:text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95";
     }
@@ -1490,9 +1839,9 @@ function initWrapped() {
     const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
 
     // Update Percentage and Progress Bar
-    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+    document.getElementById("wrappedPercent").textContent = `${percent}% `;
     const progressBar = document.getElementById("wrappedProgressBar");
-    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (progressBar) progressBar.style.width = `${percent}% `;
 
     // Calculate Weapon/Augment stats
     const weaponsAll = state.all.filter(it => /weapon/i.test(it.type)).length;
@@ -1511,7 +1860,7 @@ function initWrapped() {
     }
     const bestMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0];
 
-    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+    document.getElementById("wrappedPercent").textContent = `${percent}% `;
 
     // Build dynamic stats array
     const statsGrid = document.getElementById("wrappedStatsGrid");
@@ -1525,7 +1874,7 @@ function initWrapped() {
         value: state.wrappedData.contributionCount,
         label: "Locations<br>Reported",
         color: "text-emerald-400",
-        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`
+        icon: `< svg class="w-4 h-4" fill = "currentColor" viewBox = "0 0 24 24" > <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg > `
       });
     }
 
@@ -1535,7 +1884,7 @@ function initWrapped() {
         value: bestMap[0],
         label: "Best<br>Map",
         color: "text-purple-400",
-        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>`,
+        icon: `< svg class="w-4 h-4" fill = "currentColor" viewBox = "0 0 24 24" > <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" /></svg > `,
         smallText: true
       });
     }
@@ -1827,9 +2176,9 @@ function initWrapped() {
       modal.classList.remove("flex", "items-center", "justify-center");
       document.body.style.overflow = "";
 
-      // Restore Submit FAB if on collection tab
+      // Restore Submit FAB if on blueprints tab
       const fab = document.getElementById("submitLocationFab");
-      if (fab && state.currentTab === "collection") {
+      if (fab && state.currentTab === "blueprints") {
         fab.classList.remove("hidden");
       }
     };
@@ -2220,6 +2569,7 @@ function showCollectToast(blueprintName) {
   const toast = document.getElementById("collectToast");
   const toastText = document.getElementById("collectToastText");
   const toastProgress = document.getElementById("collectToastProgress");
+  const fab = document.getElementById("submitLocationFab");
 
   if (!toast || !toastText || !toastProgress) return;
 
@@ -2239,6 +2589,9 @@ function showCollectToast(blueprintName) {
 
   toast.classList.remove("hidden");
 
+  // Hide FAB while toast is visible (mobile only)
+  if (fab && window.innerWidth <= 768) fab.classList.add("hidden");
+
   // Hide after 10 seconds
   toastTimeout = setTimeout(() => {
     hideToast();
@@ -2248,9 +2601,13 @@ function showCollectToast(blueprintName) {
 function hideToast() {
   const toast = document.getElementById("collectToast");
   const toastProgress = document.getElementById("collectToastProgress");
+  const fab = document.getElementById("submitLocationFab");
 
   if (toast) toast.classList.add("hidden");
   if (toastProgress) toastProgress.classList.remove("animate");
+
+  // Show FAB again when toast is hidden (only on blueprints tab and mobile)
+  if (fab && state.currentTab === "blueprints" && window.innerWidth <= 768) fab.classList.remove("hidden");
 
   if (toastTimeout) {
     clearTimeout(toastTimeout);
@@ -2263,7 +2620,7 @@ async function submitBlueprintLocation() {
   const map = document.getElementById("submitMap")?.value;
   const condition = document.getElementById("submitCondition")?.value;
   const location = document.getElementById("submitLocation")?.value;
-  const container = document.getElementById("submitContainer")?.value;
+  const container = getContainerValue(); // Use container picker value
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
 
@@ -2710,6 +3067,10 @@ function initUI() {
       if (v === 'name_asc') state.dataSort = { column: 'name', direction: 'asc' };
       if (v === 'name_desc') state.dataSort = { column: 'name', direction: 'desc' };
 
+      // Confidence Logic
+      if (v === 'conf_asc') state.dataSort = { column: 'confidence', direction: 'asc' };
+      if (v === 'conf_desc') state.dataSort = { column: 'confidence', direction: 'desc' };
+
       // New Rarity logic for Data Registry
       if (v === 'rarity_asc') state.dataSort = { column: 'rarity', direction: 'asc' };
       if (v === 'rarity_desc') state.dataSort = { column: 'rarity', direction: 'desc' };
@@ -2840,6 +3201,7 @@ function initUI() {
   // Desktop
   setupCollapsible("toggleRarity", "rarityFilters", "iconRarity");
   setupCollapsible("toggleType", "typeFilters", "iconType");
+  setupCollapsible("disclaimerHeader", "disclaimerContent", "disclaimerIcon");
   setupCollapsible("toggleMap", "mapFilters", "iconMap");
   setupCollapsible("toggleCond", "condFilters", "iconCond");
   setupCollapsible("toggleConf", "confFilters", "iconConf");
@@ -2854,14 +3216,29 @@ function initUI() {
   document.querySelectorAll('[data-sort]').forEach(el => {
     el.onclick = () => {
       const field = el.dataset.sort;
-      if (state.dataSort.column === field) {
-        state.dataSort.direction = state.dataSort.direction === 'asc' ? 'desc' : 'asc';
-      } else {
-        state.dataSort.column = field;
-        // Default sort direction for numbers (entries, confidence) is desc, text is asc
-        state.dataSort.direction = (field === 'entries' || field === 'confidence') ? 'desc' : 'asc';
+      let newSort = state.filters.sortData; // Default to current
+
+      if (field === 'name') {
+        // Toggle A-Z / Z-A
+        newSort = (state.filters.sortData === 'name_asc') ? 'name_desc' : 'name_asc';
+      } else if (field === 'confidence') {
+        // Toggle High-Low / Low-High
+        newSort = (state.filters.sortData === 'conf_desc') ? 'conf_asc' : 'conf_desc';
+      } else if (field === 'entries') {
+        // Toggle High-Low / Low-High
+        newSort = (state.filters.sortData === 'entries_desc') ? 'entries_asc' : 'entries_desc';
       }
-      renderDataRegistry();
+
+      // Update dropdowns and trim state
+      const sort1 = document.getElementById("sortSelect");
+      const sort2 = document.getElementById("sortSelectMobile");
+
+      if (sort1) sort1.value = newSort;
+      if (sort2) sort2.value = newSort;
+
+      // Trigger the standard onSort flow to handle state updates & re-render
+      // This ensures consistency between dropdown and header clicks
+      if (sort1) sort1.onchange({ target: { value: newSort } });
     };
   });
 }
@@ -2956,7 +3333,13 @@ async function loadData() {
         const questReward = colQuestReward ? parseBoolField(r[colQuestReward]) : false;
         const description = colDescription ? norm(r[colDescription]) : "";
         const active = colActive ? parseBoolField(r[colActive]) : true; // Default to true if column missing
-        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description, active });
+
+        // Parse list-based fields (Map, Condition) for filtering
+        // Split by comma, trim, and filter out empty strings
+        const mapList = map.split(',').map(s => s.trim()).filter(s => s);
+        const condList = cond.split(',').map(s => s.trim()).filter(s => s);
+
+        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description, active, mapList, condList });
       }
 
       // Filter out inactive items from state - they won't appear anywhere on the site
@@ -2997,6 +3380,30 @@ const TYPE_ORDER = [
   "Material"
 ];
 
+const ALLOWED_MAPS = [
+  "Dam Battlegrounds",
+  "Blue Gate",
+  "Buried City",
+  "Spaceport",
+  "Stella Montis"
+];
+
+const ALLOWED_CONDITIONS = [
+  "Day",
+  "Night",
+  "Storm",
+  "Cold Snap",
+  "Harvester",
+  "Matriarch",
+  "Hidden Bunker",
+  "Husk Graveyard",
+  "Launch Tower Loot",
+  "Locked Gate",
+  "Prospecting Probes",
+  "Lush Blooms",
+  "N/A"
+];
+
 function buildFacets() {
   state.facets.rarities = uniqSorted(state.all.map(i => i.rarity)).sort((a, b) => rarityRank(b) - rarityRank(a));
   state.facets.types = uniqSorted(state.all.map(i => i.type))
@@ -3007,9 +3414,26 @@ function buildFacets() {
       if (ib === -1) ib = 999;
       return ia - ib || a.localeCompare(b);
     });
-  state.facets.maps = uniqSorted(state.all.map(i => i.map));
 
-  state.facets.conds = uniqSorted(state.all.map(i => i.cond));
+  // Maps: Collect all split values, filter by ALLOWED_MAPS
+  const allMaps = new Set();
+  state.all.forEach(i => {
+    i.mapList.forEach(m => {
+      if (ALLOWED_MAPS.includes(m)) allMaps.add(m);
+    });
+  });
+  state.facets.maps = Array.from(allMaps).sort((a, b) => a.localeCompare(b));
+
+  // Conditions: Collect all split values, filter by ALLOWED_CONDITIONS
+  const allConds = new Set();
+  state.all.forEach(i => {
+    i.condList.forEach(c => {
+      if (ALLOWED_CONDITIONS.includes(c)) allConds.add(c);
+      // Special case: N/A is allowed, but norm() might filter it out elsewhere? 
+      // uniqSorted filters falsy. Here we explicitly check inclusions.
+    });
+  });
+  state.facets.conds = Array.from(allConds).sort((a, b) => a.localeCompare(b));
   // Sort confidence by predefined order
   state.facets.confs = uniqSorted(state.all.map(i => i.conf))
     .sort((a, b) => {
@@ -3196,8 +3620,8 @@ function applyFilters() {
   let out = state.all.filter(it => {
     if (hasR && !state.filters.rarities.has(it.rarity)) return false;
     if (hasT && !state.filters.types.has(it.type)) return false;
-    if (hasM && !state.filters.maps.has(it.map)) return false;
-    if (hasC && !state.filters.conds.has(it.cond)) return false;
+    if (hasM && !it.mapList.some(m => state.filters.maps.has(m))) return false;
+    if (hasC && !it.condList.some(c => state.filters.conds.has(c))) return false;
     if (hasConf && !state.filters.confs.has(it.conf)) return false;
 
     // Collection filter (works in both tabs)
@@ -3345,7 +3769,8 @@ function renderGrid() {
 
     // -- "Most Likely" Group Container --
     const spawnGroup = document.createElement("div");
-    spawnGroup.className = "bg-zinc-900/50 rounded-lg p-3 border border-zinc-800 mb-3";
+    // Changed to 20% opacity black + glassy border
+    spawnGroup.className = "bg-black/20 rounded-lg p-3 border border-white/10 mb-3";
 
     // Group Header
     const groupHeader = document.createElement("div");
@@ -3456,25 +3881,6 @@ function renderGrid() {
       details.appendChild(row);
     }
 
-    // -- Link to Data Registry (Detailed Data) --
-    const dataLink = document.createElement("div");
-    // Changed specific styling used to make it a distinct, visible button
-    dataLink.className = "mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800 rounded-lg cursor-pointer transition-all group/link shadow-sm";
-    dataLink.onclick = (e) => {
-      e.stopPropagation();
-      if (window.openDataDetail) window.openDataDetail(it.name);
-    };
-
-    dataLink.innerHTML = `
-      <span class="text-xs font-bold text-zinc-300 group-hover/link:text-white uppercase tracking-wider">Detailed Data</span>
-      <svg class="w-4 h-4 text-zinc-500 group-hover/link:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
-    `;
-    details.appendChild(dataLink);
-
-
-
     // Description (if present) - Standard Row Layout
     if (it.description) {
       const row = document.createElement("div");
@@ -3509,6 +3915,23 @@ function renderGrid() {
       details.appendChild(a);
     }
 
+    // -- Link to Data Registry (Detailed Data) --
+    const dataLink = document.createElement("div");
+    // Changed to 20% opacity black + glassy border
+    dataLink.className = "mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black/20 border border-white/10 hover:border-emerald-400 hover:bg-black/30 rounded-lg cursor-pointer transition-all group/link shadow-sm";
+    dataLink.onclick = (e) => {
+      e.stopPropagation();
+      if (window.openDataDetail) window.openDataDetail(it.name);
+    };
+
+    dataLink.innerHTML = `
+      <span class="text-xs font-bold text-zinc-300 group-hover/link:text-white uppercase tracking-wider">Detailed Data</span>
+      <svg class="w-4 h-4 text-zinc-500 group-hover/link:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+      </svg>
+    `;
+    details.appendChild(dataLink);
+
     frame.style.cursor = "pointer";
     frame.onclick = (e) => {
       e.stopPropagation();
@@ -3517,12 +3940,15 @@ function renderGrid() {
         // Toggle Collected Status
         if (state.collectedItems.has(it.name)) {
           state.collectedItems.delete(it.name);
+          hideToast(); // Hide toast if uncollecting
         } else {
           state.collectedItems.add(it.name);
           state.wishlistedItems.delete(it.name);
-          // Don't show toast in mass mode
+          // Show toast in mass mode too
+          if (state.currentTab === "blueprints") {
+            showCollectToast(it.name);
+          }
         }
-        hideToast();
         saveCollectionState();
         updateCardVisuals(frame, it.name);
         debouncedSyncToCloud();
@@ -3940,11 +4366,17 @@ function initContextMenu() {
       // Toggle collected state
       if (state.collectedItems.has(itemName)) {
         state.collectedItems.delete(itemName);
+        hideToast(); // Hide toast if uncollecting
       } else {
         state.wishlistedItems.delete(itemName); // Remove from wishlist if present
         state.collectedItems.add(itemName);
+        // Show toast asking for location data (only on blueprints tab)
+        if (state.currentTab === "blueprints") {
+          showCollectToast(itemName);
+        }
       }
       saveCollectionState();
+      debouncedSyncToCloud();
       if (frame) updateCardVisuals(frame, itemName);
       updateProgress();
       hideMenu();
@@ -4130,6 +4562,65 @@ function renderDataRegistry() {
       const rA = rarityRank(getRarity(a));
       const rB = rarityRank(getRarity(b));
       return (rA - rB) * dir;
+    }
+
+    if (col === 'confidence') {
+      const getConfRank = (c) => {
+        const idx = CONFIDENCE_ORDER.indexOf(c);
+        return idx === -1 ? 999 : idx;
+      };
+      // CONFIDENCE_ORDER: Confirmed (0) -> Not Enough Data (4).
+      // Descending (High->Low) means 0 comes first.
+      // Ascending (Low->High) means 4 comes first.
+      // Default array index sort (a-b) puts 0 first.
+      // So 'asc' direction (1) should yield 0->4? No...
+      // Let's define: High=Confirmed, Low=NotEnoughData.
+      // 'conf_desc' (High->Low) => Confirmed first.
+      // 'conf_asc' (Low->High) => NotEnoughData first.
+
+      const rankA = getConfRank(a.confidence);
+      const rankB = getConfRank(b.confidence);
+
+      // We want to sort by INDEX.
+      // If direction is 'desc' (High->Low), we want Index 0 (Confirmed) first.
+      // JS sort(a-b): smaller first. 0 is smaller than 4.
+      // So (rankA - rankB) puts Confirmed first.
+      // Meaning for 'desc' we want to use (rankA - rankB).
+      // If direction is 'asc' (Low->High), we want Index 4 first. 
+      // So (rankB - rankA)? Or just reverse (rankA - rankB) * -1?
+      // Wait, standard `dir` is 1 for ASC, -1 for DESC.
+      // If I want 0 first when DESC (-1), then I need result to be negative when A=0, B=4.
+      // (0 - 4) = -4. 
+      // (rankA - rankB) * 1 (ASC) => 0 first.
+      // So (rankA - rankB) * dir => 
+      // if ASC (1): 0 first (Confirmed). That's HIGH to LOW confidence.
+      // Ah. My mapping of ASC/DESC to the Dropdown text matters.
+      // Dropdown: "Confidence (High -> Low)" (conf_desc).
+      // In onSort: conf_desc sets direction 'desc'.
+      // So when 'desc', we want HIGH (Confirmed, index 0) first.
+      // Standard sort: 0, 1, 2...
+      // So we want natural index order for DESC.
+      // So we want (rankA - rankB) when DESC.
+      // Wait. dir is -1 for DESC.
+      // So (rankA - rankB) * -1 => (0 - 4)*-1 = 4. 4 is positive, so B (index 4) comes first. WRONG.
+      // Detailed check:
+      // a=0, b=4. a-b = -4. 
+      // if return < 0, a comes first.
+      // We want a(0) first. So we want negative result.
+      // If we use (rankA - rankB) => -4. Correct logic for "Index 0 first".
+      // But `dir` multiplier flips it!
+      // So if dir is 'desc' (-1), we get 4 => b first.
+      // So for Confidence, specifically, we need to INVERT the dir multiplier relative to standard sorts, OR just handle it explicitly.
+
+      const sortVal = rankA - rankB;
+      // If DESC (High->Low), we want sortVal (Index 0 first).
+      // If ASC (Low->High), we want -sortVal (Index 4 first).
+
+      if (state.dataSort.direction === 'desc') {
+        return sortVal;
+      } else {
+        return sortVal * -1;
+      }
     }
 
     // Simple string sorts for others
@@ -4398,23 +4889,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Sort Headers
-  document.querySelectorAll("[data-sort]").forEach(header => {
-    header.addEventListener("click", () => {
-      const col = header.dataset.sort;
-      if (state.dataSort.column === col) {
-        state.dataSort.direction = state.dataSort.direction === 'asc' ? 'desc' : 'asc';
-      } else {
-        state.dataSort.column = col;
-        state.dataSort.direction = 'asc'; // true? No, 'asc'
-      }
-      renderDataRegistry();
+  // Sort Headers: Removed redundant listener. Handled in initUI.
+  // Visual feedback: Removed. Handled via filter state.
 
-      // Visual feedback could be added here (arrow icons)
-      document.querySelectorAll("[data-sort]").forEach(h => h.classList.remove("text-emerald-400"));
-      header.classList.add("text-emerald-400");
-    });
-  });
 
   // Refresh Btn
   const refreshBtn = document.getElementById("dataRefreshBtn");
@@ -4424,3 +4901,322 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 });
+
+/* ==========================================================================
+   INTERACTIVE MAP PICKER
+   ========================================================================== */
+
+const MAP_CONFIG = {
+  "dam_battlegrounds": {
+    name: "Dam Battlegrounds",
+    url: "/images/maps/dam_battlegrounds.png",
+    bounds: [[0, 0], [1000, 1000]]
+  },
+  "the_spaceport": {
+    name: "The Spaceport",
+    url: "/images/maps/the_spaceport.png",
+    bounds: [[0, 0], [1000, 1000]]
+  },
+  "buried_city": {
+    name: "Buried City",
+    url: "/images/maps/buried_city.png",
+    bounds: [[0, 0], [1000, 1000]]
+  },
+  "the_blue_gate": {
+    name: "The Blue Gate",
+    url: "/images/maps/the_blue_gate.png",
+    bounds: [[0, 0], [1000, 1000]]
+  },
+  "stella_montis_upper": {
+    name: "Stella Montis (Upper)",
+    url: "/images/maps/stella_montis_upper.png",
+    bounds: [[0, 0], [1000, 1000]]
+  },
+  "stella_montis_lower": {
+    name: "Stella Montis (Lower)",
+    url: "/images/maps/stella_montis_lower.png",
+    bounds: [[0, 0], [1000, 1000]]
+  }
+};
+
+let mapPickerState = {
+  map: null,
+  currentPin: null,
+  currentMapId: "dam_battlegrounds",
+  selectedLocation: null
+};
+
+function initMapPicker() {
+  const openBtn = document.getElementById("openMapPickerBtn");
+  const closeBtn = document.getElementById("closeMapPickerBtn");
+  const confirmBtn = document.getElementById("confirmPinBtn");
+  const modal = document.getElementById("mapPickerModal");
+
+  if (openBtn) openBtn.onclick = openMapPicker;
+  if (closeBtn) closeBtn.onclick = closeMapPicker;
+  if (confirmBtn) confirmBtn.onclick = confirmMapSelection;
+
+  // Close on backdrop click
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) closeMapPicker();
+    };
+  }
+}
+
+function openMapPicker() {
+  const modal = document.getElementById("mapPickerModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  // Use flex to show it (overriding hidden)
+  modal.classList.add("flex");
+
+  // Initialize map if first time
+  if (!mapPickerState.map) {
+    // Wait for modal transition/render
+    setTimeout(() => initLeafletMap(), 50);
+  } else {
+    // Refresh layout (needed because modal was hidden)
+    setTimeout(() => {
+      mapPickerState.map.invalidateSize();
+    }, 100);
+  }
+
+  // Pre-select current map from form if possible, else default
+  const currentMapInput = document.getElementById("submitMap");
+  const mapId = currentMapInput && currentMapInput.value ? currentMapInput.value : "dam_battlegrounds";
+  // If map config doesn't have it (e.g. unknown ID), fallback
+  const validMapId = MAP_CONFIG[mapId] ? mapId : "dam_battlegrounds";
+  loadMap(validMapId);
+}
+
+function closeMapPicker() {
+  const modal = document.getElementById("mapPickerModal");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+}
+
+function initLeafletMap() {
+  // Check if L exists
+  if (typeof L === 'undefined') {
+    console.error("Leaflet not loaded");
+    return;
+  }
+
+  // Init map container
+  mapPickerState.map = L.map('leafletMap', {
+    crs: L.CRS.Simple,
+    minZoom: -1,
+    maxZoom: 2,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.control.zoom({
+    position: 'bottomright'
+  }).addTo(mapPickerState.map);
+
+  // Click handler
+  mapPickerState.map.on('click', onMapClick);
+
+  // Render tabs
+  renderMapTabs();
+}
+
+function renderMapTabs() {
+  const container = document.getElementById("mapTabsContainer");
+  if (!container) return;
+
+  // Render tabs - Filter out Lower, we'll handle it via toggle
+  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => id !== "stella_montis_lower");
+
+  container.innerHTML = visibleMaps.map(([id, config]) => {
+    const isStella = id === "stella_montis_upper";
+    const label = isStella ? "Stella Montis" : config.name;
+
+    return `
+    <button onclick="loadMap('${id}')" 
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white"
+      id="map-tab-${id}">
+      ${label}
+    </button>
+  `}).join('');
+}
+
+function loadMap(mapId) {
+  // Handle Stella Montis consolidation
+  let actualMapId = mapId;
+  const isStella = mapId.includes("stella");
+
+  // If switching TO Stella (generic or upper), verify state
+  if (isStella && !mapPickerState.stellaLevel) {
+    mapPickerState.stellaLevel = "upper";
+  }
+
+  if (isStella) {
+    actualMapId = `stella_montis_${mapPickerState.stellaLevel}`;
+  }
+
+  if (!MAP_CONFIG[actualMapId]) return;
+
+  mapPickerState.currentMapId = actualMapId;
+
+  // Update tabs styles
+  document.querySelectorAll('#mapTabsContainer button').forEach(btn => {
+    btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white";
+  });
+
+  // Highlight the parent tab for Stella
+  const tabId = isStella ? "stella_montis_upper" : actualMapId;
+  const activeBtn = document.getElementById(`map-tab-${tabId}`);
+  if (activeBtn) {
+    activeBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+  }
+
+  // Remove existing layers (images)
+  mapPickerState.map.eachLayer(layer => {
+    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
+      mapPickerState.map.removeLayer(layer);
+    }
+  });
+
+  // Handle Level Toggle for Stella Montis
+  updateLevelToggle(isStella);
+
+  // Clear pin state
+  mapPickerState.currentPin = null;
+  mapPickerState.selectedLocation = null;
+  document.getElementById("confirmPinBtn").disabled = true;
+  document.getElementById("coordinatesDisplay").textContent = "No location selected";
+
+  // Add image overlay
+  const bounds = [[0, 0], [1000, 1000]]; // Normalized 1000x1000 coordinate system
+  L.imageOverlay(MAP_CONFIG[actualMapId].url, bounds).addTo(mapPickerState.map);
+
+  // Fit bounds
+  mapPickerState.map.fitBounds(bounds);
+
+  // Show instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) instructions.style.opacity = '1';
+}
+
+function updateLevelToggle(show) {
+  let toggle = document.getElementById("stellaLevelToggle");
+
+  if (!show) {
+    if (toggle) toggle.remove();
+    return;
+  }
+
+  if (!toggle) {
+    toggle = document.createElement("div");
+    toggle.id = "stellaLevelToggle";
+    toggle.className = "absolute bottom-6 right-6 z-[400] flex flex-col gap-2 bg-black/60 backdrop-blur-md p-2 rounded-lg border border-white/10";
+    document.getElementById("leafletMap").parentElement.appendChild(toggle);
+  }
+
+  const currentLevel = mapPickerState.stellaLevel || "upper";
+
+  toggle.innerHTML = `
+    <button onclick="switchStellaLevel('upper')" 
+      class="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${currentLevel === 'upper' ? 'bg-emerald-600 text-white' : 'bg-transparent text-zinc-400 hover:text-white'}">
+      Upper
+    </button>
+    <button onclick="switchStellaLevel('lower')" 
+      class="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${currentLevel === 'lower' ? 'bg-emerald-600 text-white' : 'bg-transparent text-zinc-400 hover:text-white'}">
+      Lower
+    </button>
+  `;
+}
+
+window.switchStellaLevel = (level) => {
+  mapPickerState.stellaLevel = level;
+  loadMap(`stella_montis_${level}`);
+};
+
+function onMapClick(e) {
+  const { lat, lng } = e.latlng;
+
+  // Bounds check (0-1000)
+  if (lat < 0 || lat > 1000 || lng < 0 || lng > 1000) return;
+
+  // Remove old pin
+  if (mapPickerState.currentPin) {
+    mapPickerState.map.removeLayer(mapPickerState.currentPin);
+  }
+
+  // Add new pin with SVG icon
+  const customIcon = L.divIcon({
+    className: 'custom-pin-icon',
+    html: `
+      <div class="relative -top-6 -left-3">
+        <svg class="w-8 h-8 text-emerald-500 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32]
+  });
+
+  mapPickerState.currentPin = L.marker([lat, lng], { icon: customIcon }).addTo(mapPickerState.map);
+
+  // Update UI
+  const x = Math.round(lng);
+  const y = Math.round(lat);
+
+  mapPickerState.selectedLocation = { x, y, mapId: mapPickerState.currentMapId };
+
+  document.getElementById("coordinatesDisplay").textContent = `X: ${x}, Y: ${y}`;
+  document.getElementById("confirmPinBtn").disabled = false;
+
+  // Hide instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) instructions.style.opacity = '0';
+}
+
+function confirmMapSelection() {
+  if (!mapPickerState.selectedLocation) return;
+
+  const { x, y, mapId } = mapPickerState.selectedLocation;
+
+  // Update form inputs
+  const locationInput = document.getElementById("submitLocation");
+  const mapSelect = document.getElementById("submitMap");
+
+  // Auto-select map
+  if (mapSelect) {
+    // If it's stella lower or upper, set to the generic stella option if that's what is there
+    // In our HTML we have "stella_montis_upper" serving as the Stella option
+    if (mapId.includes("stella")) {
+      mapSelect.value = "stella_montis_upper";
+    } else {
+      mapSelect.value = mapId;
+    }
+  }
+
+  if (locationInput) {
+    // Format text
+    let mapName = MAP_CONFIG[mapId]?.name || "Map";
+    // Simplify Stella names
+    if (mapId === "stella_montis_upper") mapName = "Stella Upper";
+    if (mapId === "stella_montis_lower") mapName = "Stella Lower";
+
+    locationInput.value = `${mapName} (${x}, ${y})`;
+
+    // Flash effect
+    locationInput.classList.add("ring-2", "ring-emerald-500");
+    setTimeout(() => locationInput.classList.remove("ring-2", "ring-emerald-500"), 500);
+
+    // Focus so user can type more details
+    locationInput.focus();
+  }
+
+  closeMapPicker();
+}
+
+window.loadMap = loadMap;
