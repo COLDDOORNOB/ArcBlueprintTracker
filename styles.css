@@ -19,6 +19,11 @@ body {
   font-family: 'Barlow', system-ui, sans-serif;
   overflow-y: scroll;
   /* Always show scrollbar to prevent layout shift */
+  position: relative;
+  min-height: 100vh;
+
+  /* Background Base */
+  background-color: #000;
 }
 
 /* Tab buttons and navigation - Urbanist for modern feel */
@@ -78,44 +83,89 @@ button {
 }
 
 /* GPU-accelerated background on a separate layer that won't break fixed positioning */
+/* Scrolling Background - Tiled Lines Pattern */
 body::before {
   content: "";
-  position: fixed;
+  position: absolute;
+  /* Scrolls with the page */
   top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
-  background-image: url("/Background/stripes.webp");
-  background-repeat: no-repeat;
-  background-position: left top;
-  background-size: auto 100vh;
+  height: 100%;
+  min-height: 100vh;
+  background-image: url("/Background/Lines_Background_1_BW.webp");
+  background-repeat: repeat-y;
+  /* Stack vertically for seamless scroll */
+  background-position: center top;
+  background-size: 100% auto;
+  /* Full width, stack height */
   z-index: -1;
   pointer-events: none;
-  /* GPU acceleration on the pseudo-element, not body */
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+
+  /* B&W and Blur Effect */
+  filter: grayscale(100%) blur(4px) brightness(0.4);
 }
 
-/* Desktop only: Mirrored background on right side */
-@media (min-width: 768px) {
+/* Mobile Background Zoom & Alternating Pattern */
+@media (max-width: 768px) {
+  body::before {
+    background-image: url("/Background/Lines_Background_1_BW.webp");
+    background-size: auto 160vh;
+    /* 2x Zoom (was 80vh) */
+    background-position: center top;
+    /* Mask: Show 0-160, Hide 160-320 */
+    -webkit-mask-image: repeating-linear-gradient(to bottom, black 0, black 160vh, transparent 160vh, transparent 320vh);
+    mask-image: repeating-linear-gradient(to bottom, black 0, black 160vh, transparent 160vh, transparent 320vh);
+  }
+
   body::after {
     content: "";
-    position: fixed;
+    position: absolute;
     top: 0;
-    right: 0;
-    width: 50%;
-    height: 100vh;
-    background-image: url("/Background/stripes.webp");
-    background-repeat: no-repeat;
-    background-position: right top;
-    background-size: auto 100vh;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    background-image: url("/Background/Lines_Background_2_BW.webp");
+    background-repeat: repeat-y;
+    background-size: auto 160vh;
+    background-position: center top;
     z-index: -1;
     pointer-events: none;
-    transform: scaleX(-1) rotate(180deg) translateZ(0);
-    backface-visibility: hidden;
-    opacity: 1;
+    transform: scaleX(-1);
+    /* Flip horizontally */
+
+    /* Same filters */
+    filter: grayscale(100%) blur(4px) brightness(0.4);
+
+    /* Mask: Hide 0-160, Show 160-320 */
+    -webkit-mask-image: repeating-linear-gradient(to bottom, transparent 0, transparent 160vh, black 160vh, black 320vh);
+    mask-image: repeating-linear-gradient(to bottom, transparent 0, transparent 160vh, black 160vh, black 320vh);
   }
+}
+
+/* Mirrored background removed as requested (single image) */
+
+/* Low Cost Film Grain Overlay */
+#bg-grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Behind content, over background */
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.80' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  /* Tile small chunks for sharpness */
+  opacity: 0.08;
+  mix-blend-mode: screen;
+  filter: contrast(200%) grayscale(100%);
+}
+
+
+/* Main Grid Layout - Responsive Cards */
+#grid {
+  grid-template-columns: repeat(auto-fill, minmax(var(--cardSize), 1fr));
 }
 
 /* Custom Scrollbar */
@@ -547,11 +597,7 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 /* Force hide desktop toggle on mobile (Specificity Fix) */
-@media (max-width: 767px) {
-  #desktopFilterBtn {
-    display: none !important;
-  }
-}
+
 
 .tab-button {
   padding: 12px 32px;
@@ -1051,6 +1097,7 @@ input[type=range]::-webkit-slider-runnable-track {
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition: all 0.2s ease;
+  container-type: inline-size;
 }
 
 .container-picker-card:hover {
@@ -1073,15 +1120,20 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .container-picker-card .card-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: clamp(0.7rem, 10cqw, 1rem);
+  font-weight: 700;
   color: #fafafa;
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.1;
   max-width: 100%;
+  margin-top: 2px;
+  /* Multi-line clamp instead of ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .container-picker-card .card-pool {
@@ -1165,4 +1217,219 @@ input[type=range]::-webkit-slider-runnable-track {
 
 #mapInstructions {
   pointer-events: none;
+}
+
+/* =====================================================
+   CRT/Monitor Visual Effects for Map Picker
+   ===================================================== */
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.97;
+  }
+
+  5% {
+    opacity: 0.90;
+  }
+
+  10% {
+    opacity: 0.94;
+  }
+
+  15% {
+    opacity: 0.98;
+  }
+
+  20% {
+    opacity: 0.95;
+  }
+
+  25% {
+    opacity: 0.91;
+  }
+
+  30% {
+    opacity: 0.94;
+  }
+
+  35% {
+    opacity: 0.96;
+  }
+
+  40% {
+    opacity: 0.98;
+  }
+
+  45% {
+    opacity: 0.92;
+  }
+
+  50% {
+    opacity: 0.95;
+  }
+
+  55% {
+    opacity: 0.99;
+  }
+
+  60% {
+    opacity: 0.92;
+  }
+
+  65% {
+    opacity: 0.98;
+  }
+
+  70% {
+    opacity: 0.99;
+  }
+
+  75% {
+    opacity: 0.96;
+  }
+
+  80% {
+    opacity: 0.90;
+  }
+
+  85% {
+    opacity: 0.97;
+  }
+
+  90% {
+    opacity: 0.93;
+  }
+
+  95% {
+    opacity: 0.99;
+  }
+
+  100% {
+    opacity: 0.94;
+  }
+}
+
+@keyframes scanline-move {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 0 100vh;
+  }
+}
+
+/* CRT Container: The "Monitor" chassis */
+.crt-container {
+  position: relative;
+  overflow: hidden;
+  background: #090c12;
+  /* 33% Darker than #0e121b */
+  box-shadow:
+    0 0 0 4px #090c12,
+    /* Match bezel */
+    0 0 0 8px #05070a,
+    /* Even darker outer bezel */
+    0 0 20px rgba(9, 12, 18, 0.8);
+  border-radius: 12px;
+}
+
+/* Enhances the map layer to look like a screen */
+.crt-screen {
+  position: relative;
+  z-index: 1;
+  filter: contrast(1.1) brightness(1.1) saturate(1.1);
+  /* Window Mask Removed - now tracking image via .crt-map-image */
+}
+
+/* Force Leaflet to be transparent so we see the container background */
+.leaflet-container {
+  background: transparent !important;
+}
+
+/* Performance Optimization for Smooth Zoom */
+.leaflet-zoom-animated {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  /* Force HW accel */
+}
+
+/* 
+   Main Map Layer: Sharp, rounded corners.
+*/
+.crt-map-image {
+  /* No mask - sharp edges with rounding */
+  mask-image: none;
+  -webkit-mask-image: none;
+  border-radius: 40px;
+  /* Requested rounding */
+  z-index: 10;
+}
+
+/* Glow Layer removed */
+
+/* Common Overlay Base */
+.crt-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Vignette removed - using mask + background color instead */
+
+/* Scanlines: RGB TV Mask */
+.crt-scanlines {
+  background: linear-gradient(to bottom,
+      rgba(255, 0, 0, 0.15) 0%,
+      rgba(255, 0, 0, 0.15) 33.3%,
+      rgba(0, 255, 0, 0.15) 33.3%,
+      rgba(0, 255, 0, 0.15) 66.6%,
+      rgba(0, 0, 255, 0.15) 66.6%,
+      rgba(0, 0, 255, 0.15) 100%);
+  background-size: 100% 3px;
+  opacity: 0.5;
+  mix-blend-mode: hard-light;
+  pointer-events: none;
+}
+
+/* Flicker Animation to simulate refresh rate instability */
+.crt-flicker-anim {
+  animation: crt-flicker 0.15s infinite;
+  background: rgba(255, 255, 255, 0.02);
+  mix-blend-mode: overlay;
+  will-change: opacity;
+}
+
+/* Color Separation / Chromatic Aberration (Simulated via text shadow / border, or subtle gradient mix) */
+/* Real RGB shift is hard without Canvas/WebGL, but we can fake a "phosphor" grid or tint */
+.crt-phosphor {
+  /* Tiny grid pattern to simulate RGB mask */
+  background-image: radial-gradient(circle, rgba(20, 255, 20, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: screen;
+  opacity: 0.2;
+}
+
+/* Scanline Sweep Removed */
+/* Scanline Sweep Removed */
+
+/* Removed separate aberration - merged into scanlines/RGB effect */
+
+/* Optional: Slight color shift pulse */
+.crt-pulse {
+  animation: crt-color-pulse 8s infinite ease-in-out;
+  will-change: filter;
+}
+
+@keyframes crt-color-pulse {
+
+  0%,
+  100% {
+    filter: hue-rotate(0deg);
+  }
+
+  50% {
+    filter: hue-rotate(3deg);
+  }
 }

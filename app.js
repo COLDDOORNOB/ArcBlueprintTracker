@@ -1,6 +1,6 @@
 ﻿import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
-import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   safeInit("Blueprint Submission", initBlueprintSubmission);
   safeInit("Wrapped", initWrapped);
   safeInit("Announcements", initAnnouncements);
+  safeInit("Sidebar", initSidebar);
   safeInit("Context Menu", initContextMenu);
 
   // loadData is core, but we wrap it too just in case
@@ -394,6 +395,7 @@ async function syncToCloud() {
     await setDoc(userRef, {
       collectedItems: Array.from(state.collectedItems),
       wishlistedItems: Array.from(state.wishlistedItems),
+      spares: state.spares, // Save Spares to Cloud
       lastSync: new Date().toISOString(),
       updatedAt: new Date()
     }, { merge: true });
@@ -435,6 +437,20 @@ async function loadFromCloud(user) {
           }
         });
         if (state.wishlistedItems.size > preSize) changed = true;
+        if (state.wishlistedItems.size > preSize) changed = true;
+      }
+
+      // Merge Spares
+      if (data.spares) {
+        // We will take the max of local vs cloud to be safe, or just cloud if simple
+        // Let's iterate cloud keys
+        Object.entries(data.spares).forEach(([item, count]) => {
+          const current = state.spares[item] || 0;
+          if (count > current) {
+            state.spares[item] = count;
+            changed = true;
+          }
+        });
       }
 
       if (changed) {
@@ -481,16 +497,19 @@ function initAuth() {
       console.log("Attempting Google Sign-in...");
       // FORCE "Local" Persistence (Keep logged in indefinitely)
       await setPersistence(auth, browserLocalPersistence);
+
+      // Attempt Popup Sign-in
       await signInWithPopup(auth, googleProvider);
       console.log("Sign-in successful!");
     } catch (error) {
       console.error("Firebase Auth Error:", error.code, error.message);
+
       if (error.code === 'auth/popup-closed-by-user') {
         console.warn("Popup was closed before finishing.");
       } else if (error.code === 'auth/operation-not-allowed') {
         alert("Google Sign-in is not enabled in the Firebase Console.");
       } else if (error.code === 'auth/unauthorized-domain') {
-        alert("This domain is not authorized for Firebase Auth. Check your Firebase Console settings.");
+        alert(`Domain unauthorized (${window.location.hostname}). To test mobile, use your LIVE site (arc-blueprint-tracker.web.app) or whitelist this IP in Firebase Console.`);
       } else {
         alert("Sign-in failed: " + error.message);
       }
@@ -965,8 +984,8 @@ function updateSortOptions(tab) {
   let html = "";
   if (tab === "data") {
     html = `
-      <option value="entries_desc">Entries (High → Low)</option>
-      <option value="entries_asc">Entries (Low → High)</option>
+      <option value="rarity_desc">Rarity (High → Low)</option>
+      <option value="rarity_asc">Rarity (Low → High)</option>
       <option value="conf_desc">Confidence (High → Low)</option>
       <option value="conf_asc">Confidence (Low → High)</option>
       <option value="name_asc">Name (A → Z)</option>
@@ -986,7 +1005,7 @@ function updateSortOptions(tab) {
   if (sort1) {
     sort1.innerHTML = html;
     if (tab === "data") {
-      sort1.value = state.filters.sortData || "entries_desc";
+      sort1.value = state.filters.sortData || "rarity_desc";
     } else {
       sort1.value = state.filters.sortBlueprints || "rarity_desc";
     }
@@ -994,7 +1013,7 @@ function updateSortOptions(tab) {
   if (sort2) {
     sort2.innerHTML = html;
     if (tab === "data") {
-      sort2.value = state.filters.sortData || "entries_desc";
+      sort2.value = state.filters.sortData || "rarity_desc";
     } else {
       sort2.value = state.filters.sortBlueprints || "rarity_desc";
     }
@@ -1007,6 +1026,9 @@ function switchTab(tabName) {
 
   // Update Sort Options logic
   updateSortOptions(tabName === "data" ? "data" : "blueprints");
+
+  // Update Grid/List Size Label
+  if (typeof updateGridSizeLabel === 'function') updateGridSizeLabel(tabName);
 
   // Tab Buttons
   const blueprintsBtn = document.getElementById("tabBlueprints");
@@ -1421,6 +1443,9 @@ function closeSubmissionModal() {
   // Reset container picker
   clearContainerSelection();
   hideCustomContainerForm();
+
+  // Reset map picker
+  if (window.clearMapSelection) window.clearMapSelection();
 }
 
 // ==========================================
@@ -1579,7 +1604,7 @@ async function openContainerPicker() {
   // Focus search after short delay for animation
   setTimeout(() => {
     if (pickerSearch) pickerSearch.focus();
-  }, 100);
+  }, 200);
 }
 
 function closeContainerPicker() {
@@ -1626,9 +1651,9 @@ function renderContainerPickerGrid(query) {
     const card = document.createElement("div");
     card.className = "container-picker-card";
     card.innerHTML = `
-      <img src="${CONTAINER_IMAGE_BASE}${container.image}" alt="${container.name}" loading="lazy" />
-      <div class="card-name">${container.name}</div>
-      <div class="card-pool">${container.lootPool}</div>
+      <img src="${CONTAINER_IMAGE_BASE}${container.image}" alt="${container.name}" loading="lazy" class="w-full h-24 object-cover rounded-lg mb-1.5" />
+      <div class="card-name text-white leading-tight font-bold">${container.name}</div>
+      <div class="card-pool text-zinc-400 mt-0.5">${container.lootPool}</div>
     `;
 
     card.addEventListener("click", () => {
@@ -2617,9 +2642,16 @@ function hideToast() {
 
 async function submitBlueprintLocation() {
   const blueprintName = document.getElementById("submitBlueprintName")?.value;
-  const map = document.getElementById("submitMap")?.value;
+
+  // New Map Fields
+  const mapId = document.getElementById("submitMapId")?.value;
+  const mapX = document.getElementById("submitMapX")?.value;
+  const mapY = document.getElementById("submitMapY")?.value;
+
   const condition = document.getElementById("submitCondition")?.value;
-  const location = document.getElementById("submitLocation")?.value;
+  // Notes replaces Location
+  const notes = document.getElementById("submitNotes")?.value;
+
   const container = getContainerValue(); // Use container picker value
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
@@ -2629,26 +2661,49 @@ async function submitBlueprintLocation() {
     return;
   }
 
-  // Require at least one data field (Map/Cond/Loc/Cont/Trials/Quest)
-  // Submitting ONLY a blueprint name is not useful.
-  const hasData = map || condition || location || container || trialsReward || questReward;
+  // Require at least one data field
+  const hasData = mapId || condition || notes || container || trialsReward || questReward;
 
   if (!hasData) {
-    alert("Please provide at least one detail (Map, Condition, Location, Container, or Reward Type).");
+    alert("Please provide at least one detail (Map, Condition, Notes, Container, or Reward Type).");
     return;
   }
 
   try {
+    // Check for Custom Container Submission
+    const customForm = document.getElementById("customContainerForm");
+    const customNameInput = document.getElementById("customContainerName");
+    const customDescInput = document.getElementById("customContainerDescription");
+
+    // If using custom container, save it to separate collection
+    if (customForm && !customForm.classList.contains("hidden") && customNameInput?.value.trim()) {
+      try {
+        await addDoc(collection(db, "containerSubmissions"), {
+          name: customNameInput.value.trim(),
+          description: customDescInput?.value.trim() || "",
+          submittedAt: new Date().toISOString(),
+          userId: auth.currentUser?.uid || "anonymous"
+        });
+        console.log("Custom container submitted successfully");
+      } catch (err) {
+        console.error("Failed to submit custom container:", err);
+        // Continue with blueprint submission anyway
+      }
+    }
+
     await addDoc(collection(db, "blueprintSubmissions"), {
       blueprintName: blueprintName || "",
-      map: map || "",
+      map: mapId || "",
       condition: condition || "",
-      location: location || "",
-      container: container || "",
+      location: notes || "", // Mapped from "Location Notes" input
+      container: container.replace("CUSTOM: ", "") || "", // Clean up custom prefix
       trialsReward: trialsReward,
       questReward: questReward,
       submittedAt: new Date().toISOString(),
-      userId: auth.currentUser?.uid || "anonymous"
+      userId: auth.currentUser?.uid || "anonymous",
+      // Coordinates moved to bottom
+      mapX: mapX || "",
+      mapY: mapY || ""
     });
 
     closeSubmissionModal();
@@ -3043,6 +3098,9 @@ function initUI() {
       state.filtersOpen = !state.filtersOpen;
       sessionStorage.setItem("filtersOpen", state.filtersOpen);
       updateSidebarVisibility();
+
+      // Ensure Correct Label on Open
+      updateGridSizeLabel(state.currentTab);
     };
   }
 
@@ -3062,8 +3120,8 @@ function initUI() {
 
     if (state.currentTab === "data") {
       state.filters.sortData = v;
-      if (v === 'entries_asc') state.dataSort = { column: 'entries', direction: 'asc' };
-      if (v === 'entries_desc') state.dataSort = { column: 'entries', direction: 'desc' };
+      if (v === 'entries_asc') state.dataSort = { column: 'rarity', direction: 'asc' }; // Fallback
+      if (v === 'entries_desc') state.dataSort = { column: 'rarity', direction: 'desc' }; // Fallback
       if (v === 'name_asc') state.dataSort = { column: 'name', direction: 'asc' };
       if (v === 'name_desc') state.dataSort = { column: 'name', direction: 'desc' };
 
@@ -3117,19 +3175,20 @@ function initUI() {
     state.filters.confs.clear();
     state.filters.search = "";
     // state.filters.sort = "rarity_desc"; // Deprecated
+    // state.filters.sort = "rarity_desc"; // Deprecated
     state.filters.sortBlueprints = "rarity_desc";
-    state.filters.sortData = "entries_desc";
+    state.filters.sortData = "rarity_desc";
     if (s1) s1.value = "";
     if (s2) s2.value = "";
 
     // Reset dropdown to current tab's default
-    const defaultSort = (state.currentTab === "data") ? "entries_desc" : "rarity_desc";
+    const defaultSort = "rarity_desc";
     if (sort1) sort1.value = defaultSort;
     if (sort2) sort2.value = defaultSort;
     state.filters.collected = "all";
 
     // Reset Data Sort
-    state.dataSort = { column: 'entries', direction: 'desc' };
+    state.dataSort = { column: 'rarity', direction: 'desc' };
 
     if (state.currentTab === "data") {
       renderDataRegistry();
@@ -3141,7 +3200,7 @@ function initUI() {
     initCollectionFilters(); // This re-binds but also re-syncs visual state based on state.filters.collected
     saveFilters();
   };
-  ["resetBtn", "resetBtn2", "resetBtnMobile"].forEach(id => {
+  ["resetBtn", "resetBtn2"].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.onclick = resetAll;
   });
@@ -3156,35 +3215,17 @@ function initUI() {
 
   bindAll("condAllBtn", state.filters.conds);
   bindAll("confAllBtn", state.filters.confs);
-  bindAll("rarityAllBtnMobile", state.filters.rarities);
-  bindAll("typeAllBtnMobile", state.filters.types);
-  bindAll("mapAllBtnMobile", state.filters.maps);
-  bindAll("condAllBtnMobile", state.filters.conds);
-  bindAll("confAllBtnMobile", state.filters.confs);
 
-  // Grid size slider (desktop + mobile), persisted in localStorage
-  const gs1 = document.getElementById("gridSize");
-  const gs2 = document.getElementById("gridSizeMobile");
-  const initial = loadGridSize();
-  setGridSize(initial);
-  if (gs1) {
-    gs1.min = String(GRID.min); gs1.max = String(GRID.max); gs1.step = String(GRID.step);
-    gs1.value = String(initial);
-    gs1.addEventListener("input", (e) => {
-      const v = e.target.value;
-      if (gs2) gs2.value = v;
-      setGridSize(v);
-    });
-  }
-  if (gs2) {
-    gs2.min = String(GRID.min); gs2.max = String(GRID.max); gs2.step = String(GRID.step);
-    gs2.value = String(initial);
-    gs2.addEventListener("input", (e) => {
-      const v = e.target.value;
-      if (gs1) gs1.value = v;
-      setGridSize(v);
-    });
-  }
+  // --- Grid Size Logic (Adaptive Buttons) ---
+  // Grid Size Logic moved to unified initGridSizeController
+
+
+  // Helper for window resize
+  window.addEventListener("resize", () => {
+    applyGridSize(currentGridSize);
+  });
+
+
   // Collapsible sections
   const setupCollapsible = (toggleId, contentId, iconId) => {
     const toggle = document.getElementById(toggleId);
@@ -3224,10 +3265,10 @@ function initUI() {
       } else if (field === 'confidence') {
         // Toggle High-Low / Low-High
         newSort = (state.filters.sortData === 'conf_desc') ? 'conf_asc' : 'conf_desc';
-      } else if (field === 'entries') {
-        // Toggle High-Low / Low-High
-        newSort = (state.filters.sortData === 'entries_desc') ? 'entries_asc' : 'entries_desc';
       }
+      /* Entries removed */
+      /* else if (field === 'entries') { ... } */
+
 
       // Update dropdowns and trim state
       const sort1 = document.getElementById("sortSelect");
@@ -3681,12 +3722,15 @@ function renderGrid() {
     if (empty) empty.classList.add("hidden");
   }
 
+  // Reverted to hardcoded default (Medium) to fix regression
+  grid.className = "grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5";
 
   const cards = [];
 
   for (const it of state.filtered) {
     const card = document.createElement("div");
-    card.className = "card-compact bg-zinc-950 border border-zinc-800/50 rounded-2xl p-2 opacity-0"; // Start invisible
+    card.className = "card-compact border border-zinc-800/50 rounded-2xl p-2 opacity-0"; // Start invisible
+    card.style.backgroundColor = "#0C0C0F"; // Custom dark background
     card.style.position = "relative";
     card.style.overflow = "visible";
     card.style.setProperty("--glow-color", rarityColor(it.rarity));
@@ -3735,21 +3779,23 @@ function renderGrid() {
     // Concave ramp: Center shifted out, hard stop for sharpness (60% -> 60%)
     corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${rarityColor(it.rarity)}66 60%, ${rarityColor(it.rarity)}cc 100%)`;
 
+    // --- Pill: Confidence ---
     const tab = document.createElement("div");
     tab.className = "type-tab";
-    tab.style.background = rarityColor(it.rarity) + "22";
-    tab.style.borderColor = rarityColor(it.rarity);
 
-    const tabIcon = document.createElement("img");
-    tabIcon.src = it.typeIcon;
-    tabIcon.alt = it.type;
+    // Use global CONFIDENCE_COLORS (exact rarity colors)
+    const confColor = CONFIDENCE_COLORS[it.conf] || "#E11D48"; // Default red for N/A
 
-    const tabText = document.createElement("span");
-    tabText.className = "";
-    tabText.textContent = it.type || "â€”";
+    // Glassy background + border colored by confidence
+    tab.style.background = confColor + "9E"; // ~62% opacity
+    tab.style.borderColor = confColor;
 
-    tab.appendChild(tabIcon);
-    tab.appendChild(tabText);
+    const confText = document.createElement("span");
+    confText.className = "text-white font-semibold";
+    confText.style.textShadow = "0 1px 2px rgba(0,0,0,0.5)"; // Shadow for readability
+    confText.textContent = it.conf || "N/A";
+
+    tab.appendChild(confText);
 
     imgWrap.appendChild(img);
     imgWrap.appendChild(corner);
@@ -3759,8 +3805,15 @@ function renderGrid() {
     title.className = "mt-2 px-1 pb-1";
 
     const name = document.createElement("div");
-    name.className = "font-semibold leading-tight";
-    name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
+    name.className = "font-semibold leading-tight transition-all duration-200";
+
+    // Dynamic Text Size
+    const bpSize = state.blueprintGridSize || 'M';
+    if (bpSize === 'S') name.classList.add("text-xs");
+    else if (bpSize === 'L') name.classList.add("text-base"); // Large
+    else name.classList.add("text-sm"); // Medium (Default)    
+
+    // name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)"; // Removed clamp
     name.textContent = it.name;
     title.appendChild(name);
     const details = document.createElement("div");
@@ -4078,6 +4131,102 @@ function initCollectionFilter() {
 
 
 
+
+// Unified Sidebar Logic
+// Unified Sidebar Logic
+// Unified Sidebar Logic
+function initSidebar() {
+  const sidebar = document.getElementById("filtersSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  const openBtn = document.getElementById("desktopFilterBtn");
+  const closeBtn = document.getElementById("closeSidebarBtn");
+
+  if (!sidebar) console.error("Sidebar not found");
+
+  const openSidebar = () => {
+    if (sidebar) {
+      // Force inline style execution
+      sidebar.style.transform = "translateX(0)";
+      sidebar.style.display = "block";
+
+      // Mobile: Slide in
+      sidebar.classList.remove("-translate-x-full", "hidden");
+      sidebar.classList.add("translate-x-0");
+      sidebar.classList.remove("pointer-events-none");
+      sidebar.classList.add("pointer-events-auto");
+
+      // Desktop: Explicitly Switch to Block
+      sidebar.classList.remove("md:hidden");
+      sidebar.classList.add("md:block");
+    }
+    if (window.innerWidth < 768) {
+      if (backdrop) backdrop.classList.remove("hidden");
+      document.body.classList.add("overflow-hidden"); // Lock scroll
+    }
+  };
+
+  const closeSidebar = () => {
+    if (sidebar) {
+      // Clean up inline styles
+      sidebar.style.transform = "";
+      sidebar.style.display = "";
+
+      // Mobile: Slide out
+      sidebar.classList.add("-translate-x-full");
+      sidebar.classList.remove("translate-x-0");
+
+      sidebar.classList.remove("pointer-events-auto");
+      sidebar.classList.add("pointer-events-none");
+
+      // Desktop: Explicitly Hide
+      if (window.innerWidth >= 768) {
+        sidebar.classList.remove("md:block");
+        sidebar.classList.add("md:hidden");
+        sidebar.classList.add("hidden");
+        sidebar.style.display = "none"; // FORCE HIDE
+      }
+    }
+    if (backdrop) backdrop.classList.add("hidden");
+    document.body.classList.remove("overflow-hidden"); // Unlock scroll
+  };
+
+  const toggleSidebar = () => {
+    if (!sidebar) return;
+
+    // Robust Visibility Check
+    // If display is none, it is hidden.
+    const style = window.getComputedStyle(sidebar);
+    const isHidden = style.display === 'none';
+
+    // On mobile, it might be display:block but translated off-screen.
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // For mobile, check translation class
+      if (sidebar.classList.contains("-translate-x-full")) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    } else {
+      // Desktop
+      if (isHidden) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    }
+  };
+
+  if (openBtn) {
+    openBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSidebar();
+    });
+  }
+
+  if (closeBtn) closeBtn.onclick = closeSidebar;
+  if (backdrop) backdrop.onclick = closeSidebar;
+}
 
 // Update initCollectionFilters to handle both tabs
 // Update initCollectionFilters to handle unified grid
@@ -4411,7 +4560,7 @@ function initContextMenu() {
 const DATA_CSV_URL = "./data_registry.csv";
 
 state.detailedData = [];
-state.dataSort = { column: 'entries', direction: 'desc' }; // Default sort
+state.dataSort = { column: 'rarity', direction: 'desc' }; // Default sort
 state.dataSearch = "";
 
 async function fetchDetailedData() {
@@ -4550,7 +4699,6 @@ function renderDataRegistry() {
     const dir = state.dataSort.direction === 'asc' ? 1 : -1;
     const col = state.dataSort.column;
 
-    if (col === 'entries') return (a.entries - b.entries) * dir;
     if (col === 'name') return a.name.localeCompare(b.name) * dir;
 
     if (col === 'rarity') {
@@ -4581,47 +4729,49 @@ function renderDataRegistry() {
       const rankA = getConfRank(a.confidence);
       const rankB = getConfRank(b.confidence);
 
-      // We want to sort by INDEX.
-      // If direction is 'desc' (High->Low), we want Index 0 (Confirmed) first.
-      // JS sort(a-b): smaller first. 0 is smaller than 4.
-      // So (rankA - rankB) puts Confirmed first.
-      // Meaning for 'desc' we want to use (rankA - rankB).
-      // If direction is 'asc' (Low->High), we want Index 4 first. 
-      // So (rankB - rankA)? Or just reverse (rankA - rankB) * -1?
-      // Wait, standard `dir` is 1 for ASC, -1 for DESC.
-      // If I want 0 first when DESC (-1), then I need result to be negative when A=0, B=4.
-      // (0 - 4) = -4. 
-      // (rankA - rankB) * 1 (ASC) => 0 first.
-      // So (rankA - rankB) * dir => 
-      // if ASC (1): 0 first (Confirmed). That's HIGH to LOW confidence.
-      // Ah. My mapping of ASC/DESC to the Dropdown text matters.
-      // Dropdown: "Confidence (High -> Low)" (conf_desc).
-      // In onSort: conf_desc sets direction 'desc'.
-      // So when 'desc', we want HIGH (Confirmed, index 0) first.
-      // Standard sort: 0, 1, 2...
-      // So we want natural index order for DESC.
-      // So we want (rankA - rankB) when DESC.
-      // Wait. dir is -1 for DESC.
-      // So (rankA - rankB) * -1 => (0 - 4)*-1 = 4. 4 is positive, so B (index 4) comes first. WRONG.
-      // Detailed check:
-      // a=0, b=4. a-b = -4. 
-      // if return < 0, a comes first.
-      // We want a(0) first. So we want negative result.
-      // If we use (rankA - rankB) => -4. Correct logic for "Index 0 first".
-      // But `dir` multiplier flips it!
-      // So if dir is 'desc' (-1), we get 4 => b first.
-      // So for Confidence, specifically, we need to INVERT the dir multiplier relative to standard sorts, OR just handle it explicitly.
+      // Primary: Confidence
+      if (rankA !== rankB) {
+        // High->Low (desc) means Confirmed (0) first for direction desc?
+        // Wait, earlier logic: (rankA - rankB) * dir works if rank 0 is "High".
+        // Let's verify direction. 
+        // If sorting Numbers (0, 1, 2) Ascension: 0, 1, 2. Descension: 2, 1, 0.
+        // We want Confirmed (0) first when "High -> Low".
+        // "High -> Low" implies Descending. 
+        // If dir is -1 (desc), (0-2)*-1 = 2 (positive). B comes first? 
+        // No, standard sort(a,b): result < 0 => a first.
+        // If dir is -1: (0 - 4)*-1 = 4 (>0) => b first. So NotEnoughData first. That's wrong.
+        // We want 0 first when DESC.
+        // So behavior is actually Ascending index for "High Confidence".
+        // Let's just hardcode the logic:
+        // 'conf_desc' (High->Low): 0 -> 4.
+        // 'conf_asc' (Low->High): 4 -> 0.
+        // In onSort map: 'conf_desc' -> direction 'desc'.
 
-      const sortVal = rankA - rankB;
-      // If DESC (High->Low), we want sortVal (Index 0 first).
-      // If ASC (Low->High), we want -sortVal (Index 4 first).
-
-      if (state.dataSort.direction === 'desc') {
-        return sortVal;
-      } else {
-        return sortVal * -1;
+        // If direction is 'desc', we want a-b (0 first).
+        // If direction is 'asc', we want b-a (4 first).
+        if (state.dataSort.direction === 'desc') {
+          return rankA - rankB;
+        } else {
+          return rankB - rankA;
+        }
       }
+
+      // Secondary: Rarity (High -> Low)
+      // Rarity Rank: 0 (Exotic) -> 4 (Common)
+      const getRarity = (item) => {
+        let bp = state.all.find(bi => bi.name === item.name);
+        if (!bp && item.name.includes("Light Stick")) bp = state.all.find(bi => bi.name.includes("Light Stick"));
+        return bp ? bp.rarity : 'common';
+      };
+
+      const rA = rarityRank(getRarity(a));
+      const rB = rarityRank(getRarity(b));
+
+      // Secondary is always High->Low (Exotic first) unless... ?
+      // Let's stick to High->Low (0 first) for secondary.
+      return rA - rB;
     }
+
 
     // Simple string sorts for others
     return String(a[col]).localeCompare(String(b[col])) * dir;
@@ -4630,6 +4780,31 @@ function renderDataRegistry() {
   if (filtered.length === 0) {
     container.innerHTML = `<div class="py-10 text-center text-zinc-500">No matching records found.</div>`;
     return;
+  }
+
+  // Determine density classes based on dataGridSize
+  const size = state.dataGridSize || 'medium';
+  let densityClass = "py-3 md:py-4 text-xs md:text-sm"; // Default (Medium)
+  // rowGap unused in header class but good to have if we used it later
+
+  if (size === 'small') {
+    densityClass = "py-1.5 md:py-2 text-[10px] md:text-xs";
+  } else if (size === 'large') {
+    // Reduced from py-6 to keep it tighter while keeping wider layout
+    densityClass = "py-3 md:py-4 text-sm md:text-base";
+  }
+
+  // Define Image and Text sizes
+  let imgSizeClass = "w-10 h-10"; // Medium
+  let textSizeClass = "text-sm";  // Medium
+
+  if (size === 'small') {
+    imgSizeClass = "w-8 h-8";
+    textSizeClass = "text-xs";
+  } else if (size === 'large') {
+    // Reduced from w-14/text-base to prevent cutoff
+    imgSizeClass = "w-12 h-12";
+    textSizeClass = "text-sm md:text-base";
   }
 
   filtered.forEach((item, index) => {
@@ -4648,17 +4823,27 @@ function renderDataRegistry() {
 
     // Header (The Row itself)
     const header = document.createElement("div");
-    // Responsive Grid: Col 1 fixed 90px. Added 20px col for Arrow on mobile.
-    header.className = "grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 gap-y-2 md:gap-4 px-3 md:px-4 py-2 items-center cursor-pointer hover:bg-white/5 transition-colors";
+
+    // Dynamic Grid Cols based on size
+    // Default: [2fr,1fr,1fr,1fr,40px]
+    let colClass = "md:grid-cols-[2fr,1fr,1fr,1fr,40px]";
+
+    if (size === 'large') {
+      // Wide Name column (3fr), reduced Condition/Map columns to 0.8fr
+      colClass = "md:grid-cols-[3fr,0.8fr,1fr,0.8fr,40px]";
+    }
+
+    // Mobile remains: [90px,0.8fr,1fr,0.8fr,0.5fr,20px]
+    header.className = `group grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] ${colClass} gap-x-1 md:gap-4 ${densityClass} px-3 md:px-4 border-b border-white/5 hover:bg-white/5 transition-colors items-center cursor-pointer`;
 
     const miniCardId = `mini-card-${index}`;
 
     header.innerHTML = `
       <!-- Item Name & Icon (Col 1) -->
       <div class="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4 overflow-hidden md:border-r border-white/5 pr-0 h-full min-w-0">
-        <div id="${miniCardId}" class="shrink-0 relative flex items-center justify-center">
+        <div id="${miniCardId}" class="shrink-0 relative flex items-center justify-center ${imgSizeClass}">
             ${!localBP ? `
-            <div class="w-10 h-10 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden" 
+            <div class="${imgSizeClass} rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden" 
                  style="border-color: ${rarityColor(rarity)}66">
               <img src="${icon}" class="w-full h-full object-contain p-1" loading="lazy">
               <div class="absolute inset-0 bg-${rarityColor(rarity)}/10"></div>
@@ -4666,7 +4851,7 @@ function renderDataRegistry() {
         </div>
         <div class="flex flex-col min-w-0 w-full">
           <!-- Text wrap enabled, sized down on mobile, type removed -->
-          <span class="font-bold text-sm text-zinc-200 break-words leading-tight group-hover:text-emerald-400 transition-colors">${item.name}</span>
+          <span class="font-bold ${textSizeClass} text-zinc-200 break-words leading-tight group-hover:text-emerald-400 transition-colors">${item.name}</span>
         </div>
       </div>
 
@@ -4677,10 +4862,7 @@ function renderDataRegistry() {
       <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestMap}</div>
 
       <!-- Best Condition -->
-      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestCondition}</div>
-
-      <!-- Entries -->
-      <div class="text-right text-sm font-mono font-bold text-zinc-300 md:border-r border-white/5 h-full flex items-center justify-end pr-1 md:pr-2">${item.entries}</div>
+      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium md:border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestCondition}</div>
 
       <!-- Arrow (Grid Column) -->
       <div class="flex justify-end items-center h-full text-zinc-600 group-hover:text-zinc-300">
@@ -4694,7 +4876,15 @@ function renderDataRegistry() {
     if (localBP) {
       const wrapper = header.querySelector(`#${miniCardId}`);
       if (wrapper) {
-        const scale = 0.42; // Middle ground size (approx 84px)
+        // Dynamic Scale based on state.dataGridSize
+        // BaseW is 200px.
+        // Small: 50px (0.25)
+        // Medium: 84px (0.42) - Default
+        // Large: 130px (0.65)
+        let scale = 0.42;
+        if (state.dataGridSize === 'small') scale = 0.25;
+        if (state.dataGridSize === 'large') scale = 0.65;
+
         const baseW = 200;
 
         // Adjust wrapper to fit
@@ -4900,6 +5090,18 @@ document.addEventListener("DOMContentLoaded", () => {
       fetchDetailedData();
     };
   }
+
+  // Disclaimer Toggle
+  const disclaimerBtn = document.getElementById("disclaimerToggleBtn");
+  const disclaimerContent = document.getElementById("disclaimerContent");
+  const disclaimerIcon = document.getElementById("disclaimerIcon");
+
+  if (disclaimerBtn && disclaimerContent && disclaimerIcon) {
+    disclaimerBtn.addEventListener("click", () => {
+      disclaimerContent.classList.toggle("hidden");
+      disclaimerIcon.classList.toggle("rotate-180");
+    });
+  }
 });
 
 /* ==========================================================================
@@ -4909,33 +5111,33 @@ document.addEventListener("DOMContentLoaded", () => {
 const MAP_CONFIG = {
   "dam_battlegrounds": {
     name: "Dam Battlegrounds",
-    url: "/images/maps/dam_battlegrounds.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/dam_battlegrounds.webp",
+    bounds: [[0, 0], [1000, 1095]] // 4260x3890 (~1.095 aspect)
   },
   "the_spaceport": {
     name: "The Spaceport",
-    url: "/images/maps/the_spaceport.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/the_spaceport.webp",
+    bounds: [[0, 0], [1000, 1000]] // Square
   },
   "buried_city": {
     name: "Buried City",
-    url: "/images/maps/buried_city.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/buried_city.webp",
+    bounds: [[0, 0], [1000, 1000]] // Square
   },
   "the_blue_gate": {
     name: "The Blue Gate",
-    url: "/images/maps/the_blue_gate.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/the_blue_gate.webp",
+    bounds: [[0, 0], [1000, 1333]] // 4096x3072 (~1.33 aspect)
   },
   "stella_montis_upper": {
     name: "Stella Montis (Upper)",
-    url: "/images/maps/stella_montis_upper.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/stella_montis_lower.webp", // Swapped
+    bounds: [[0, 0], [1000, 1667]] // Swapped bounds
   },
   "stella_montis_lower": {
     name: "Stella Montis (Lower)",
-    url: "/images/maps/stella_montis_lower.png",
-    bounds: [[0, 0], [1000, 1000]]
+    url: "/images/maps/stella_montis_upper.webp", // Swapped
+    bounds: [[0, 0], [1000, 1333]] // Swapped bounds
   }
 };
 
@@ -4943,16 +5145,20 @@ let mapPickerState = {
   map: null,
   currentPin: null,
   currentMapId: "dam_battlegrounds",
+  stellaLevel: "upper", // Default
   selectedLocation: null
 };
 
 function initMapPicker() {
-  const openBtn = document.getElementById("openMapPickerBtn");
+  const openBtn = document.getElementById("mapLocationDisplay");
   const closeBtn = document.getElementById("closeMapPickerBtn");
   const confirmBtn = document.getElementById("confirmPinBtn");
   const modal = document.getElementById("mapPickerModal");
 
-  if (openBtn) openBtn.onclick = openMapPicker;
+  if (openBtn) {
+    openBtn.onclick = openMapPicker;
+    openBtn.style.cursor = "pointer";
+  }
   if (closeBtn) closeBtn.onclick = closeMapPicker;
   if (confirmBtn) confirmBtn.onclick = confirmMapSelection;
 
@@ -4960,6 +5166,11 @@ function initMapPicker() {
   if (modal) {
     modal.onclick = (e) => {
       if (e.target === modal) closeMapPicker();
+
+      // Close dropdown if clicking outside
+      if (!e.target.closest('#stellaDropdownMenu') && !e.target.closest('#map-tab-stella')) {
+        toggleStellaDropdown(false);
+      }
     };
   }
 }
@@ -4972,23 +5183,80 @@ function openMapPicker() {
   // Use flex to show it (overriding hidden)
   modal.classList.add("flex");
 
+  // Determine valid map ID
+  const currentMapInput = document.getElementById("submitMapId");
+  let mapId = currentMapInput && currentMapInput.value ? currentMapInput.value : "dam_battlegrounds";
+  if (!mapId) mapId = "dam_battlegrounds";
+  const validMapId = MAP_CONFIG[mapId] ? mapId : "dam_battlegrounds";
+
   // Initialize map if first time
   if (!mapPickerState.map) {
     // Wait for modal transition/render
-    setTimeout(() => initLeafletMap(), 50);
+    setTimeout(() => {
+      initLeafletMap();
+      loadMap(validMapId);
+    }, 50);
   } else {
     // Refresh layout (needed because modal was hidden)
     setTimeout(() => {
       mapPickerState.map.invalidateSize();
+      loadMap(validMapId);
     }, 100);
   }
 
-  // Pre-select current map from form if possible, else default
-  const currentMapInput = document.getElementById("submitMap");
-  const mapId = currentMapInput && currentMapInput.value ? currentMapInput.value : "dam_battlegrounds";
-  // If map config doesn't have it (e.g. unknown ID), fallback
-  const validMapId = MAP_CONFIG[mapId] ? mapId : "dam_battlegrounds";
-  loadMap(validMapId);
+  // Update button text state
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) {
+    if (mapPickerState.selectedLocation) {
+      btnText.textContent = "Confirm Location";
+    } else {
+      btnText.textContent = "Submit Map (No Pin)";
+    }
+  }
+
+  // Ensure button is enabled
+  const confirmBtn = document.getElementById("confirmPinBtn");
+  if (confirmBtn) confirmBtn.disabled = false;
+
+  // Initial Remove Pin Button State
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) {
+    if (mapPickerState.selectedLocation) {
+      removeBtn.classList.remove("hidden");
+    } else {
+      removeBtn.classList.add("hidden");
+    }
+    removeBtn.onclick = removePin;
+  }
+}
+
+function removePin(e) {
+  if (e) e.stopPropagation();
+
+  // Remove layer
+  if (mapPickerState.currentPin) {
+    mapPickerState.map.removeLayer(mapPickerState.currentPin);
+    mapPickerState.currentPin = null;
+  }
+
+  // Clear state
+  mapPickerState.selectedLocation = null;
+  document.getElementById("coordinatesDisplay").textContent = "No location selected";
+
+  // Update UI Text
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) btnText.textContent = "Submit Map (No Pin)";
+
+  // Hide Remove Button
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) removeBtn.classList.add("hidden");
+
+  // Show instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) {
+    instructions.style.opacity = '1';
+    instructions.textContent = "Click or tap anywhere to place a pin";
+  }
 }
 
 function closeMapPicker() {
@@ -5011,6 +5279,9 @@ function initLeafletMap() {
     crs: L.CRS.Simple,
     minZoom: -1,
     maxZoom: 2,
+    zoomSnap: 0,       // Allow fractional zoom levels (smooth zoom)
+    zoomDelta: 0.1,    // Small zoom steps for wheel/pinch
+    wheelPxPerZoomLevel: 120, // Slower, smoother wheel zooming
     zoomControl: false,
     attributionControl: false
   });
@@ -5030,50 +5301,109 @@ function renderMapTabs() {
   const container = document.getElementById("mapTabsContainer");
   if (!container) return;
 
-  // Render tabs - Filter out Lower, we'll handle it via toggle
-  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => id !== "stella_montis_lower");
+  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => !id.includes("stella"));
 
-  container.innerHTML = visibleMaps.map(([id, config]) => {
-    const isStella = id === "stella_montis_upper";
-    const label = isStella ? "Stella Montis" : config.name;
-
-    return `
+  // Render standard tabs
+  let html = visibleMaps.map(([id, config]) => `
     <button onclick="loadMap('${id}')" 
       class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white"
       id="map-tab-${id}">
-      ${label}
+      ${config.name}
     </button>
-  `}).join('');
+  `).join('');
+
+  // Add Stella Montis Dropdown Tab
+  const currentStellaLevel = mapPickerState.stellaLevel || "upper";
+
+  html += `
+    <div class="relative inline-block text-left" id="stellaDropdownContainer">
+      <button onclick="toggleStellaDropdown()" 
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2"
+        id="map-tab-stella">
+        Stella Montis
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </button>
+      
+      <div id="stellaDropdownMenu" class="hidden absolute right-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
+        <div class="py-1">
+          <button onclick="loadMap('stella_montis_upper'); toggleStellaDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'upper' ? 'text-emerald-500 font-bold' : ''}">
+            Upper Level
+          </button>
+          <button onclick="loadMap('stella_montis_lower'); toggleStellaDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'lower' ? 'text-emerald-500 font-bold' : ''}">
+            Lower Level
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
 }
+
+window.toggleStellaDropdown = (forceState) => {
+  const menu = document.getElementById("stellaDropdownMenu");
+  const btn = document.getElementById("map-tab-stella");
+  if (!menu || !btn) return;
+
+  const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
+
+  if (show) {
+    // Calculate position
+    const rect = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 8}px`; // 8px gap
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${Math.max(rect.width, 160)}px`; // At least button width or 160px
+    menu.style.zIndex = '9999'; // Very high z-index
+
+    // Remove hidden
+    menu.classList.remove("hidden");
+  } else {
+    menu.classList.add("hidden");
+  }
+};
 
 function loadMap(mapId) {
   // Handle Stella Montis consolidation
   let actualMapId = mapId;
   const isStella = mapId.includes("stella");
 
-  // If switching TO Stella (generic or upper), verify state
-  if (isStella && !mapPickerState.stellaLevel) {
-    mapPickerState.stellaLevel = "upper";
-  }
+  // Close dropdown if clicking away or loading another map
+  if (!isStella) toggleStellaDropdown(false);
 
+  // If switching TO Stella (generic or upper), verify state
   if (isStella) {
+    if (mapId === "stella_montis_upper") mapPickerState.stellaLevel = "upper";
+    if (mapId === "stella_montis_lower") mapPickerState.stellaLevel = "lower";
     actualMapId = `stella_montis_${mapPickerState.stellaLevel}`;
   }
 
-  if (!MAP_CONFIG[actualMapId]) return;
+  // Config Validation
+  const config = MAP_CONFIG[actualMapId];
+  if (!config) return;
 
   mapPickerState.currentMapId = actualMapId;
 
   // Update tabs styles
-  document.querySelectorAll('#mapTabsContainer button').forEach(btn => {
+  document.querySelectorAll('#mapTabsContainer > button').forEach(btn => {
     btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white";
   });
 
-  // Highlight the parent tab for Stella
-  const tabId = isStella ? "stella_montis_upper" : actualMapId;
-  const activeBtn = document.getElementById(`map-tab-${tabId}`);
-  if (activeBtn) {
-    activeBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+  // Stella Tab Highlight
+  const stellaBtn = document.getElementById(`map-tab-stella`);
+  if (isStella && stellaBtn) {
+    stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 flex items-center gap-2";
+  } else if (!isStella) {
+    // Normal Tab Highlight
+    const activeBtn = document.getElementById(`map-tab-${actualMapId}`);
+    if (activeBtn) {
+      activeBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+    }
+    if (stellaBtn) {
+      stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2";
+    }
   }
 
   // Remove existing layers (images)
@@ -5083,8 +5413,9 @@ function loadMap(mapId) {
     }
   });
 
-  // Handle Level Toggle for Stella Montis
-  updateLevelToggle(isStella);
+  // Remove old in-map toggle if exists
+  const oldToggle = document.getElementById("stellaLevelToggle");
+  if (oldToggle) oldToggle.remove();
 
   // Clear pin state
   mapPickerState.currentPin = null;
@@ -5092,9 +5423,9 @@ function loadMap(mapId) {
   document.getElementById("confirmPinBtn").disabled = true;
   document.getElementById("coordinatesDisplay").textContent = "No location selected";
 
-  // Add image overlay
-  const bounds = [[0, 0], [1000, 1000]]; // Normalized 1000x1000 coordinate system
-  L.imageOverlay(MAP_CONFIG[actualMapId].url, bounds).addTo(mapPickerState.map);
+  // Add image overlay with specific bounds
+  const bounds = config.bounds;
+  L.imageOverlay(config.url, bounds, { className: 'crt-map-image' }).addTo(mapPickerState.map);
 
   // Fit bounds
   mapPickerState.map.fitBounds(bounds);
@@ -5102,68 +5433,56 @@ function loadMap(mapId) {
   // Show instructions
   const instructions = document.getElementById("mapInstructions");
   if (instructions) instructions.style.opacity = '1';
+
+  // Re-render tabs to update dropdown highlight state if needed (optional, but good for active state in dropdown)
+  // Actually renderMapTabs calls loadMap so don't call it here to avoid loop. 
+  // Just manual update of dropdown items if we want.
+  const dropItems = document.querySelectorAll("#stellaDropdownMenu button");
+  dropItems.forEach(btn => {
+    if (btn.innerText.includes("Upper") && mapPickerState.stellaLevel === 'upper') btn.classList.add("text-emerald-500", "font-bold");
+    else if (btn.innerText.includes("Lower") && mapPickerState.stellaLevel === 'lower') btn.classList.add("text-emerald-500", "font-bold");
+    else {
+      btn.classList.remove("text-emerald-500", "font-bold");
+      btn.classList.add("text-zinc-300");
+    }
+  });
+
+  // Reset confirmation state on map change (optional, but consistent)
+  removePin();
 }
-
-function updateLevelToggle(show) {
-  let toggle = document.getElementById("stellaLevelToggle");
-
-  if (!show) {
-    if (toggle) toggle.remove();
-    return;
-  }
-
-  if (!toggle) {
-    toggle = document.createElement("div");
-    toggle.id = "stellaLevelToggle";
-    toggle.className = "absolute bottom-6 right-6 z-[400] flex flex-col gap-2 bg-black/60 backdrop-blur-md p-2 rounded-lg border border-white/10";
-    document.getElementById("leafletMap").parentElement.appendChild(toggle);
-  }
-
-  const currentLevel = mapPickerState.stellaLevel || "upper";
-
-  toggle.innerHTML = `
-    <button onclick="switchStellaLevel('upper')" 
-      class="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${currentLevel === 'upper' ? 'bg-emerald-600 text-white' : 'bg-transparent text-zinc-400 hover:text-white'}">
-      Upper
-    </button>
-    <button onclick="switchStellaLevel('lower')" 
-      class="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${currentLevel === 'lower' ? 'bg-emerald-600 text-white' : 'bg-transparent text-zinc-400 hover:text-white'}">
-      Lower
-    </button>
-  `;
-}
-
-window.switchStellaLevel = (level) => {
-  mapPickerState.stellaLevel = level;
-  loadMap(`stella_montis_${level}`);
-};
 
 function onMapClick(e) {
   const { lat, lng } = e.latlng;
+  const config = MAP_CONFIG[mapPickerState.currentMapId];
 
-  // Bounds check (0-1000)
-  if (lat < 0 || lat > 1000 || lng < 0 || lng > 1000) return;
+  if (!config) return;
+
+  // Bounds check (dynamic based on map)
+  const [maxY, maxX] = config.bounds[1];
+
+  if (lat < 0 || lat > maxY || lng < 0 || lng > maxX) return;
 
   // Remove old pin
   if (mapPickerState.currentPin) {
     mapPickerState.map.removeLayer(mapPickerState.currentPin);
   }
 
-  // Add new pin with SVG icon
+  // Add new pin with SVG icon - Standard Pin (Larger ~45px)
   const customIcon = L.divIcon({
     className: 'custom-pin-icon',
     html: `
-      <div class="relative -top-6 -left-3">
-        <svg class="w-8 h-8 text-emerald-500 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5">
+      <div class="relative">
+        <svg class="w-[45px] h-[45px] text-emerald-500 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32]
+    iconSize: [45, 45],
+    iconAnchor: [22.5, 45]
   });
 
   mapPickerState.currentPin = L.marker([lat, lng], { icon: customIcon }).addTo(mapPickerState.map);
+
 
   // Update UI
   const x = Math.round(lng);
@@ -5174,49 +5493,232 @@ function onMapClick(e) {
   document.getElementById("coordinatesDisplay").textContent = `X: ${x}, Y: ${y}`;
   document.getElementById("confirmPinBtn").disabled = false;
 
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) btnText.textContent = "Submit Pinned Location";
+
+  // Show Remove Pin button
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) removeBtn.classList.remove("hidden");
+
   // Hide instructions
   const instructions = document.getElementById("mapInstructions");
   if (instructions) instructions.style.opacity = '0';
 }
 
 function confirmMapSelection() {
-  if (!mapPickerState.selectedLocation) return;
+  // Use selected location OR current map ID if no pin
+  const mapId = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.mapId : mapPickerState.currentMapId;
+  const x = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.x : null;
+  const y = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.y : null;
 
-  const { x, y, mapId } = mapPickerState.selectedLocation;
+  // New hidden inputs
+  const idInput = document.getElementById("submitMapId");
+  const xInput = document.getElementById("submitMapX");
+  const yInput = document.getElementById("submitMapY");
 
-  // Update form inputs
-  const locationInput = document.getElementById("submitLocation");
-  const mapSelect = document.getElementById("submitMap");
+  if (idInput) idInput.value = mapId || "";
+  if (xInput) xInput.value = x !== null ? x : "";
+  if (yInput) yInput.value = y !== null ? y : "";
 
-  // Auto-select map
-  if (mapSelect) {
-    // If it's stella lower or upper, set to the generic stella option if that's what is there
-    // In our HTML we have "stella_montis_upper" serving as the Stella option
-    if (mapId.includes("stella")) {
-      mapSelect.value = "stella_montis_upper";
-    } else {
-      mapSelect.value = mapId;
-    }
+  // Update Display
+  let mapName = MAP_CONFIG[mapId]?.name || "Map";
+  // Simplify Stella names
+  if (mapId === "stella_montis_upper") mapName = "Stella Upper";
+  if (mapId === "stella_montis_lower") mapName = "Stella Lower";
+
+  const displayVal = x !== null && y !== null ? `${mapName} (${x}, ${y})` : mapName;
+  const displayEl = document.getElementById("mapDisplayValue");
+  if (displayEl) {
+    displayEl.textContent = displayVal;
+    displayEl.classList.remove("text-zinc-500");
+    displayEl.classList.add("text-white", "font-medium");
   }
 
-  if (locationInput) {
-    // Format text
-    let mapName = MAP_CONFIG[mapId]?.name || "Map";
-    // Simplify Stella names
-    if (mapId === "stella_montis_upper") mapName = "Stella Upper";
-    if (mapId === "stella_montis_lower") mapName = "Stella Lower";
+  // Show Clear Button
+  const clearBtn = document.getElementById("clearMapBtn");
+  if (clearBtn) clearBtn.classList.remove("hidden");
 
-    locationInput.value = `${mapName} (${x}, ${y})`;
-
-    // Flash effect
-    locationInput.classList.add("ring-2", "ring-emerald-500");
-    setTimeout(() => locationInput.classList.remove("ring-2", "ring-emerald-500"), 500);
-
-    // Focus so user can type more details
-    locationInput.focus();
+  // Highlight container
+  const container = document.getElementById("mapLocationDisplay");
+  if (container) {
+    container.classList.add("border-emerald-500", "bg-emerald-500/10");
+    setTimeout(() => container.classList.remove("bg-emerald-500/10"), 500);
   }
 
   closeMapPicker();
 }
 
+window.clearMapSelection = (e) => {
+  if (e) e.stopPropagation(); // prevent opening picker
+  const idInput = document.getElementById("submitMapId");
+  const xInput = document.getElementById("submitMapX");
+  const yInput = document.getElementById("submitMapY");
+
+  if (idInput) idInput.value = "";
+  if (xInput) xInput.value = "";
+  if (yInput) yInput.value = "";
+
+  const displayEl = document.getElementById("mapDisplayValue");
+  if (displayEl) {
+    displayEl.textContent = "Select Map Location...";
+    displayEl.classList.add("text-zinc-500");
+    displayEl.classList.remove("text-white", "font-medium");
+  }
+
+  const clearBtn = document.getElementById("clearMapBtn");
+  if (clearBtn) clearBtn.classList.add("hidden");
+
+  const container = document.getElementById("mapLocationDisplay");
+  if (container) container.classList.remove("border-emerald-500");
+};
+
 window.loadMap = loadMap;
+window.openMapPicker = openMapPicker;
+
+// Data Grid Size Logic
+const STORAGE_KEY_DATA_GRID = "arc_dataGridSize_v1";
+
+function updateGridSizeLabel(tab) {
+  const labelDesktop = document.getElementById("gridSizeLabelKey"); // We need to add ID to HTML first? No, let's use querySelector
+  // The label is inside ".filter-options h3"
+  // Let's rely on IDs: gridSizeLabel (desktop) and gridSizeLabelMobile (mobile)
+  // Wait, index.html doesn't have IDs for the H3 headers. 
+  // We need to add IDs to index.html or use robust selector.
+  // Actually, let's use the ID "lblGridSize" if we add it, or search for text.
+
+  const labels = document.querySelectorAll(".filter-options h3");
+  labels.forEach(lbl => {
+    if (lbl.textContent.includes("Grid Size") || lbl.textContent.includes("List Size")) {
+      lbl.textContent = (tab === 'data') ? "List Size" : "Grid Size";
+    }
+  });
+}
+
+function initGridSizeController() {
+  const btns = {
+    small: document.getElementById("btnGridSmall"),
+    medium: document.getElementById("btnGridMedium"),
+    large: document.getElementById("btnGridLarge")
+  };
+
+  // Load from Storage
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_DATA_GRID);
+    if (saved) state.dataGridSize = saved;
+  } catch (e) {
+    console.debug("Failed to load data grid size", e);
+  }
+
+
+
+
+
+
+
+  // --- Unified Logic ---
+  const BP_STORAGE_KEY = "gridSizePreference";
+  let bpSize = localStorage.getItem(BP_STORAGE_KEY) || "M";
+
+  function setBlueprintGridSize(sizeKey) {
+    const isMobile = window.innerWidth <= 768;
+    let sizePx = 150;
+
+    if (isMobile) {
+      if (sizeKey === "S") sizePx = 90;
+      else if (sizeKey === "M") sizePx = 120;
+      else if (sizeKey === "L") sizePx = 140;
+    } else {
+      if (sizeKey === "S") sizePx = 110;
+      else if (sizeKey === "M") sizePx = 150;
+      else if (sizeKey === "L") sizePx = 220;
+    }
+
+    document.documentElement.style.setProperty("--cardSize", sizePx + "px");
+    try { localStorage.setItem(BP_STORAGE_KEY, sizeKey); } catch (e) { }
+    bpSize = sizeKey;
+    state.blueprintGridSize = sizeKey;
+    updateVisuals();
+    if (typeof renderGrid === 'function') renderGrid();
+  }
+
+  function setDataGridSize(size) {
+    state.dataGridSize = size;
+    try { localStorage.setItem(STORAGE_KEY_DATA_GRID, size); } catch (e) { }
+    updateVisuals();
+    if (typeof renderDataRegistry === 'function') renderDataRegistry();
+  }
+
+  function updateVisuals() {
+    // Reset all buttons to inactive state
+    Object.values(btns).forEach(btn => {
+      if (!btn) return;
+      btn.classList.remove("bg-emerald-600", "text-white", "font-bold");
+      btn.classList.remove("bg-zinc-600", "text-white", "border-zinc-500");
+      btn.classList.add("bg-zinc-800", "text-zinc-400", "border-transparent");
+    });
+
+    let activeBtn = null;
+
+    if (state.currentTab === 'data') {
+      // Data tab
+      const active = state.dataGridSize || 'medium';
+      activeBtn = btns[active];
+    } else {
+      // Blueprints tab (and others)
+      const activeKey = state.blueprintGridSize || bpSize || 'M';
+      if (activeKey === 'S') activeBtn = btns.small;
+      else if (activeKey === 'M') activeBtn = btns.medium;
+      else if (activeKey === 'L') activeBtn = btns.large;
+    }
+
+    // Apply grey highlight to active button (same for both tabs)
+    if (activeBtn) {
+      activeBtn.classList.remove("bg-zinc-800", "text-zinc-400", "border-transparent");
+      activeBtn.classList.add("bg-zinc-600", "text-white", "border-zinc-500");
+    }
+  }
+
+  const handleClick = (sizeName) => {
+    if (state.currentTab === 'data') {
+      setDataGridSize(sizeName);
+    } else {
+      const map = { small: 'S', medium: 'M', large: 'L' };
+      setBlueprintGridSize(map[sizeName]);
+    }
+  };
+
+  if (btns.small) btns.small.onclick = () => handleClick('small');
+  if (btns.medium) btns.medium.onclick = () => handleClick('medium');
+  if (btns.large) btns.large.onclick = () => handleClick('large');
+
+  // Initial Apply
+  setBlueprintGridSize(bpSize);
+  window.updateGridVisuals = updateVisuals;
+
+  // Initialize Default
+  if (!state.dataGridSize) state.dataGridSize = 'medium';
+}
+
+// Hook into DOMContentLoaded
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    initGridSizeController();
+    // Hook ALL tab buttons to update visuals on switch
+    const tabBtns = [
+      document.getElementById("tabBlueprints"),
+      document.getElementById("tabData"),
+      document.getElementById("tabProgression")
+    ];
+    tabBtns.forEach(tabBtn => {
+      if (tabBtn) {
+        tabBtn.addEventListener("click", () => {
+          setTimeout(() => {
+            if (typeof window.updateGridVisuals === 'function') {
+              window.updateGridVisuals();
+            }
+          }, 50);
+        });
+      }
+    });
+  }, 150);
+});

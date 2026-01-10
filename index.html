@@ -74,19 +74,11 @@
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
+  <div id="bg-grain"></div>
   <!-- Tab Navigation -->
   <div class="tab-nav">
     <div class="flex items-center md:absolute md:left-6">
-      <button id="mobileFilterBtn" class="nav-circle-btn md:hidden" aria-label="Open filters">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          class="w-6 h-6">
-          <line x1="4" y1="6" x2="20" y2="6"></line>
-          <line x1="7" y1="12" x2="17" y2="12"></line>
-          <line x1="10" y1="18" x2="14" y2="18"></line>
-        </svg>
-      </button>
-      <button id="desktopFilterBtn" class="nav-circle-btn hidden md:flex mr-2 transition-opacity"
-        aria-label="Toggle filters">
+      <button id="desktopFilterBtn" class="nav-circle-btn flex mr-2 transition-opacity" aria-label="Toggle filters">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           class="w-6 h-6">
           <line x1="4" y1="6" x2="20" y2="6"></line>
@@ -96,8 +88,8 @@
       </button>
     </div>
     <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
-    <button id="tabProgression" class="tab-button">Progression</button>
     <button id="tabData" class="tab-button">Data</button>
+    <button id="tabProgression" class="tab-button">Progression</button>
     <button id="announcementsBtn" class="nav-circle-btn md:absolute md:right-6" aria-label="Announcements">
       <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -117,17 +109,26 @@
     </div>
   </header>
 
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 z-[190] bg-black/60 hidden md:hidden transition-opacity"></div>
+
   <div class="min-h-screen flex">
     <aside id="filtersSidebar"
-      class="w-[320px] shrink-0 border-r border-zinc-800 bg-zinc-950/60 backdrop-blur px-4 py-5 hidden">
-      <div class="flex items-center justify-between gap-3">
+      class="fixed top-0 left-0 bottom-0 z-[5000] md:z-0 w-[80%] -translate-x-full transition-transform duration-300 bg-zinc-950/80 backdrop-blur border-r border-zinc-800 px-5 py-6 md:translate-x-0 md:static md:block md:w-[320px] md:bg-zinc-950/60 overflow-y-auto">
+
+      <!-- Mobile Header (Logo + Close) -->
+      <div class="flex items-center justify-between gap-3 mb-6 md:mb-0">
         <div>
           <img id="logoHome" src="Background/Arc BP Tracker Logo White Small.webp" alt="ARC Blueprint Tracker"
             class="h-14 cursor-pointer" />
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
-        <button id="resetBtn"
-          class="filter-options text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
+        <div class="flex gap-2">
+          <button id="resetBtn"
+            class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors">Reset</button>
+          <button id="closeSidebarBtn"
+            class="md:hidden text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors">Close</button>
+        </div>
       </div>
 
       <div id="authSection" class="mt-6 border-y border-zinc-800/50 py-4">
@@ -163,11 +164,17 @@
       </div>
 
       <div class="filter-options mt-4">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-2">
           <label class="text-xs text-zinc-400">Grid size</label>
-          <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
         </div>
-        <input id="gridSize" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
+        <div id="gridSizeContainer" class="flex gap-2">
+          <button id="btnGridSmall"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Small</button>
+          <button id="btnGridMedium"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Medium</button>
+          <button id="btnGridLarge"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Large</button>
+        </div>
       </div>
 
       <div class="filter-options mt-4">
@@ -179,6 +186,8 @@
       <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Sort</label>
         <select id="sortSelect" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
+          <option value="conf_desc">Confidence (High → Low)</option>
+          <option value="conf_asc">Confidence (Low → High)</option>
           <option value="rarity_desc">Rarity (High → Low)</option>
           <option value="rarity_asc">Rarity (Low → High)</option>
           <option value="name_asc">Name (A → Z)</option>
@@ -324,6 +333,7 @@
         </div>
       </div>
       <!-- Progress Bar Section (Collection Only) -->
+      <div id="activeChips" class="flex items-center gap-2 flex-wrap mb-4 px-1"></div>
       <!-- Progression Tab -->
       <div id="progressionTab" class="hidden max-w-4xl mx-auto">
         <div class="flex flex-col items-center justify-center py-10">
@@ -430,24 +440,56 @@
       <div id="dataTab" class="hidden">
         <div class="max-w-7xl mx-auto">
           <!-- Data Header -->
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <!-- Data Header -->
+          <div class="flex flex-col gap-6 mb-6">
+            <!-- Title Row -->
             <div>
               <h2 class="text-3xl font-heading font-black text-white/90 tracking-tight">DROP REGISTRY</h2>
               <p class="text-zinc-500 text-sm mt-1">Community-sourced spawn data analysis</p>
             </div>
 
-            <div class="flex items-center gap-3 w-full md:w-auto">
-              <div class="relative flex-1 md:w-64">
+            <!-- Disclaimer (Stacked) -->
+            <div
+              class="w-full bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+              <button id="disclaimerToggleBtn"
+                class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors group">
+                <div class="flex items-center gap-2.5">
+                  <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">Raw Data
+                    Disclaimer</span>
+                </div>
+                <svg id="disclaimerIcon" class="w-5 h-5 text-zinc-500 transition-transform duration-300" fill="none"
+                  viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div id="disclaimerContent"
+                class="hidden px-4 pb-4 text-xs md:text-sm text-zinc-400 space-y-1 bg-black/20 border-t border-white/5">
+                <p><strong class="text-zinc-300">Some data may not match the Blueprints page.</strong><br>
+                  This is all of the user submitted raw data. This data contains many biases, like the amount of
+                  submissions for Dam Battlegrounds, lack of data on certain Blueprints, etc. The main Blueprints list
+                  uses educated assumptions to correct for this. If you have a different conclusion than I do, you may
+                  be
+                  right! Make of this data what you will.</p>
+              </div>
+            </div>
+
+            <!-- Search Row -->
+            <div class="flex items-center gap-3 w-full">
+              <div class="relative flex-1">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none"
                   viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input id="dataSearchInput" placeholder="Search registry..."
-                  class="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600 text-zinc-300">
+                  class="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600 text-zinc-300">
               </div>
               <button id="dataRefreshBtn"
-                class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                class="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -456,49 +498,15 @@
             </div>
           </div>
 
-
-
-          <!-- Active Chips & Disclaimer -->
-          <div id="dataActiveChips" class="flex items-center gap-2 flex-wrap mb-4"></div>
-
-          <!-- Disclaimer -->
-          <!-- Disclaimer (Collapsible) -->
-          <div class="mb-4 rounded-xl bg-zinc-950/80 border border-amber-500/20 backdrop-blur-md overflow-hidden">
-            <button id="disclaimerHeader"
-              class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors group">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span class="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">Raw Data
-                  Disclaimer</span>
-              </div>
-              <svg id="disclaimerIcon" class="w-5 h-5 text-zinc-500 transition-transform duration-300" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <div id="disclaimerContent" class="hidden px-4 pb-4 text-xs md:text-sm text-zinc-400 space-y-1">
-              <p><strong class="text-zinc-300">Some data may not match the Blueprints page.</strong><br>
-                This is all of the user submitted raw data. This data contains many biases, like the amount of
-                submissions for Dam Battlegrounds, lack of data on certain Blueprints, etc. The main Blueprints list
-                uses educated assumptions to correct for this. If you have a different conclusion than I do, you may be
-                right! Make of this data what you will.</p>
-            </div>
-          </div>
-
           <!-- Data Grid/Table Header -->
           <div
-            class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1.2fr,1.2fr,0.8fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-[10px] md:text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
+            class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1fr,1fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-[10px] md:text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
             <div class="cursor-pointer hover:text-white transition-colors select-none" data-sort="name">Item</div>
             <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="confidence">
               Confidence</div>
             <div class="md:pl-2 select-none opacity-80">Map</div>
             <div class="md:pl-2 select-none opacity-80">
               Condition</div>
-            <div class="text-right pr-2 cursor-pointer hover:text-white transition-colors select-none"
-              data-sort="entries">Entries</div>
             <div></div> <!-- Spacer for Arrow -->
           </div>
 
@@ -554,7 +562,7 @@
         <div class="text-xs text-zinc-500 font-medium whitespace-nowrap" id="resultCount"></div>
       </div>
 
-      <div id="activeChips" class="flex items-center gap-2 flex-wrap mb-4 px-1"></div>
+
 
       <div id="grid" class="grid gap-3"></div>
 
@@ -595,171 +603,20 @@
     </main>
   </div>
 
-  <div id="drawer" class="fixed inset-0 z-[200] hidden">
-    <div id="drawerBackdrop" class="absolute inset-0 bg-black/60"></div>
-    <div
-      class="absolute left-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-r border-zinc-800 p-4 pt-16 overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <img id="logoHomeMobile" src="Background/Arc BP Tracker Logo White Small.webp" alt="ARC Blueprint Tracker"
-          class="h-12 cursor-pointer" />
-        <button id="closeFiltersBtn"
-          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Close</button>
-      </div>
-      <div class="text-xs text-zinc-400 mb-4" id="metaLineMobile">Loading…</div>
 
-      <div id="authSectionMobile" class="mt-4 border-b border-zinc-800/50 pb-4">
-        <button id="loginBtnMobile"
-          class="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-zinc-700 transition-colors">
-          Sign in with Google
-        </button>
-        <div id="userProfileMobile" class="hidden flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <img id="userPhotoMobile" src="" alt="" class="w-9 h-9 rounded-full border border-zinc-800" />
-            <div id="userNameMobile" class="text-sm font-medium truncate">User Name</div>
-          </div>
-          <button id="logoutBtnMobile" class="p-2 text-zinc-500">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
-      </div>
 
-      <div class="filter-options mt-4">
-        <label class="text-xs text-zinc-400">Sort</label>
-        <select id="sortSelectMobile"
-          class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
-          <option value="rarity_desc">Rarity (High → Low)</option>
-          <option value="rarity_asc">Rarity (Low → High)</option>
-          <option value="name_asc">Name (A → Z)</option>
-          <option value="name_desc">Name (Z → A)</option>
-          <option value="type_asc">Type (A → Z)</option>
-          <option value="map_asc">Map (A → Z)</option>
-        </select>
-      </div>
 
-      <div class="filter-options mt-4">
-        <label class="text-xs text-zinc-400">Collection Status</label>
-        <div class="mt-2 grid grid-cols-3 gap-2">
-          <button id="collectedAllMobile" class="chip chip-active">All</button>
-          <button id="collectedYesMobile" class="chip">Collected</button>
-          <button id="collectedWishMobile" class="chip">Wishlist</button>
-          <button id="collectedNoMobile" class="chip">Not Collected</button>
-          <button id="collectedSparesMobile" class="chip">Has Spares</button>
-        </div>
-      </div>
 
-      <div class="filter-options mt-4">
-        <div class="flex items-center justify-between">
-          <label class="text-xs text-zinc-400">Grid size</label>
-          <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
-        </div>
-        <input id="gridSizeMobile" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
-      </div>
 
-      <div class="filter-options mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleRarityMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
-            <svg id="iconRarityMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="rarityAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="rarityFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
-      </div>
 
-      <div class="filter-options mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleTypeMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
-            <svg id="iconTypeMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="typeAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="typeFiltersMobile" class="mt-2 grid grid-cols-3 gap-2"></div>
-      </div>
 
-      <div class="filter-options mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleConfMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
-            <svg id="iconConfMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="confAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="confFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
-      </div>
 
-      <div class="filter-options mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleMapMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
-            <svg id="iconMapMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="mapAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
-      </div>
 
-      <div class="filter-options mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleCondMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
-            <svg id="iconCondMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="condAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="condFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
-      </div>
 
-      <div class="filter-options mt-6">
-        <button id="resetBtnMobile"
-          class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
-          filters</button>
-      </div>
 
-      <!-- Discord & Ko-fi Buttons -->
-      <div class="mt-6 pt-4 border-t border-zinc-800 space-y-2">
-        <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener"
-          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z" />
-          </svg>
-          Join the Discord!
-        </a>
-        <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener"
-          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#FF5E5B] hover:bg-[#e54542] text-white text-xs font-medium transition-all text-center leading-tight">
-          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
-          </svg>
-          <span>Please consider donating to keep the site free & ad-free</span>
-        </a>
-      </div>
 
-      <div class="mt-8 pt-4 border-t border-zinc-800 text-xs text-zinc-500 leading-relaxed">
-        To submit bugs, request new features, or anything else email me at <a href="mailto:colddoornob@gmail.com"
-          class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a>
-      </div>
-    </div>
-  </div>
+
+
 
   <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
   <button id="submitLocationFab"
@@ -842,39 +699,45 @@
             <option value="N/A">N/A</option>
           </select>
         </div>
-        <!-- Map -->
+        <!-- Map Location (Clickable Display) -->
         <div>
-          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
-          <div class="flex gap-2">
-            <button type="button" id="openMapPickerBtn"
-              class="px-3 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:text-white text-zinc-400 transition-colors shrink-0"
-              title="Pin Location on Map">
-              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <label class="block text-sm font-medium text-zinc-400 mb-1.5">Map Location</label>
+          <div id="mapLocationDisplay" onclick="openMapPicker()"
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-300 focus:outline-none focus:border-emerald-500 transition-colors flex items-center justify-between cursor-pointer hover:border-zinc-600 group relative">
+            <!-- Content -->
+            <div class="flex items-center gap-3 overflow-hidden">
+              <svg class="w-5 h-5 text-zinc-500 group-hover:text-emerald-500 transition-colors shrink-0" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span id="mapDisplayValue" class="truncate text-zinc-500 select-none">Select Map Location...</span>
+            </div>
+
+            <!-- Hidden Inputs for Data -->
+            <input type="hidden" id="submitMapId" name="mapId">
+            <input type="hidden" id="submitMapX" name="mapX">
+            <input type="hidden" id="submitMapY" name="mapY">
+
+            <!-- Clear Button -->
+            <button type="button" id="clearMapBtn" onclick="clearMapSelection(event)"
+              class="hidden p-1 rounded-full hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors z-10"
+              title="Clear Location">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </button>
-            <select id="submitMap"
-              class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-              <option value="">Select a Map...</option>
-              <option value="dam_battlegrounds">Dam Battlegrounds</option>
-              <option value="the_blue_gate">Blue Gate</option>
-              <option value="the_spaceport">Spaceport</option>
-              <option value="buried_city">Buried City</option>
-              <option value="stella_montis_upper">Stella Montis</option>
-              <option value="N/A">N/A</option>
-            </select>
           </div>
         </div>
-        <!-- Location -->
+
+        <!-- Notes -->
         <div>
-          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What specific location?
-            (e.g., Security Wing)</label>
-          <input type="text" id="submitLocation"
+          <label for="submitNotes" class="block text-sm font-medium text-zinc-400 mb-1.5">Notes</label>
+          <input type="text" id="submitNotes"
             class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            placeholder="Enter location detail..." autocomplete="off">
+            placeholder="Additional notes (e.g. inside Control Tower Key room)" autocomplete="off">
         </div>
         <!-- Container Picker -->
         <div>
@@ -1015,10 +878,11 @@
   </div>
 
   <!-- Map Picker Modal -->
+
   <div id="mapPickerModal"
     class="fixed inset-0 z-[10002] hidden items-center justify-center bg-black/80 backdrop-blur-sm">
     <div
-      class="relative w-full h-full max-w-[95vw] max-h-[95vh] bg-zinc-900 overflow-hidden flex flex-col md:rounded-2xl border border-zinc-800 shadow-2xl">
+      class="relative w-full h-full md:w-auto md:h-[95vh] aspect-[5/4] bg-zinc-900 overflow-hidden flex flex-col md:rounded-2xl border border-zinc-800 shadow-2xl">
 
       <!-- Map Header & Navigation -->
       <div
@@ -1036,20 +900,30 @@
         </button>
       </div>
 
-      <!-- Map Container -->
-      <div class="relative flex-1 overflow-hidden bg-zinc-950">
-        <div id="leafletMap" class="w-full h-full z-10 box-border border-none outline-none"></div>
+      <!-- Map Container (CRT Style) -->
+      <div class="relative flex-1 bg-zinc-950 flex items-center justify-center p-2 md:p-6 overflow-hidden">
+        <div
+          class="crt-container relative w-full h-full max-h-full aspect-[5/4] md:aspect-[4/5] shadow-[0_0_50px_rgba(0,0,0,0.8)] border-4 border-zinc-900 rounded-2xl mx-auto">
 
-        <!-- Region Overlay (Bottom Left) -->
-        <div id="regionNameOverlay"
-          class="absolute bottom-6 left-6 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-lg text-white font-bold text-lg border border-white/10 pointer-events-none hidden">
-          Unknown Region
-        </div>
+          <div id="leafletMap" class="w-full h-full z-10 crt-screen box-border border-none outline-none"></div>
 
-        <!-- Instructions Overlay (Top Center) -->
-        <div id="mapInstructions"
-          class="absolute top-6 left-1/2 -translate-x-1/2 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-zinc-300 text-sm border border-white/10 pointer-events-none transition-opacity duration-300">
-          Click or tap anywhere to place a pin
+          <!-- CRT Overlays -->
+          <div class="crt-overlay crt-scanlines"></div>
+          <div class="crt-overlay crt-flicker-anim"></div>
+          <div class="crt-overlay crt-phosphor"></div>
+          <!-- Scan sweep removed -->
+
+          <!-- Region Overlay (Bottom Left) -->
+          <div id="regionNameOverlay"
+            class="absolute bottom-6 left-6 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-lg text-white font-bold text-lg border border-white/10 pointer-events-none hidden">
+            Unknown Region
+          </div>
+
+          <!-- Instructions Overlay (Top Center) -->
+          <div id="mapInstructions"
+            class="absolute top-6 left-1/2 -translate-x-1/2 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-zinc-300 text-sm border border-white/10 pointer-events-none transition-opacity duration-300 whitespace-nowrap">
+            Click or tap anywhere to place a pin
+          </div>
         </div>
       </div>
 
@@ -1059,13 +933,19 @@
           <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
           <span id="coordinatesDisplay" class="text-zinc-400 font-mono text-sm">No location selected</span>
         </div>
-        <button id="confirmPinBtn" disabled
-          class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-          <span>Confirm Location</span>
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-        </button>
+        <div class="flex items-center gap-3">
+          <button id="removePinBtn" type="button"
+            class="hidden px-4 py-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 font-semibold transition-colors">
+            Remove Pin
+          </button>
+          <button id="confirmPinBtn" type="button"
+            class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <span id="confirmBtnText">Submit Map (No Pin)</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1117,7 +997,8 @@
               <div class="w-full">
                 <img src="Background/Arc BP Tracker Logo White Small.webp" alt="Arc Blueprint Tracker"
                   class="h-10 mx-auto mb-1">
-                <div class="text-white text-xs uppercase tracking-[0.4em] font-black opacity-90">2025 BLUEPRINT WRAPPED
+                <div class="text-white text-xs uppercase tracking-[0.4em] font-black opacity-90">2025 BLUEPRINT
+                  WRAPPED
                 </div>
               </div>
 
@@ -1275,9 +1156,11 @@
 
               <div class="space-y-4">
                 <div>
-                  <h4 class="text-zinc-100 font-bold text-xs uppercase tracking-wider mb-2">2025 Blueprint Wrapped</h4>
+                  <h4 class="text-zinc-100 font-bold text-xs uppercase tracking-wider mb-2">2025 Blueprint Wrapped
+                  </h4>
                   <ul class="list-disc list-inside space-y-1.5 ml-1">
-                    <li><strong>Shareable Stats Card:</strong> Generate a high-res image showing your collection %, top
+                    <li><strong>Shareable Stats Card:</strong> Generate a high-res image showing your collection %,
+                      top
                       categories, and total findings.</li>
                     <li>This will be migrated into a "Share" feature later.</li>
                   </ul>
@@ -1288,7 +1171,8 @@
                   <ul class="list-disc list-inside space-y-1.5 ml-1">
                     <li><strong>Track Extras:</strong> You can now log exactly how many duplicate blueprints you have.
                     </li>
-                    <li><strong>Quick Menu:</strong> From the "My Collection" tab Right-click any item (or long-press on
+                    <li><strong>Quick Menu:</strong> From the "My Collection" tab Right-click any item (or long-press
+                      on
                       mobile) to instantly add or remove Spares.</li>
                     <li><strong>Inventory Management:</strong> Perfect for managing items you want to trade or give
                       away.</li>
@@ -1634,6 +1518,25 @@
   </div>
 
   <script src="app.js" type="module"></script>
+
+  <!-- SVG Filter for Global Chromatic Aberration -->
+  <svg style="display: none;">
+    <defs>
+      <filter id="chromatic-aberration">
+        <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
+        <feOffset in="red" dx="3" dy="0" result="red_offset" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
+        <feOffset in="green" dx="0" dy="0" result="green_offset" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
+        <feOffset in="blue" dx="-3" dy="0" result="blue_offset" />
+        <feMerge>
+          <feMergeNode in="red_offset" />
+          <feMergeNode in="green_offset" />
+          <feMergeNode in="blue_offset" />
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
 </body>
 
 </html>
