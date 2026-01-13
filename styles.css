@@ -273,10 +273,12 @@ input[type=range]::-webkit-slider-runnable-track {
   bottom: 5px;
   left: 5px;
   border-radius: 999px;
-  padding: clamp(6px, 4cqi, 12px) clamp(8px, 5cqi, 14px);
+  padding: 3cqi 4cqi;
+  /* Scaled padding */
   display: flex;
   align-items: center;
-  gap: clamp(6px, 3cqi, 10px);
+  gap: 3cqi;
+  /* Scaled gap */
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
   background: rgba(24, 24, 27, 0.40);
@@ -287,14 +289,16 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .type-tab img {
-  width: clamp(16px, 10cqi, 24px);
-  height: clamp(16px, 10cqi, 24px);
+  width: 10cqi;
+  /* Scaled icon */
+  height: 10cqi;
   flex: 0 0 auto;
   image-rendering: -webkit-optimize-contrast;
 }
 
 .type-tab span {
-  font-size: clamp(10px, 7cqi, 13px);
+  font-size: 7cqi;
+  /* Scaled font */
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   overflow: hidden;
@@ -413,20 +417,11 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Mobile Optimizations */
 @media (max-width: 768px) {
   .type-tab {
-    /* Reduce pill size by 30% on mobile - using cqi for consistent scaling */
-    padding: clamp(4px, 3cqi, 8px) clamp(6px, 4cqi, 10px);
-    gap: clamp(4px, 2.5cqi, 7px);
+    /* Uses main definition cqi now, keep consistent */
     max-width: 85cqi;
   }
 
-  .type-tab img {
-    width: clamp(11px, 8cqi, 17px);
-    height: clamp(11px, 8cqi, 17px);
-  }
-
-  .type-tab span {
-    font-size: clamp(8px, 6cqi, 9px);
-  }
+  /* Removed old clamp sizes to rely on cqi */
 
   /* Collection Progress Fixes */
   #collectionProgressContainer {
@@ -686,10 +681,14 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Collected Badge (Blueprints Tab) */
 .collected-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
+  bottom: 4cqi;
+  /* Scaled */
+  right: 4cqi;
+  /* Scaled */
+  width: 12cqi;
+  /* Scaled */
+  height: 12cqi;
+  /* Scaled */
   background: #22c55e;
   border-radius: 50%;
   display: flex;
@@ -700,8 +699,10 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .collected-badge svg {
-  width: 14px;
-  height: 14px;
+  width: 8cqi;
+  /* Scaled */
+  height: 8cqi;
+  /* Scaled */
   stroke: white;
   stroke-width: 3;
   fill: none;
@@ -866,10 +867,14 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Wishlist visual styles */
 .wishlist-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
+  bottom: 4cqi;
+  /* Scaled */
+  right: 4cqi;
+  /* Scaled */
+  width: 12cqi;
+  /* Scaled */
+  height: 12cqi;
+  /* Scaled */
   background: #fbbf24;
   /* Amber-400 */
   border-radius: 50%;
@@ -881,8 +886,10 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .wishlist-badge svg {
-  width: 14px;
-  height: 14px;
+  width: 8cqi;
+  /* Scaled */
+  height: 8cqi;
+  /* Scaled */
   fill: #78350f;
   /* Amber-900 */
   stroke: none;
