@@ -1091,6 +1091,16 @@ function switchTab(tabName) {
     }
   }
 
+  // Toggle Blueprint Search Bar Visibility
+  const blueprintSearchBar = document.getElementById("blueprintSearchBar");
+  if (blueprintSearchBar) {
+    if (showGrid) {
+      blueprintSearchBar.classList.remove("hidden");
+    } else {
+      blueprintSearchBar.classList.add("hidden");
+    }
+  }
+
 
 
   if (grid) {

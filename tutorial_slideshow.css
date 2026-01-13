@@ -1,0 +1,214 @@
+/* Tutorial Slideshow Overlay */
+.tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.tutorial-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.tutorial-modal {
+    background: #18181b;
+    /* zinc-950 */
+    border: 1px solid #27272a;
+    /* zinc-800 */
+    border-radius: 20px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tutorial-overlay.active .tutorial-modal {
+    transform: scale(1);
+}
+
+/* Image Container */
+.tutorial-image-container {
+    flex: 1;
+    background: #09090b;
+    /* zinc-950 darker */
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.tutorial-image-container img {
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+    object-fit: contain;
+    /* Optional: Smooth transition between slides */
+    transition: opacity 0.2s ease;
+}
+
+/* Content/Text Container */
+.tutorial-content {
+    padding: 24px;
+    background: #18181b;
+    border-top: 1px solid #27272a;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.tutorial-text {
+    font-size: 16px;
+    line-height: 1.5;
+    color: #e4e4e7;
+    /* zinc-200 */
+    text-align: center;
+}
+
+.tutorial-text .text-highlight {
+    color: #10b981;
+    /* emerald-500 */
+    font-weight: 600;
+}
+
+.tutorial-text .text-green {
+    color: #22c55e;
+    font-weight: bold;
+}
+
+.tutorial-text .text-yellow {
+    color: #fbbf24;
+    font-weight: bold;
+}
+
+.tutorial-text .text-blue {
+    color: #3b82f6;
+    font-weight: bold;
+}
+
+/* Navigation */
+.tutorial-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.tutorial-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.tutorial-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3f3f46;
+    /* zinc-700 */
+    transition: all 0.2s;
+}
+
+.tutorial-dot.active {
+    background: #10b981;
+    /* emerald-500 */
+    transform: scale(1.2);
+}
+
+.tutorial-btn-group {
+    display: flex;
+    gap: 12px;
+}
+
+.tutorial-btn {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    color: #a1a1aa;
+    /* zinc-400 */
+    border: 1px solid transparent;
+}
+
+.tutorial-btn:hover {
+    color: #fff;
+    background: #27272a;
+}
+
+.tutorial-btn.primary {
+    background: #047857;
+    /* emerald-700 */
+    color: white;
+    box-shadow: 0 4px 12px rgba(4, 120, 87, 0.3);
+}
+
+.tutorial-btn.primary:hover {
+    background: #059669;
+    /* emerald-600 */
+    transform: translateY(-1px);
+}
+
+.tutorial-close-absolute {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    font-size: 20px;
+    line-height: 1;
+    transition: background 0.2s;
+}
+
+.tutorial-close-absolute:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+/* Mobile Tweaks */
+@media (max-width: 768px) {
+    .tutorial-modal {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        border: none;
+    }
+
+    .tutorial-image-container {
+        /* On mobile, give image more space */
+        flex: 1;
+        background-color: #000;
+    }
+
+    .tutorial-content {
+        padding: 20px;
+        padding-bottom: 30px;
+        /* Safe area */
+    }
+}

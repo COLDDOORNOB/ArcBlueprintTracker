@@ -722,7 +722,7 @@ input[type=range]::-webkit-slider-runnable-track {
   position: fixed !important;
   bottom: 20px;
   right: 20px;
-  z-index: 9999;
+  z-index: 40;
   box-shadow: 0 8px 20px -5px rgba(4, 120, 87, 0.5);
 }
 
