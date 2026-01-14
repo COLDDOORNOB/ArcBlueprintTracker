@@ -10,6 +10,7 @@
     gtag('js', new Date());
     gtag('config', 'G-EHCHELVTW7');
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -46,7 +47,20 @@
   <link rel="manifest" href="/favicons/site.webmanifest">
   <link rel="shortcut icon" href="/favicons/favicon.ico">
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts - Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Prompt:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+
+  <!-- Leaflet.js for Interactive Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
@@ -57,22 +71,36 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="/assets/index-DsFp_z3-.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CXxE8IR7.css">
+  <script type="module" crossorigin src="/assets/index-BEhqT6w5.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DJ4EAm2K.css">
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
+  <div id="bg-grain"></div>
   <!-- Tab Navigation -->
   <div class="tab-nav">
-    <button id="mobileFilterBtn" class="mobile-filter-btn md:hidden" aria-label="Open filters">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <line x1="4" y1="6" x2="20" y2="6"></line>
-        <line x1="7" y1="12" x2="17" y2="12"></line>
-        <line x1="10" y1="18" x2="14" y2="18"></line>
-      </svg>
-    </button>
+    <div class="flex items-center md:absolute md:left-6">
+      <button id="desktopFilterBtn" class="nav-circle-btn flex mr-2 transition-opacity" aria-label="Toggle filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          class="w-6 h-6">
+          <line x1="4" y1="6" x2="20" y2="6"></line>
+          <line x1="7" y1="12" x2="17" y2="12"></line>
+          <line x1="10" y1="18" x2="14" y2="18"></line>
+        </svg>
+      </button>
+    </div>
     <button id="tabBlueprints" class="tab-button tab-button-active">Blueprints</button>
-    <button id="tabCollection" class="tab-button">My Collection</button>
+    <button id="tabData" class="tab-button">Data</button>
+    <button id="tabProgression" class="tab-button">Progression</button>
+    <button id="announcementsBtn" class="nav-circle-btn md:absolute md:right-6" aria-label="Announcements">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+      </svg>
+      <div id="newsBadge"
+        class="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-[10px] font-black text-white flex items-center justify-center rounded-full border-2 border-zinc-950 hidden shadow-lg">
+        0</div>
+    </button>
   </div>
 
   <!-- Mobile Header (must be outside flex container) -->
@@ -83,16 +111,26 @@
     </div>
   </header>
 
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 z-[190] bg-black/60 hidden md:hidden transition-opacity"></div>
+
   <div class="min-h-screen flex">
-    <aside class="w-[320px] shrink-0 border-r border-zinc-800 bg-zinc-950/60 backdrop-blur px-4 py-5 hidden md:block">
-      <div class="flex items-center justify-between gap-3">
+    <aside id="filtersSidebar"
+      class="fixed top-0 left-0 bottom-0 z-[5000] md:z-0 w-[80%] -translate-x-full transition-transform duration-300 bg-zinc-950/80 backdrop-blur border-r border-zinc-800 px-5 py-6 md:translate-x-0 md:static md:block md:w-[320px] md:bg-zinc-950/60 overflow-y-auto">
+
+      <!-- Mobile Header (Logo + Close) -->
+      <div class="flex items-center justify-between gap-3 mb-6 md:mb-0">
         <div>
           <img id="logoHome" src="Background/Arc BP Tracker Logo White Small.webp" alt="ARC Blueprint Tracker"
             class="h-14 cursor-pointer" />
           <p class="text-xs text-zinc-400 mt-1" id="metaLine">Loading…</p>
         </div>
-        <button id="resetBtn"
-          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Reset</button>
+        <div class="flex gap-2">
+          <button id="resetBtn"
+            class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors">Reset</button>
+          <button id="closeSidebarBtn"
+            class="md:hidden text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors">Close</button>
+        </div>
       </div>
 
       <div id="authSection" class="mt-6 border-y border-zinc-800/50 py-4">
@@ -127,23 +165,31 @@
         </div>
       </div>
 
-      <div class="mt-4">
-        <div class="flex items-center justify-between">
+      <div class="filter-options mt-4">
+        <div class="flex items-center justify-between mb-2">
           <label class="text-xs text-zinc-400">Grid size</label>
-          <div class="text-xs text-zinc-500" id="gridSizeLabel">220px</div>
         </div>
-        <input id="gridSize" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
+        <div id="gridSizeContainer" class="flex gap-2">
+          <button id="btnGridSmall"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Small</button>
+          <button id="btnGridMedium"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Medium</button>
+          <button id="btnGridLarge"
+            class="flex-1 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg transition-colors border border-transparent">Large</button>
+        </div>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Search</label>
         <input id="searchInput" placeholder="Name, type, map…"
           class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-600" />
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Sort</label>
         <select id="sortSelect" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
+          <option value="conf_desc">Confidence (High → Low)</option>
+          <option value="conf_asc">Confidence (Low → High)</option>
           <option value="rarity_desc">Rarity (High → Low)</option>
           <option value="rarity_asc">Rarity (Low → High)</option>
           <option value="name_asc">Name (A → Z)</option>
@@ -152,17 +198,18 @@
         </select>
       </div>
 
-      <div class="mt-4">
+      <div class="filter-options mt-4">
         <label class="text-xs text-zinc-400">Collection Status</label>
-        <div class="mt-2 flex gap-2">
-          <button id="collectedAllBlueprints" class="chip chip-active flex-1">All</button>
-          <button id="collectedYesBlueprints" class="chip flex-1">Collected</button>
-          <button id="collectedWishBlueprints" class="chip flex-1">Wishlist</button>
-          <button id="collectedNoBlueprints" class="chip flex-1">Not Collected</button>
+        <div class="mt-2 grid grid-cols-3 gap-2">
+          <button id="collectedAll" class="chip chip-active">All</button>
+          <button id="collectedYes" class="chip">Collected</button>
+          <button id="collectedWish" class="chip">Wishlist</button>
+          <button id="collectedNo" class="chip">Not Collected</button>
+          <button id="collectedSpares" class="chip">Has Spares</button>
         </div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleRarity" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
@@ -176,7 +223,7 @@
         <div id="rarityFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleType" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
@@ -190,7 +237,7 @@
         <div id="typeFilters" class="mt-2 grid grid-cols-3 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleConf" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
@@ -204,7 +251,7 @@
         <div id="confFilters" class="mt-2 grid grid-cols-2 gap-2"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleMap" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
@@ -218,7 +265,7 @@
         <div id="mapFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
       </div>
 
-      <div class="mt-6">
+      <div class="filter-options mt-6">
         <div class="flex items-center justify-between">
           <button id="toggleCond" class="flex items-center gap-2 group">
             <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
@@ -230,6 +277,26 @@
           <button id="condAllBtn" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
         </div>
         <div id="condFilters" class="mt-2 flex flex-wrap gap-2 hidden"></div>
+      </div>
+
+      <!-- Discord & Ko-fi Buttons -->
+      <div class="mt-6 pt-4 border-t border-zinc-800 space-y-2">
+        <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener"
+          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z" />
+          </svg>
+          Join the Discord!
+        </a>
+        <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener"
+          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#FF5E5B] hover:bg-[#e54542] text-white text-xs font-medium transition-all text-center leading-tight">
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
+          </svg>
+          <span>Please consider donating to keep the site free & ad-free</span>
+        </a>
       </div>
 
       <div class="mt-8 text-xs text-zinc-500 leading-relaxed">
@@ -268,53 +335,217 @@
         </div>
       </div>
       <!-- Progress Bar Section (Collection Only) -->
-      <div id="collectionProgressContainer" class="collection-only mb-6 hidden px-1">
-        <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
-          <div class="flex flex-col">
-            <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Total Progress</span>
-            <span
-              class="text-4xl font-black bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent leading-none"
-              id="progressPercent">0%</span>
+      <div id="activeChips" class="flex items-center gap-2 flex-wrap mb-4 px-1"></div>
+      <!-- Progression Tab -->
+      <div id="progressionTab" class="hidden max-w-4xl mx-auto">
+        <div class="flex flex-col items-center justify-center py-10">
+          <!-- Total Progress Glassy Card (Full Width) -->
+          <div class="w-full mb-10">
+
+
+            <!-- Glassy Container -->
+            <div class="rounded-2xl border border-white/20 bg-black/50 backdrop-blur-xl shadow-2xl p-6 md:p-8">
+              <!-- Header Row -->
+              <div class="flex items-start justify-between mb-6">
+                <div class="text-xs text-white/40 uppercase tracking-widest">
+                  <span id="progressionCount" class="text-white/60 font-bold">0</span>
+                  <span>/</span>
+                  <span id="progressionTotal">0</span>
+                  <span class="ml-1">Items Collected</span>
+                </div>
+                <h2 class="text-lg font-semibold text-white/70 uppercase tracking-wider">Collection Progress</h2>
+              </div>
+
+
+
+              <!-- Hero Percentage -->
+              <div class="text-center mb-6">
+                <span id="progressionSign" class="text-6xl md:text-7xl font-black text-white drop-shadow-lg">0%</span>
+              </div>
+
+              <!-- Progress Bar (Thin) -->
+              <div class="relative h-3 w-full rounded-full overflow-hidden border border-white/10 bg-black/30">
+                <div id="progressionBarMain"
+                  class="absolute top-0 left-0 h-full w-0 transition-all duration-[1500ms] ease-out rounded-full">
+                  <div class="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent rounded-full"></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="text-right flex flex-col items-end gap-2">
-            <span class="text-xs text-zinc-500 font-bold bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800"
-              id="progressCount">0 / 0</span>
+
+          <!-- Progress by Category Section -->
+          <div class="w-full mb-10">
+            <div class="rounded-2xl border border-white/20 bg-black/50 backdrop-blur-xl shadow-2xl p-6 md:p-8">
+              <h3 class="text-lg font-semibold text-white/70 uppercase tracking-wider mb-6">Progress by Category</h3>
+              <div id="progressionCategories" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <!-- Categories injected by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Wrapped Button (Centered Below Categories) -->
+          <div class="w-full flex justify-center mb-10">
             <button id="showWrappedBtn"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-[11px] font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z">
-                </path>
+              class="flex items-center gap-2 px-6 py-3 rounded-full bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-all shadow-lg hover:shadow-emerald-500/10 backdrop-blur-md group hover:scale-105 active:scale-95">
+              <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
               </svg>
-              View 2025 Wrapped
+              <span>View My Blueprint Wrapped 2025</span>
             </button>
           </div>
+
+          <!-- User Contributions Stats -->
+          <div id="userStatsSection" class="w-full mb-10 hidden">
+            <div class="rounded-2xl border border-white/20 bg-black/50 backdrop-blur-xl shadow-2xl p-6 md:p-8">
+              <h3 class="text-lg font-semibold text-white/70 uppercase tracking-wider mb-6">Your Contributions</h3>
+
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <!-- Submission Count -->
+                <div class="glass-panel rounded-xl p-6 flex flex-col items-center justify-center gap-2">
+                  <div class="text-xs text-zinc-400 uppercase tracking-widest font-bold">Submissions</div>
+                  <div class="text-4xl font-black text-emerald-400 text-glow-soft" id="statSubmissionCount">0</div>
+                </div>
+
+                <!-- Best Map -->
+                <div class="glass-panel rounded-xl p-6 flex flex-col items-center justify-center gap-2">
+                  <div class="text-xs text-zinc-400 uppercase tracking-widest font-bold">Best Map</div>
+                  <div class="flex flex-col items-center">
+                    <div class="text-xl font-bold text-white text-center leading-tight text-glow-soft" id="statBestMap">
+                      -</div>
+                    <div class="text-sm font-medium text-zinc-500" id="statBestMapCount"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recent Finds -->
+              <div class="w-full">
+                <h4 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-4">Recent Finds</h4>
+                <!-- Grid for Recent Items -->
+                <div id="recentFindsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  <!-- Rendered items go here -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
+          <!-- Wrapped Button -->
+          <!-- Wrapped Button Moved to Header -->
         </div>
-        <div class="h-2.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800/50">
-          <div id="progressBar"
-            class="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full relative shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-            style="width: 0%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);">
-            <div class="absolute inset-0 bg-white/10 animate-pulse"></div>
+      </div>
+
+      <!-- Data Tab -->
+      <div id="dataTab" class="hidden">
+        <div class="max-w-7xl mx-auto">
+          <!-- Data Header -->
+          <!-- Data Header -->
+          <div class="flex flex-col gap-6 mb-6">
+            <!-- Title Row -->
+            <div>
+              <h2 class="text-3xl font-heading font-black text-white/90 tracking-tight">DROP REGISTRY</h2>
+              <p class="text-zinc-500 text-sm mt-1">Community-sourced spawn data analysis</p>
+            </div>
+
+            <!-- Disclaimer (Stacked) -->
+            <div
+              class="w-full bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+              <button id="disclaimerToggleBtn"
+                class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors group">
+                <div class="flex items-center gap-2.5">
+                  <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">Raw Data
+                    Disclaimer</span>
+                </div>
+                <svg id="disclaimerIcon" class="w-5 h-5 text-zinc-500 transition-transform duration-300" fill="none"
+                  viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div id="disclaimerContent"
+                class="hidden px-4 pb-4 text-xs md:text-sm text-zinc-400 space-y-1 bg-black/20 border-t border-white/5">
+                <p><strong class="text-zinc-300">Some data may not match the Blueprints page.</strong><br>
+                  This is all of the user submitted raw data. This data contains many biases, like the amount of
+                  submissions for Dam Battlegrounds, lack of data on certain Blueprints, etc. The main Blueprints list
+                  uses educated assumptions to correct for this. If you have a different conclusion than I do, you may
+                  be
+                  right! Make of this data what you will.</p>
+              </div>
+            </div>
+
+            <!-- Search Row -->
+            <div class="flex items-center gap-3 w-full">
+              <div class="relative flex-1">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none"
+                  viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input id="dataSearchInput" placeholder="Search registry..."
+                  class="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600 text-zinc-300">
+              </div>
+              <button id="dataRefreshBtn"
+                class="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Data Grid/Table Header -->
+          <div
+            class="grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] md:grid-cols-[2fr,1fr,1fr,1fr,40px] gap-x-1 md:gap-4 px-3 md:px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-t-2xl text-[10px] md:text-xs font-bold text-zinc-300 uppercase tracking-wider backdrop-blur-md sticky top-0 z-40">
+            <div class="cursor-pointer hover:text-white transition-colors select-none" data-sort="name">Item</div>
+            <div class="md:pl-2 cursor-pointer hover:text-white transition-colors select-none" data-sort="confidence">
+              Confidence</div>
+            <div class="md:pl-2 select-none opacity-80">Map</div>
+            <div class="md:pl-2 select-none opacity-80">
+              Condition</div>
+            <div></div> <!-- Spacer for Arrow -->
+          </div>
+
+          <!-- Data Rows Container -->
+          <div id="dataRows" class="flex flex-col gap-2 md:gap-0">
+            <!-- Loading State -->
+            <div class="py-20 text-center">
+              <div
+                class="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4">
+              </div>
+              <p class="text-zinc-500">Fetching live data...</p>
+            </div>
           </div>
         </div>
       </div>
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-6 min-h-[32px]">
-        <div class="flex items-center gap-2 flex-wrap" id="activeChips"></div>
 
-        <div id="collectionHelp"
-          class="collection-only flex items-center gap-2.5 p-1.5 pr-4 bg-zinc-900 border border-zinc-800 rounded-full w-fit shadow-xl shrink min-w-0">
-          <div
-            class="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 border border-zinc-700">
-            <svg class="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <!-- Main Grid Section -->
+      <!-- <div id="gridSection"> (Implicitly the rest of the content) -->
+      <div id="gridHeader"
+        class="flex flex-nowrap md:flex-wrap items-center justify-between gap-2 md:gap-4 mb-6 min-h-[32px]">
+        <div class="flex items-center gap-3 shrink-0">
+          <button id="toggleMassCollectBtn"
+            class="flex items-center gap-2 px-3 py-2 rounded-full bg-zinc-900/80 backdrop-blur-md hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-zinc-300 transition-all shadow-lg shrink-0">
+            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
-          </div>
-          <span class="text-[11px] text-zinc-400 font-medium leading-tight">Click once to mark an item
-            as Collected and again to Wishlist it.</span>
+            <div class="flex flex-col text-left leading-none whitespace-nowrap">
+              <span>Mark items</span>
+              <span>as Collected</span>
+            </div>
+          </button>
         </div>
 
-        <div id="blueprintHelp"
-          class="blueprints-only flex items-center gap-2.5 p-1.5 pr-4 bg-zinc-900 border border-zinc-800 rounded-full w-fit shadow-xl shrink min-w-0">
+        <!-- Unified Help Banner -->
+        <div id="unifiedHelp"
+          class="flex items-center gap-2.5 p-2 pr-4 bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-full w-fit shadow-lg shrink min-w-0">
           <div
             class="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 border border-zinc-700">
             <svg class="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -322,12 +553,18 @@
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <span class="text-[11px] text-zinc-400 font-medium leading-tight">Click an item to see details/spawn
-            location.</span>
+          <!-- Mobile text -->
+          <span class="md:hidden text-[11px] text-zinc-400 font-medium leading-tight">Tap for details | Long Press
+            for Actions</span>
+          <!-- Desktop text -->
+          <span class="hidden md:inline text-[11px] text-zinc-400 font-medium leading-tight">Click item for details |
+            Right Click for actions</span>
         </div>
 
         <div class="text-xs text-zinc-500 font-medium whitespace-nowrap" id="resultCount"></div>
       </div>
+
+
 
       <div id="grid" class="grid gap-3"></div>
 
@@ -340,162 +577,52 @@
 
       <!-- Mobile Footer -->
       <footer class="md:hidden mt-12 mb-20 px-1 text-center text-xs text-zinc-500 leading-relaxed">
+        <!-- Discord & Ko-fi Buttons (Mobile Footer) -->
+        <div class="mb-6 space-y-2">
+          <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener"
+            class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium transition-colors">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z" />
+            </svg>
+            Join the Discord!
+          </a>
+          <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener"
+            class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#FF5E5B] hover:bg-[#e54542] text-white text-xs font-medium transition-all text-center leading-tight">
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
+            </svg>
+            <span>Please consider donating to keep the site free & ad-free</span>
+          </a>
+        </div>
         <p>Item Data source: TheGamingMerchant on YouTube. Images and UI icons from ARC Raiders Wiki.</p>
         <p class="mt-2">To submit bugs, request new features, or anything else email me at <a
             href="mailto:colddoornob@gmail.com"
-            class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a></p>
+            class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a>
+        </p>
       </footer>
     </main>
   </div>
 
-  <div id="drawer" class="fixed inset-0 z-[200] hidden">
-    <div id="drawerBackdrop" class="absolute inset-0 bg-black/60"></div>
-    <div
-      class="absolute left-0 top-0 bottom-0 w-[92%] max-w-[420px] bg-zinc-950 border-r border-zinc-800 p-4 pt-16 overflow-y-auto">
-      <div class="flex items-center justify-between mb-4">
-        <img id="logoHomeMobile" src="Background/Arc BP Tracker Logo White Small.webp" alt="ARC Blueprint Tracker"
-          class="h-12 cursor-pointer" />
-        <button id="closeFiltersBtn"
-          class="text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800">Close</button>
-      </div>
-      <div class="text-xs text-zinc-400 mb-4" id="metaLineMobile">Loading…</div>
 
-      <div id="authSectionMobile" class="mt-4 border-b border-zinc-800/50 pb-4">
-        <button id="loginBtnMobile"
-          class="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-zinc-700 transition-colors">
-          Sign in with Google
-        </button>
-        <div id="userProfileMobile" class="hidden flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <img id="userPhotoMobile" src="" alt="" class="w-9 h-9 rounded-full border border-zinc-800" />
-            <div id="userNameMobile" class="text-sm font-medium truncate">User Name</div>
-          </div>
-          <button id="logoutBtnMobile" class="p-2 text-zinc-500">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
-      </div>
 
-      <div class="mt-4">
-        <label class="text-xs text-zinc-400">Sort</label>
-        <select id="sortSelectMobile"
-          class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm">
-          <option value="rarity_desc">Rarity (High → Low)</option>
-          <option value="rarity_asc">Rarity (Low → High)</option>
-          <option value="name_asc">Name (A → Z)</option>
-          <option value="name_desc">Name (Z → A)</option>
-          <option value="type_asc">Type (A → Z)</option>
-          <option value="map_asc">Map (A → Z)</option>
-        </select>
-      </div>
 
-      <div class="mt-4">
-        <label class="text-xs text-zinc-400">Collection Status</label>
-        <div class="mt-2 flex gap-2">
-          <button id="collectedAllMobile" class="chip chip-active flex-1">All</button>
-          <button id="collectedYesMobile" class="chip flex-1">Collected</button>
-          <button id="collectedWishMobile" class="chip flex-1">Wishlist</button>
-          <button id="collectedNoMobile" class="chip flex-1">Not Collected</button>
-        </div>
-      </div>
 
-      <div class="mt-4">
-        <div class="flex items-center justify-between">
-          <label class="text-xs text-zinc-400">Grid size</label>
-          <div class="text-xs text-zinc-500" id="gridSizeLabelMobile">220px</div>
-        </div>
-        <input id="gridSizeMobile" type="range" min="70" max="220" step="10" value="120" class="mt-2 w-full" />
-      </div>
 
-      <div class="mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleRarityMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Rarity</h2>
-            <svg id="iconRarityMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="rarityAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="rarityFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
-      </div>
 
-      <div class="mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleTypeMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Item Type</h2>
-            <svg id="iconTypeMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="typeAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="typeFiltersMobile" class="mt-2 grid grid-cols-3 gap-2"></div>
-      </div>
 
-      <div class="mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleConfMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Data Confidence</h2>
-            <svg id="iconConfMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200 rotate-180"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="confAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="confFiltersMobile" class="mt-2 grid grid-cols-2 gap-2"></div>
-      </div>
 
-      <div class="mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleMapMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Map</h2>
-            <svg id="iconMapMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="mapAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="mapFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
-      </div>
 
-      <div class="mt-6">
-        <div class="flex items-center justify-between">
-          <button id="toggleCondMobile" class="flex items-center gap-2 group">
-            <h2 class="text-sm font-semibold group-hover:text-white transition-colors">Condition</h2>
-            <svg id="iconCondMobile" class="w-3 h-3 text-zinc-500 transition-transform duration-200" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button id="condAllBtnMobile" class="text-xs text-zinc-400 hover:text-zinc-200">All</button>
-        </div>
-        <div id="condFiltersMobile" class="mt-2 flex flex-wrap gap-2 hidden"></div>
-      </div>
 
-      <div class="mt-6">
-        <button id="resetBtnMobile"
-          class="w-full text-xs px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800">Reset
-          filters</button>
-      </div>
 
-      <div class="mt-8 pt-4 border-t border-zinc-800 text-xs text-zinc-500 leading-relaxed">
-        To submit bugs, request new features, or anything else email me at <a href="mailto:colddoornob@gmail.com"
-          class="text-zinc-400 hover:text-white underline">colddoornob@gmail.com</a>
-      </div>
-    </div>
-  </div>
+
+
+
 
   <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
   <button id="submitLocationFab"
-    class="collection-only hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
+    class="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
     aria-label="Submit Blueprint Location">
     <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -509,7 +636,7 @@
   </button>
 
   <!-- Timed Toast Notification (My Collection Only) -->
-  <div id="collectToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden">
+  <div id="collectToast" class="fixed bottom-24 right-5 z-50 hidden">
     <div
       class="relative px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors">
       <p id="collectToastText" class="text-sm font-medium text-white"></p>
@@ -552,20 +679,6 @@
             <option value="">Select a Blueprint...</option>
           </select>
         </div>
-        <!-- Map -->
-        <div>
-          <label for="submitMap" class="block text-sm font-medium text-zinc-400 mb-1.5">What Map was it on?</label>
-          <select id="submitMap"
-            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-            <option value="">Select a Map...</option>
-            <option value="Dam Battlegrounds">Dam Battlegrounds</option>
-            <option value="Blue Gate">Blue Gate</option>
-            <option value="Spaceport">Spaceport</option>
-            <option value="Buried City">Buried City</option>
-            <option value="Stella Montis">Stella Montis</option>
-            <option value="N/A">N/A</option>
-          </select>
-        </div>
         <!-- Condition -->
         <div>
           <label for="submitCondition" class="block text-sm font-medium text-zinc-400 mb-1.5">What Condition was it
@@ -588,21 +701,103 @@
             <option value="N/A">N/A</option>
           </select>
         </div>
-        <!-- Location -->
+        <!-- Map Location (Clickable Display) -->
         <div>
-          <label for="submitLocation" class="block text-sm font-medium text-zinc-400 mb-1.5">What location on the map?
-            (e.g., Security Wing, Village)</label>
-          <input type="text" id="submitLocation"
-            class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            placeholder="Enter location...">
+          <label class="block text-sm font-medium text-zinc-400 mb-1.5">Map Location</label>
+          <div id="mapLocationDisplay" onclick="openMapPicker()"
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-300 focus:outline-none focus:border-emerald-500 transition-colors flex items-center justify-between cursor-pointer hover:border-zinc-600 group relative">
+            <!-- Content -->
+            <div class="flex items-center gap-3 overflow-hidden">
+              <svg class="w-5 h-5 text-zinc-500 group-hover:text-emerald-500 transition-colors shrink-0" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span id="mapDisplayValue" class="truncate text-zinc-500 select-none">Select Map Location...</span>
+            </div>
+
+            <!-- Hidden Inputs for Data -->
+            <input type="hidden" id="submitMapId" name="mapId">
+            <input type="hidden" id="submitMapX" name="mapX">
+            <input type="hidden" id="submitMapY" name="mapY">
+
+            <!-- Clear Button -->
+            <button type="button" id="clearMapBtn" onclick="clearMapSelection(event)"
+              class="hidden p-1 rounded-full hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors z-10"
+              title="Clear Location">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
         </div>
-        <!-- Container -->
+
+        <!-- Notes -->
         <div>
-          <label for="submitContainer" class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?
-            (e.g., Breachable Rusty Metal Box)</label>
-          <input type="text" id="submitContainer"
+          <label for="submitNotes" class="block text-sm font-medium text-zinc-400 mb-1.5">Notes</label>
+          <input type="text" id="submitNotes"
             class="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-            placeholder="Enter container type...">
+            placeholder="Additional notes (e.g. inside Control Tower Key room)" autocomplete="off">
+        </div>
+        <!-- Container Picker -->
+        <div>
+          <label class="block text-sm font-medium text-zinc-400 mb-1.5">What kind of container?</label>
+
+          <!-- Selected Container Display (shown when container is selected) -->
+          <div id="selectedContainerDisplay"
+            class="hidden items-center gap-3 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 cursor-pointer hover:border-zinc-600 transition-colors">
+            <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-zinc-700">
+              <img id="selectedContainerImg" src="" alt="" class="w-full h-full object-cover" />
+            </div>
+            <span id="selectedContainerName" class="flex-1 text-white font-medium truncate"></span>
+            <button type="button" id="clearContainerBtn"
+              class="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Open Picker Button (shown when no container selected) -->
+          <button type="button" id="openContainerPickerBtn"
+            class="w-full px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors flex items-center gap-3">
+            <svg class="w-5 h-5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>Tap to select a container...</span>
+            <svg class="w-5 h-5 ml-auto text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <!-- Hidden input for form submission -->
+          <input type="hidden" id="submitContainer" name="container" value="" />
+        </div>
+
+        <!-- Custom Container Form (collapsible) -->
+        <div id="customContainerForm" class="hidden space-y-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold text-amber-400">Submit New Container</h4>
+            <button type="button" id="hideCustomContainerBtn" class="text-zinc-500 hover:text-white transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <input type="text" id="customContainerName"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+            placeholder="Container name (e.g., Yellow Breaker Box)" />
+          <input type="text" id="customContainerDescription"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+            placeholder="Brief description (e.g., Found in industrial areas)" />
+          <div>
+            <label class="block text-xs text-zinc-500 mb-1.5">Screenshot (optional)</label>
+            <input type="file" id="customContainerScreenshot" accept="image/*"
+              class="w-full text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:text-zinc-300 file:font-medium file:cursor-pointer hover:file:bg-zinc-700" />
+          </div>
         </div>
         <!-- Reward Type Checkboxes -->
         <div class="flex gap-6 pt-2">
@@ -627,87 +822,722 @@
     </div>
   </div>
 
-  <!-- 2025 Wrapped Modal -->
-  <div id="wrappedModal"
-    class="fixed inset-0 z-[300] hidden items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-2xl">
+  <!-- Container Picker Modal -->
+  <div id="containerPickerModal"
+    class="fixed inset-0 z-[10001] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <!-- ... Content of Container Picker ... -->
     <div
-      class="relative w-full max-w-3xl max-h-full aspect-square bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col scale-[0.9] sm:scale-100">
-      <!-- Wrapped Content (to be rendered to canvas) -->
-      <div id="wrappedContent"
-        class="flex-1 relative overflow-hidden bg-gradient-to-br from-zinc-950 via-emerald-950 to-zinc-950 p-6 flex flex-col items-center text-center">
-        <!-- Background Glow -->
+      class="relative w-full max-w-4xl max-h-[85vh] bg-zinc-900/95 backdrop-blur-xl rounded-2xl border border-zinc-700 shadow-2xl overflow-hidden flex flex-col">
+      <!-- ... (Kept existing content structure implied, but we are replacing the outer block closing to append) -->
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-5 border-b border-zinc-800">
+        <h2 class="text-lg font-semibold text-white">Select Container</h2>
+        <button id="closeContainerPickerBtn" class="text-zinc-500 hover:text-white transition-colors p-1"
+          aria-label="Close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="p-4 border-b border-zinc-800/50">
+        <div class="relative">
+          <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input type="text" id="containerPickerSearch"
+            class="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-base"
+            placeholder="Search containers..." autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Scrollable Container Grid -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <div id="containerPickerGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <!-- Container cards populated by JS -->
+        </div>
+
+        <!-- Submit New Container Button -->
+        <div class="mt-6">
+          <button type="button" id="containerPickerCustomBtn"
+            class="w-full px-4 py-4 flex items-center justify-center gap-3 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors">
+            <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div class="text-left">
+              <div class="text-sm font-semibold text-amber-400">Container not listed?</div>
+              <div class="text-xs text-zinc-500">Submit a new container type</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Picker Modal -->
+
+  <div id="mapPickerModal"
+    class="fixed inset-0 z-[10002] hidden items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div
+      class="relative w-full h-full md:w-auto md:h-[95vh] aspect-[5/4] bg-zinc-900 overflow-hidden flex flex-col md:rounded-2xl border border-zinc-800 shadow-2xl">
+
+      <!-- Map Header & Navigation -->
+      <div
+        class="z-20 bg-zinc-900/95 backdrop-blur-xl border-b border-zinc-800 p-4 flex flex-col md:flex-row gap-4 items-center justify-between shrink-0">
+        <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide pb-2 md:pb-0"
+          id="mapTabsContainer">
+          <!-- Populated by JS -->
+        </div>
+
+        <button id="closeMapPickerBtn"
+          class="absolute top-4 right-4 md:static p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors z-50">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Map Container (CRT Style) -->
+      <div class="relative flex-1 bg-zinc-950 flex items-center justify-center p-2 md:p-6 overflow-hidden">
         <div
-          class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle,rgba(16,185,129,0.15)_0%,transparent_70%)] pointer-events-none">
-        </div>
+          class="crt-container relative w-full h-full max-h-full aspect-[5/4] md:aspect-[4/5] shadow-[0_0_50px_rgba(0,0,0,0.8)] border-4 border-zinc-900 rounded-2xl mx-auto">
 
-        <!-- Background Pattern -->
-        <div class="absolute inset-0 opacity-10 pointer-events-none"
-          style="background-image: url('Background/Arc BP Image Background.webp'); background-size: cover; mix-blend-mode: overlay;">
-        </div>
+          <div id="leafletMap" class="w-full h-full z-10 crt-screen box-border border-none outline-none"></div>
 
-        <!-- UI Elements -->
-        <div class="relative z-10 w-full flex flex-col h-full items-center justify-between gap-1">
-          <div class="w-full">
-            <img src="Background/Arc BP Tracker Logo White Small.webp" alt="Arc Blueprint Tracker"
-              class="h-10 mx-auto mb-1">
-            <h3 class="text-zinc-500 text-[8px] uppercase tracking-[0.4em] font-black">2025 Blueprint Wrapped</h3>
+          <!-- CRT Overlays -->
+          <div class="crt-overlay crt-scanlines"></div>
+          <div class="crt-overlay crt-flicker-anim"></div>
+          <div class="crt-overlay crt-phosphor"></div>
+          <!-- Scan sweep removed -->
+
+          <!-- Region Overlay (Bottom Left) -->
+          <div id="regionNameOverlay"
+            class="absolute bottom-6 left-6 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-lg text-white font-bold text-lg border border-white/10 pointer-events-none hidden">
+            Unknown Region
           </div>
 
-          <div class="flex flex-col items-center">
-            <div id="wrappedPercent"
-              class="text-6xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(16,185,129,0.5)] leading-none">
-              0%</div>
-            <div class="text-zinc-400 text-[8px] font-bold uppercase tracking-[0.2em]">Collection Complete</div>
-          </div>
-
-          <!-- Stats Grid -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 w-full px-4 mb-2">
-            <div class="bg-white/5 backdrop-blur-md rounded-xl p-2 border border-white/10 flex flex-col items-center">
-              <div id="wrappedReportCount" class="text-lg font-black text-emerald-400">0</div>
-              <div class="text-[7px] text-zinc-500 uppercase font-black tracking-wider text-center leading-tight">
-                Locations<br>Reported</div>
-            </div>
-            <div class="bg-white/5 backdrop-blur-md rounded-xl p-2 border border-white/10 flex flex-col items-center">
-              <div id="wrappedTotalBP" class="text-lg font-black text-white">0</div>
-              <div class="text-[7px] text-zinc-500 uppercase font-black tracking-wider text-center leading-tight">
-                Blueprints<br>Collected</div>
-            </div>
-            <div class="bg-white/5 backdrop-blur-md rounded-xl p-2 border border-white/10 flex flex-col items-center">
-              <div id="wrappedWeaponStat" class="text-lg font-black text-amber-500">0/0</div>
-              <div class="text-[7px] text-zinc-500 uppercase font-black tracking-wider text-center leading-tight">
-                Weapons<br>Collected</div>
-            </div>
-            <div class="bg-white/5 backdrop-blur-md rounded-xl p-2 border border-white/10 flex flex-col items-center">
-              <div id="wrappedAugmentStat" class="text-lg font-black text-cyan-400">0/0</div>
-              <div class="text-[7px] text-zinc-500 uppercase font-black tracking-wider text-center leading-tight">
-                Augments<br>Collected</div>
-            </div>
-          </div>
-
-          <div class="w-full px-4">
-            <h4 class="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-1">Collection Highlights</h4>
-            <div id="wrappedHighlights" class="grid grid-cols-3 gap-2 w-full mx-auto">
-              <!-- Mini cards go here -->
-            </div>
-          </div>
-
-          <div class="w-full text-zinc-400 text-xs font-black tracking-[0.4em] uppercase py-2">
-            ARCBLUEPRINTTRACKER.COM
+          <!-- Instructions Overlay (Top Center) -->
+          <div id="mapInstructions"
+            class="absolute top-6 left-1/2 -translate-x-1/2 z-[400] px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-zinc-300 text-sm border border-white/10 pointer-events-none transition-opacity duration-300 whitespace-nowrap">
+            Click or tap anywhere to place a pin
           </div>
         </div>
       </div>
 
-      <!-- Action Buttons (Not part of the square capture) -->
-      <div class="p-4 bg-zinc-950/80 backdrop-blur border-t border-white/5 flex gap-3">
-        <button id="closeWrappedBtn"
-          class="flex-1 px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-bold transition-colors">Close</button>
-        <button id="downloadWrappedBtn"
-          class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]">Download
-          Square</button>
+      <!-- Footer / Confirmation Panel -->
+      <div class="z-20 bg-zinc-900 p-4 border-t border-zinc-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <span id="coordinatesDisplay" class="text-zinc-400 font-mono text-sm">No location selected</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="removePinBtn" type="button"
+            class="hidden px-4 py-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 font-semibold transition-colors">
+            Remove Pin
+          </button>
+          <button id="confirmPinBtn" type="button"
+            class="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <span id="confirmBtnText">Submit Map (No Pin)</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gamertag Input Modal -->
+  <div id="gamertagModal"
+    class="fixed inset-0 z-[350] hidden items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+    <div class="relative p-[2px] rounded-3xl max-w-md w-full"
+      style="background: linear-gradient(135deg, rgba(16,185,129,0.6) 0%, rgba(255,255,255,0.3) 50%, rgba(16,185,129,0.6) 100%); box-shadow: 0 0 60px rgba(16,185,129,0.3);">
+      <div class="bg-zinc-900/95 backdrop-blur-2xl rounded-[22px] p-8 flex flex-col items-center gap-6">
+        <div class="text-center">
+          <div class="text-2xl font-black text-white mb-2">Add Your Gamertag</div>
+          <div class="text-zinc-400 text-sm">Display your username on your Wrapped image</div>
+        </div>
+        <div
+          class="w-full flex items-center bg-zinc-800/80 border border-white/10 rounded-xl px-4 focus-within:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+          <span class="text-zinc-500 text-lg font-bold">@</span>
+          <input id="gamertagInput" type="text" placeholder="YourGamertag"
+            class="flex-1 bg-transparent py-3 pl-1 text-white text-lg font-bold placeholder-zinc-500 focus:outline-none">
+        </div>
+        <div class="flex gap-4 w-full">
+          <button id="skipGamertagBtn"
+            class="flex-1 px-6 py-3 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold transition-all border border-white/10">Skip</button>
+          <button id="confirmGamertagBtn"
+            class="flex-1 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] border border-emerald-400/30">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2025 Wrapped Modal -->
+  <div id="wrappedModal" class="fixed inset-0 z-[300] hidden bg-black/95 backdrop-blur-2xl overflow-auto p-4 md:p-8">
+    <div class="w-full min-h-full flex flex-col items-center justify-center">
+      <div id="wrappedInner" class="flex flex-col items-center gap-6 w-full max-w-[896px] shrink-0">
+        <!-- Square Preview Container with Shimmer Border -->
+        <div id="wrappedOuterContainer"
+          class="relative w-full aspect-square rounded-3xl p-[2px] bg-gradient-to-br from-emerald-400/50 via-white/20 to-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
+          <div id="wrappedShimmer"
+            class="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-400/30 via-transparent to-emerald-400/30 animate-pulse pointer-events-none">
+          </div>
+
+          <!-- Wrapped Content (to be rendered to canvas) -->
+          <div id="wrappedContent"
+            class="w-full h-full relative overflow-hidden rounded-[22px] flex flex-col items-center text-center"
+            style="background: radial-gradient(circle at center, rgba(16,185,129,0.15) 0%, transparent 70%), linear-gradient(to bottom right, rgba(9,9,11,0.9) 0%, rgba(6,78,59,0.85) 50%, rgba(9,9,11,0.9) 100%), url('Background/Arc BP Image Background.webp'); background-size: cover, cover, cover; background-position: center, center, center;">
+
+            <!-- UI Elements -->
+            <div class="relative z-10 w-full flex flex-col h-full items-center justify-between gap-1 p-6">
+              <div class="w-full">
+                <img src="Background/Arc BP Tracker Logo White Small.webp" alt="Arc Blueprint Tracker"
+                  class="h-10 mx-auto mb-1">
+                <div class="text-white text-xs uppercase tracking-[0.4em] font-black opacity-90">2025 BLUEPRINT
+                  WRAPPED
+                </div>
+              </div>
+
+              <div class="flex flex-col items-center">
+                <div id="wrappedPercent"
+                  class="text-[80px] font-hud font-bold tracking-tighter text-white drop-shadow-[0_0_40px_rgba(16,185,129,0.5)] leading-none">
+                  0%</div>
+                <div
+                  class="text-white/90 text-sm font-tabs font-bold uppercase tracking-[0.2em] mt-1 shadow-black drop-shadow-sm">
+                  Collection Complete</div>
+                <!-- Progress Bar -->
+                <div
+                  class="w-[28rem] mt-3 p-[1.5px] rounded-full bg-gradient-to-r from-emerald-500/30 via-white/10 to-emerald-500/30 shadow-lg">
+                  <div class="w-full h-3 bg-zinc-950/80 rounded-full overflow-hidden relative">
+                    <div id="wrappedProgressBar"
+                      class="h-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] rounded-full transition-all duration-1000 ease-out"
+                      style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stats Grid - Dynamically populated -->
+              <div id="wrappedStatsGrid" class="flex justify-center gap-3 w-full px-2 mb-1 mt-3">
+                <!-- Stats will be injected by JS -->
+              </div>
+
+              <!-- Highlights Header -->
+              <div class="w-full text-center mt-2 mb-2">
+                <div class="text-white text-lg font-black uppercase tracking-[0.4em] opacity-90">
+                  Top Discoveries
+                </div>
+              </div>
+
+              <div class="w-full px-4">
+                <div id="wrappedHighlights" class="grid grid-cols-4 gap-2 w-full mx-auto">
+                  <!-- Mini cards go here -->
+                </div>
+              </div>
+
+              <div class="w-full flex justify-center pb-4 pt-[20px]">
+                <div
+                  class="px-8 py-2 rounded-full border border-white/10 bg-zinc-950/40 backdrop-blur-md text-white/90 text-sm font-hud font-bold tracking-[0.1em] uppercase">
+                  arcblueprinttracker.web.app
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Pill Buttons -->
+        <div id="wrappedActions" class="flex gap-4 justify-center w-full px-4">
+          <button id="closeWrappedBtn"
+            class="flex-1 md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white font-bold transition-all border border-white/10 backdrop-blur-xl">Close</button>
+          <button id="downloadWrappedBtn"
+            class="flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30">Download</button>
+        </div>
+      </div>
+
+      <!-- Capture Mode Close Button (Fixed at bottom for reliability) -->
+      <div id="captureModeActions"
+        class="hidden fixed bottom-10 left-0 right-0 z-[10001] px-8 flex flex-col items-center gap-4 pointer-events-none">
+
+        <!-- Informational Pill (Compact) -->
+        <div
+          class="px-5 py-2 rounded-full bg-emerald-600/95 border border-emerald-400/30 text-white shadow-2xl backdrop-blur-xl flex items-center gap-3">
+          <span class="text-sm font-black whitespace-nowrap">Screenshot to Share!</span>
+          <div class="w-px h-3 bg-white/20"></div>
+          <span class="text-[10px] opacity-90 font-bold uppercase tracking-wider whitespace-nowrap">Desktop for
+            download</span>
+        </div>
+
+        <button id="exitCaptureBtn"
+          class="w-full max-w-sm py-4 rounded-full bg-zinc-900 border border-emerald-500/30 text-emerald-400 font-bold text-lg backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] active:scale-95 transition-transform pointer-events-auto">
+          Back
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcements Drawer (Slide-Over) -->
+  <div id="announcementsDrawer" class="fixed inset-0 z-[200] hidden">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/60 transition-opacity duration-300 opacity-0"></div>
+
+    <!-- Slide Panel -->
+    <div
+      class="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-zinc-950/60 backdrop-blur border-l border-zinc-800 flex flex-col shadow-2xl transition-transform duration-300 translate-x-full">
+
+      <!-- Header -->
+      <div
+        class="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          Updates & News
+        </h2>
+        <div class="flex items-center gap-1">
+          <!-- DEV: Mark All Unread -->
+          <button id="markAllReadBtn"
+            class="p-2 text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-zinc-900"
+            title="Mark All as Read">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+          <button id="devResetAnnouncements"
+            class="p-2 text-zinc-600 hover:text-red-400 transition-colors rounded-lg hover:bg-zinc-900"
+            title="Reset Read State">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button id="closeAnnouncementsBtn"
+            class="p-2 text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-zinc-900">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Feed -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-3" id="announcementsFeed">
+        <!-- Post 0: Update v1.5 -->
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-emerald-500/30 transition-colors cursor-pointer announcement-card"
+          data-id="update-v1-5">
+          <!-- Header -->
+          <div class="p-4 flex items-start gap-4 relative">
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]">
+            </div>
+
+            <div
+              class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-500">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-0.5">
+                <h3 class="text-zinc-100 font-bold text-sm">ArcBlueprintTracker 1.5 Is here!</h3>
+                <span class="text-[10px] text-zinc-500 font-medium">NEW</span>
+              </div>
+              <p class="text-[11px] text-zinc-400 line-clamp-1 group-hover:text-zinc-300 transition-colors">
+                Version 1.5 is officially live!
+              </p>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-1 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800/50">
+              <p class="mb-3 mt-3">Version 1.5 is officially live! We’ve added new ways to share your progress and
+                manage your inventory with friends.</p>
+
+              <div class="space-y-4">
+                <div>
+                  <h4 class="text-zinc-100 font-bold text-xs uppercase tracking-wider mb-2">2025 Blueprint Wrapped
+                  </h4>
+                  <ul class="list-disc list-inside space-y-1.5 ml-1">
+                    <li><strong>Shareable Stats Card:</strong> Generate a high-res image showing your collection %,
+                      top
+                      categories, and total findings.</li>
+                    <li>This will be migrated into a "Share" feature later.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 class="text-zinc-100 font-bold text-xs uppercase tracking-wider mb-2">The "Spares" System</h4>
+                  <ul class="list-disc list-inside space-y-1.5 ml-1">
+                    <li><strong>Track Extras:</strong> You can now log exactly how many duplicate blueprints you have.
+                    </li>
+                    <li><strong>Quick Menu:</strong> From the "My Collection" tab Right-click any item (or long-press
+                      on
+                      mobile) to instantly add or remove Spares.</li>
+                    <li><strong>Inventory Management:</strong> Perfect for managing items you want to trade or give
+                      away.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 class="text-zinc-100 font-bold text-xs uppercase tracking-wider mb-2">New News Feed & Tips</h4>
+                  <ul class="list-disc list-inside space-y-1.5 ml-1">
+                    <li><strong>Updates Tab:</strong> A new tab for the latest news and patch notes.</li>
+                    <li><strong>Getting Started Guide:</strong> Updated tips for mastering your collection and the new
+                      spares system.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2 mt-5 pt-4 border-t border-zinc-800/50">
+                <div class="flex gap-2">
+                  <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener noreferrer"
+                    class="flex-1 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[10px] font-bold transition-all text-center border border-indigo-500/30">
+                    Join Discord
+                  </a>
+                  <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener noreferrer"
+                    class="flex-1 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white text-[10px] font-bold transition-all text-center border border-rose-500/30">
+                    Support on Ko-fi
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Post 1: Wrapped Announcement -->
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-zinc-700 transition-colors cursor-pointer announcement-card"
+          data-id="wrapped-2025">
+          <!-- Header (Always Visible) -->
+          <div class="p-4 flex items-start gap-3 relative">
+            <!-- Unread Dot -->
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] hidden">
+            </div>
+
+            <div class="w-10 h-10 rounded-lg bg-zinc-800/50 flex items-center justify-center shrink-0 text-emerald-500">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-zinc-100 font-bold text-sm leading-tight mb-1">2025 Blueprint Wrapped</h3>
+              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">See your stats
+                &
+                sharing card!</p>
+            </div>
+          </div>
+
+          <!-- Body (Collapsible) -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-zinc-800/50 mt-1">
+              <p class="mb-4">
+                Curious about your collection progress? Check out your personalized <strong>2025 Wrapped</strong>
+                summary! See your top categories, completion % and more.
+              </p>
+              <div class="p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/50 flex flex-col gap-3">
+                <div class="text-xs text-zinc-300">
+                  Go to <span class="text-white font-bold">My Collection</span> tab & click the button to view!
+                </div>
+                <!-- USER REQUEST: Generate Wrapped Button -->
+                <button id="generateWrappedFromNews"
+                  class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-lg shadow-emerald-500/20">
+                  Generate my Wrapped
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Post 2: Support the Project -->
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-rose-500/30 transition-colors cursor-pointer announcement-card"
+          data-id="kofi-support">
+          <!-- Header -->
+          <div class="p-4 flex items-start gap-3 relative">
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]">
+            </div>
+
+            <div class="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0 text-rose-500">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-zinc-100 font-bold text-sm leading-tight mb-1">Support the Project</h3>
+              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">Help keep this
+                tracker free and ad-free.</p>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-zinc-800/50 mt-1">
+              <p class="mb-4">
+                This is a passion project I spend a lot of time on. Hosting costs can be expensive, and I want to keep
+                the site <strong>free & ad-free</strong> for everyone.
+              </p>
+              <p class="mb-4">
+                Please consider donating if you can afford it and find this app useful! Every bit helps.
+              </p>
+              <a href="https://ko-fi.com/colddoornob" target="_blank" rel="noopener noreferrer"
+                class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors shadow-lg shadow-rose-500/20">
+                Support on Ko-fi
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Post 3: Discord Invite -->
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-indigo-500/30 transition-colors cursor-pointer announcement-card"
+          data-id="discord-invite">
+          <!-- Header -->
+          <div class="p-4 flex items-start gap-3 relative">
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] hidden">
+            </div>
+
+            <div
+              class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-500">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-zinc-100 font-bold text-sm leading-tight mb-1">Join the Official Discord</h3>
+              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">Join the
+                ArcBlueprintTracker Community.</p>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-zinc-800/50 mt-1">
+              <p class="mb-3">Connect with other Raiders! Join the official Discord to:</p>
+              <ul class="space-y-2 list-disc list-inside marker:text-indigo-500 text-xs mb-4">
+                <li>Discuss Arc Raiders.</li>
+                <li>Post your <strong class="text-white">Blueprint Wrapped</strong>.</li>
+                <li>Request future features for this tracker.</li>
+                <li>Stay updated on the latest news.</li>
+              </ul>
+              <a href="https://discord.gg/FjmBw58kkT" target="_blank" rel="noopener noreferrer"
+                class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-lg shadow-indigo-500/20">
+                Join Server
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <article
+          class="bg-zinc-900/50 rounded-xl border border-zinc-800 overflow-hidden group hover:border-zinc-700 transition-colors cursor-pointer announcement-card"
+          data-id="tutorial-001">
+          <!-- Header -->
+          <div class="p-4 flex items-start gap-3 relative">
+            <!-- Unread Dot -->
+            <div
+              class="unread-dot absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] hidden">
+            </div>
+
+            <div class="w-10 h-10 rounded-lg bg-zinc-800/50 flex items-center justify-center shrink-0 text-zinc-400">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-zinc-100 font-bold text-sm leading-tight mb-1">Getting Started</h3>
+              <p class="text-xs text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">Complete guide
+                to using the tracker.</p>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="announcement-body max-h-0 opacity-0 transition-all duration-300 ease-in-out bg-zinc-900/30">
+            <div class="p-4 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-zinc-800/50 mt-1 space-y-4">
+              <p>Welcome to the Arc Blueprint Tracker!</p>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Blueprints Tab</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>Tap a Blueprint to see information on where you can get it.</li>
+                  <li>Most likely spawn location, or if it is a Quest or Trial reward.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">My Collection Tab</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>Switch to the My Collection tab to keep track of your collection.</li>
+                  <li>
+                    <div class="inline-flex flex-wrap items-center gap-1 align-top">
+                      <span>Tap a Blueprint to mark it as</span>
+                      <span class="inline-flex items-center gap-1 text-emerald-500 font-bold">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Collected
+                      </span>
+                    </div>
+                  </li>
+                  <li>
+                    <div class="inline-flex flex-wrap items-center gap-1 align-top">
+                      <span>Tap it again to mark it as</span>
+                      <span class="inline-flex items-center gap-1 text-amber-400 font-bold">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        Wishlisted
+                      </span>
+                    </div>
+                  </li>
+                  <li>Right-click (or long-press on mobile) for quick actions menu, where you can add <strong
+                      class="text-sky-400 font-bold">spares</strong> of a
+                    Blueprint (meaning you have extra to trade or give to a friend).</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Sign in to Sync</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>Make sure you signed in to sync your progress, tracked items, and submitted Blueprint locations
+                    for your wrapped page.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Reporting</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>After you find a Blueprint please submit your findings on the My Collection tab!</li>
+                  <li>Any information you can add helps a lot, especially the Map, Condition, and Container type.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Filters</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>Tap the filters icon to filter through items however you want.</li>
+                  <li>Collected, Wishlisted, Weapons, Augments.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Share Page / Wrapped</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>You got that right, we have a "Wrapped" sharable inventory image that shows your completion and
+                    more!</li>
+                  <li>You have to see for yourself in the "My Collection" page!</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="text-white font-bold text-xs uppercase tracking-wider mb-2">Data Confidence Disclaimer</h4>
+                <ul class="list-disc list-inside space-y-1 text-xs">
+                  <li>This data is based on thousands of User Reported Blueprint spawns.</li>
+                  <li>This data is meant to point you to the most likely spawn for these items.</li>
+                  <li>If the Data Confidence is marked as "Low" or "Not Enough Data" take the findings with a grain of
+                    salt.</li>
+                  <li>Data will continue to be updated with user reports so please submit your findings!</li>
+                </ul>
+              </div>
+
+            </div>
+          </div>
+        </article>
+
+        <div class="text-center py-6 text-zinc-700 text-[10px] uppercase tracking-wider font-semibold">
+          End of updates
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Context Menu -->
+  <div id="itemContextMenu" class="fixed z-[90] opacity-0 pointer-events-none">
+    <div class="glass-panel py-1.5 min-w-[180px] overflow-hidden">
+      <button id="contextCollectedBtn" data-action="collected"
+        class="context-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span id="contextCollectedText">Mark as Collected</span>
+      </button>
+      <button id="contextWishlistBtn" data-action="wishlisted"
+        class="context-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-amber-500/20 hover:text-amber-400 transition-colors">
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+          <path
+            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+        <span id="contextWishlistText">Mark as Wishlisted</span>
+      </button>
+      <div class="border-t border-zinc-700/50 my-1"></div>
+      <!-- Inline Spares Stepper -->
+      <div class="px-4 py-2.5 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-zinc-300">
+          <svg class="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <span>Spares:</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="contextSparesMinus"
+            class="w-6 h-6 rounded-md bg-zinc-800 hover:bg-red-500/30 text-zinc-300 hover:text-red-400 flex items-center justify-center transition-colors border border-zinc-700/50">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+            </svg>
+          </button>
+          <span id="contextSparesCount" class="text-sm font-bold text-white min-w-[2ch] text-center">0</span>
+          <button id="contextSparesPlus"
+            class="w-6 h-6 rounded-md bg-zinc-800 hover:bg-emerald-500/30 text-zinc-300 hover:text-emerald-400 flex items-center justify-center transition-colors border border-zinc-700/50">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
+
+  <!-- SVG Filter for Global Chromatic Aberration -->
+  <svg style="display: none;">
+    <defs>
+      <filter id="chromatic-aberration">
+        <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
+        <feOffset in="red" dx="3" dy="0" result="red_offset" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
+        <feOffset in="green" dx="0" dy="0" result="green_offset" />
+        <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
+        <feOffset in="blue" dx="-3" dy="0" result="blue_offset" />
+        <feMerge>
+          <feMergeNode in="red_offset" />
+          <feMergeNode in="green_offset" />
+          <feMergeNode in="blue_offset" />
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
 </body>
 
 </html>

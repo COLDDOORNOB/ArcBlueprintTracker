@@ -1,30 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --cardSize: 170px;
 }
 
+/* =====================================================
+   Typography System
+   - Barlow: Body text, inputs, general content
+   - Urbanist: Tabs, navigation, section headings
+   - Prompt: Hero headings, large titles, emphasis
+   - JetBrains Mono: HUD elements, stats, counters
+   ===================================================== */
+
+/* Base body font - Barlow for readability */
 body {
+  font-family: 'Barlow', system-ui, sans-serif;
   overflow-y: scroll;
   /* Always show scrollbar to prevent layout shift */
+  position: relative;
+  min-height: 100vh;
+
+  /* Background Base */
+  background-color: #000;
+}
+
+/* Tab buttons and navigation - Urbanist for modern feel */
+.tab-button,
+.tab-nav,
+.chip,
+.context-menu-item,
+.nav-circle-btn {
+  font-family: 'Urbanist', system-ui, sans-serif;
+}
+
+/* Section headings and titles - Urbanist */
+h3,
+h4,
+h5,
+h6,
+.type-tab span,
+.details-label {
+  font-family: 'Urbanist', system-ui, sans-serif;
+}
+
+/* Large hero headings - Prompt for impact */
+h1,
+h2,
+.text-6xl,
+.text-7xl,
+.text-3xl,
+.text-2xl,
+.font-black {
+  font-family: 'Prompt', system-ui, sans-serif;
+}
+
+/* HUD elements - JetBrains Mono for technical feel */
+.font-mono,
+#progressPercent,
+#statSubmissionCount,
+#resultCount,
+#contextSparesCount,
+.spares-pill,
+.confidence-dot+span,
+.details-value {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Progression percentage - extra bold */
+#progressionSign {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 600;
+}
+
+/* Input fields - Barlow (inherited from body) */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
 }
 
 /* GPU-accelerated background on a separate layer that won't break fixed positioning */
+/* Scrolling Background - Tiled Lines Pattern */
 body::before {
   content: "";
-  position: fixed;
+  position: absolute;
+  /* Scrolls with the page */
   top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
-  background-image: url("/Background/stripes.webp");
-  background-repeat: no-repeat;
-  background-position: left top;
-  background-size: auto 100vh;
+  height: 100%;
+  min-height: 100vh;
+  background-image: url("/Background/Lines_Background_1_BW.webp");
+  background-repeat: repeat-y;
+  /* Stack vertically for seamless scroll */
+  background-position: center top;
+  background-size: 100% auto;
+  /* Full width, stack height */
   z-index: -1;
   pointer-events: none;
-  /* GPU acceleration on the pseudo-element, not body */
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+
+  /* B&W and Blur Effect */
+  filter: grayscale(100%) blur(4px) brightness(0.4);
+}
+
+/* Mobile Background Zoom & Alternating Pattern */
+@media (max-width: 768px) {
+  body::before {
+    background-image: url("/Background/Lines_Background_1_BW.webp");
+    background-size: auto 160vh;
+    /* 2x Zoom (was 80vh) */
+    background-position: center top;
+    /* Mask: Show 0-160, Hide 160-320 */
+    -webkit-mask-image: repeating-linear-gradient(to bottom, black 0, black 160vh, transparent 160vh, transparent 320vh);
+    mask-image: repeating-linear-gradient(to bottom, black 0, black 160vh, transparent 160vh, transparent 320vh);
+  }
+
+  body::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    background-image: url("/Background/Lines_Background_2_BW.webp");
+    background-repeat: repeat-y;
+    background-size: auto 160vh;
+    background-position: center top;
+    z-index: -1;
+    pointer-events: none;
+    transform: scaleX(-1);
+    /* Flip horizontally */
+
+    /* Same filters */
+    filter: grayscale(100%) blur(4px) brightness(0.4);
+
+    /* Mask: Hide 0-160, Show 160-320 */
+    -webkit-mask-image: repeating-linear-gradient(to bottom, transparent 0, transparent 160vh, black 160vh, black 320vh);
+    mask-image: repeating-linear-gradient(to bottom, transparent 0, transparent 160vh, black 160vh, black 320vh);
+  }
+}
+
+/* Mirrored background removed as requested (single image) */
+
+/* Low Cost Film Grain Overlay */
+#bg-grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Behind content, over background */
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.80' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  /* Tile small chunks for sharpness */
+  opacity: 0.08;
+  mix-blend-mode: screen;
+  filter: contrast(200%) grayscale(100%);
+}
+
+
+/* Main Grid Layout - Responsive Cards */
+#grid {
+  grid-template-columns: repeat(auto-fill, minmax(var(--cardSize), 1fr));
 }
 
 /* Custom Scrollbar */
@@ -71,10 +212,11 @@ input[type=range]::-webkit-slider-runnable-track {
   border-radius: 2px;
 }
 
-/* Card Styles */
-/* Card Styles */
+/* Card Styles - Optimized */
 .card-compact {
   container-type: inline-size;
+
+  /* Estimate height to prevent scrollbar jumpiness */
   -webkit-touch-callout: none;
   /* Disable iOS context menu/preview */
   -webkit-user-select: none;
@@ -109,8 +251,20 @@ input[type=range]::-webkit-slider-runnable-track {
   pointer-events: none;
 }
 
-.card-compact:hover .rarity-frame {
+/* .card-compact:hover .rarity-frame {
   box-shadow: 0 0 12px var(--glow-color);
+} */
+
+.rarity-corner {
+  position: absolute;
+  top: 12cqi;
+  /* ~12% of card width, scales with card size */
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  pointer-events: none;
+  border-top-right-radius: inherit;
 }
 
 /* Type Pill - Responsive Scaling */
@@ -119,10 +273,12 @@ input[type=range]::-webkit-slider-runnable-track {
   bottom: 5px;
   left: 5px;
   border-radius: 999px;
-  padding: clamp(6px, 4cqi, 12px) clamp(8px, 5cqi, 14px);
+  padding: 4cqi 5cqi;
+  /* Scaled padding - 30% larger */
   display: flex;
   align-items: center;
-  gap: clamp(6px, 3cqi, 10px);
+  gap: 4cqi;
+  /* Scaled gap - 30% larger */
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
   background: rgba(24, 24, 27, 0.40);
@@ -133,14 +289,16 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .type-tab img {
-  width: clamp(16px, 10cqi, 24px);
-  height: clamp(16px, 10cqi, 24px);
+  width: 13cqi;
+  /* Scaled icon - 30% larger */
+  height: 13cqi;
   flex: 0 0 auto;
   image-rendering: -webkit-optimize-contrast;
 }
 
 .type-tab span {
-  font-size: clamp(10px, 7cqi, 13px);
+  font-size: 9cqi;
+  /* Scaled font - 30% larger */
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   overflow: hidden;
@@ -159,11 +317,13 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 2000;
   border-radius: 16px;
   padding: 14px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  background: rgba(24, 24, 27, 0.40);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  -webkit-user-select: text;
+  /* Enable text selection */
+  user-select: text;
+  cursor: auto;
+  /* Default cursor for text selection */
 }
+
 
 .details-row {
   display: grid;
@@ -248,23 +408,20 @@ input[type=range]::-webkit-slider-runnable-track {
   /* Ensure pill stays on top of image (z-10) */
 }
 
+/* Rarity Corner adjustment for Data Registry rows */
+#dataTab .rarity-corner {
+  top: calc(10cqi + 12px);
+  /* base 10cqi + 12px offset for data rows */
+}
+
 /* Mobile Optimizations */
 @media (max-width: 768px) {
   .type-tab {
-    /* Reduce pill size by 30% on mobile - using cqi for consistent scaling */
-    padding: clamp(4px, 3cqi, 8px) clamp(6px, 4cqi, 10px);
-    gap: clamp(4px, 2.5cqi, 7px);
+    /* Uses main definition cqi now, keep consistent */
     max-width: 85cqi;
   }
 
-  .type-tab img {
-    width: clamp(11px, 8cqi, 17px);
-    height: clamp(11px, 8cqi, 17px);
-  }
-
-  .type-tab span {
-    font-size: clamp(8px, 6cqi, 9px);
-  }
+  /* Removed old clamp sizes to rely on cqi */
 
   /* Collection Progress Fixes */
   #collectionProgressContainer {
@@ -434,6 +591,9 @@ input[type=range]::-webkit-slider-runnable-track {
   justify-content: center;
 }
 
+/* Force hide desktop toggle on mobile (Specificity Fix) */
+
+
 .tab-button {
   padding: 12px 32px;
   border-radius: 999px;
@@ -521,10 +681,14 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Collected Badge (Blueprints Tab) */
 .collected-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
+  bottom: 5cqi;
+  /* Scaled */
+  right: 5cqi;
+  /* Scaled */
+  width: 16cqi;
+  /* Scaled - 30% larger */
+  height: 16cqi;
+  /* Scaled - 30% larger */
   background: #22c55e;
   border-radius: 50%;
   display: flex;
@@ -535,8 +699,10 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .collected-badge svg {
-  width: 14px;
-  height: 14px;
+  width: 10cqi;
+  /* Scaled - 30% larger */
+  height: 10cqi;
+  /* Scaled - 30% larger */
   stroke: white;
   stroke-width: 3;
   fill: none;
@@ -556,7 +722,7 @@ input[type=range]::-webkit-slider-runnable-track {
   position: fixed !important;
   bottom: 20px;
   right: 20px;
-  z-index: 9999;
+  z-index: 40;
   box-shadow: 0 8px 20px -5px rgba(4, 120, 87, 0.5);
 }
 
@@ -574,6 +740,17 @@ input[type=range]::-webkit-slider-runnable-track {
   animation: toastSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Mobile: Position toast at bottom right over the FAB */
+@media (max-width: 768px) {
+  #collectToast {
+    left: auto;
+    right: 12px;
+    bottom: 20px;
+    transform: none;
+    animation: toastSlideUpRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
 @keyframes toastSlideUp {
   from {
     opacity: 0;
@@ -583,6 +760,18 @@ input[type=range]::-webkit-slider-runnable-track {
   to {
     opacity: 1;
     transform: translate(-50%, 0);
+  }
+}
+
+@keyframes toastSlideUpRight {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -678,10 +867,14 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Wishlist visual styles */
 .wishlist-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
+  bottom: 5cqi;
+  /* Scaled */
+  right: 5cqi;
+  /* Scaled */
+  width: 16cqi;
+  /* Scaled - 30% larger */
+  height: 16cqi;
+  /* Scaled - 30% larger */
   background: #fbbf24;
   /* Amber-400 */
   border-radius: 50%;
@@ -693,8 +886,10 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .wishlist-badge svg {
-  width: 14px;
-  height: 14px;
+  width: 10cqi;
+  /* Scaled - 30% larger */
+  height: 10cqi;
+  /* Scaled - 30% larger */
   fill: #78350f;
   /* Amber-900 */
   stroke: none;
@@ -707,4 +902,683 @@ input[type=range]::-webkit-slider-runnable-track {
   z-index: 5;
   pointer-events: none;
   border-radius: 16px;
+}
+
+/* Selected State */
+.card-selected .rarity-frame {
+  border-color: var(--glow-color) !important;
+  box-shadow: 0 0 15px var(--glow-color);
+  transform: scale(1.02);
+  z-index: 40;
+}
+
+/* Ensure the details overlay is above */
+.card-selected .details-overlay {
+  z-index: 50;
+}
+
+/* === Mass Collection Mode === */
+.mass-collect-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(9, 9, 11, 0.2);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 17px;
+  /* Match card radius */
+  pointer-events: none;
+  /* Clicks passed via JS logic on card, but visual layer */
+  transition: all 0.2s ease;
+}
+
+/* Show overlays when mode is active */
+.mass-collect-mode .mass-collect-overlay {
+  display: flex;
+}
+
+.mass-collect-text {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #e4e4e7;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.mass-collect-mode .card-compact {
+  cursor: pointer !important;
+}
+
+/* Icon Container for overlapping transitions */
+.mass-collect-icons {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.mass-collect-icon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Bouncy spin */
+}
+
+/* Uncollected State (Default) */
+.mass-collect-overlay .icon-plus {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: #e4e4e7;
+}
+
+.mass-collect-overlay .icon-check {
+  opacity: 0;
+  transform: rotate(180deg) scale(0.5);
+  color: #22c55e;
+}
+
+/* Collected State */
+.overlay-collected {
+  background: rgba(9, 9, 11, 0.5) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.overlay-collected .mass-collect-text {
+  color: #22c55e;
+}
+
+.overlay-collected .icon-plus {
+  opacity: 0;
+  transform: rotate(-180deg) scale(0.5);
+}
+
+.overlay-collected .icon-check {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+/* Shared Glass Panel Style */
+.glass-panel {
+  @apply backdrop-blur-md bg-zinc-900/40 border border-white/10 shadow-2xl rounded-2xl;
+  isolation: isolate;
+}
+
+/* Reusable Text Glow - Soft Emerald */
+.text-glow-soft {
+  text-shadow: 0 0 20px rgba(52, 211, 153, 0.13), 0 0 3px rgba(52, 211, 153, 0.38);
+}
+
+/* ==========================================
+   CONTAINER PICKER STYLES
+   ========================================== */
+
+/* Container Result Item */
+.container-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.container-result:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.container-result:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+/* Container Image Preview with CRT Effect */
+.container-preview {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  /* Default size for dropdown items - 75% larger than original 45px */
+  width: 80px;
+  height: 80px;
+}
+
+.container-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Container Result Text */
+.container-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.container-result-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fafafa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.container-result-pool {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 2px;
+}
+
+/* Container Dropdown Scrollbar */
+#containerDropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+#containerDropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#containerDropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+#containerDropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Fullscreen Container Picker Grid Cards */
+.container-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(39, 39, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  container-type: inline-size;
+}
+
+.container-picker-card:hover {
+  background: rgba(63, 63, 70, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.container-picker-card:active {
+  transform: scale(0.98);
+}
+
+.container-picker-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+  background: rgba(24, 24, 27, 0.8);
+  margin-bottom: 8px;
+}
+
+.container-picker-card .card-name {
+  font-size: clamp(0.7rem, 10cqw, 1rem);
+  font-weight: 700;
+  color: #fafafa;
+  text-align: center;
+  line-height: 1.1;
+  max-width: 100%;
+  margin-top: 2px;
+  /* Multi-line clamp instead of ellipsis */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.container-picker-card .card-pool {
+  font-size: 10px;
+  color: #71717a;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* Container Picker Modal Animation */
+#containerPickerModal {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#containerPickerModal.flex {
+  opacity: 1;
+}
+
+/* Map Picker Styles */
+#mapPickerModal {
+  /* z-index set inline to 10002 */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#mapPickerModal:not(.hidden) {
+  opacity: 1;
+  display: flex !important;
+}
+
+/* Leaflet Dark Theme Overrides */
+.leaflet-container {
+  background: #09090b !important;
+  font-family: 'Urbanist', sans-serif;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  background-color: #18181b !important;
+  color: #e4e4e7 !important;
+  border-bottom: 1px solid #27272a !important;
+  transition: background-color 0.2s;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background-color: #27272a !important;
+  color: white !important;
+}
+
+.leaflet-bar {
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.active-map-tab {
+  background: #10b981 !important;
+  border-color: #059669 !important;
+  color: white !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(24, 24, 27, 0.95);
+  backdrop-filter: blur(8px);
+  color: #e4e4e7;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.leaflet-popup-tip {
+  background: rgba(24, 24, 27, 0.95);
+}
+
+#mapInstructions {
+  pointer-events: none;
+}
+
+/* =====================================================
+   CRT/Monitor Visual Effects for Map Picker
+   ===================================================== */
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.97;
+  }
+
+  5% {
+    opacity: 0.90;
+  }
+
+  10% {
+    opacity: 0.94;
+  }
+
+  15% {
+    opacity: 0.98;
+  }
+
+  20% {
+    opacity: 0.95;
+  }
+
+  25% {
+    opacity: 0.91;
+  }
+
+  30% {
+    opacity: 0.94;
+  }
+
+  35% {
+    opacity: 0.96;
+  }
+
+  40% {
+    opacity: 0.98;
+  }
+
+  45% {
+    opacity: 0.92;
+  }
+
+  50% {
+    opacity: 0.95;
+  }
+
+  55% {
+    opacity: 0.99;
+  }
+
+  60% {
+    opacity: 0.92;
+  }
+
+  65% {
+    opacity: 0.98;
+  }
+
+  70% {
+    opacity: 0.99;
+  }
+
+  75% {
+    opacity: 0.96;
+  }
+
+  80% {
+    opacity: 0.90;
+  }
+
+  85% {
+    opacity: 0.97;
+  }
+
+  90% {
+    opacity: 0.93;
+  }
+
+  95% {
+    opacity: 0.99;
+  }
+
+  100% {
+    opacity: 0.94;
+  }
+}
+
+@keyframes scanline-move {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 0 100vh;
+  }
+}
+
+/* CRT Container: The "Monitor" chassis */
+.crt-container {
+  position: relative;
+  overflow: hidden;
+  background: #090c12;
+  /* 33% Darker than #0e121b */
+  box-shadow:
+    0 0 0 4px #090c12,
+    /* Match bezel */
+    0 0 0 8px #05070a,
+    /* Even darker outer bezel */
+    0 0 20px rgba(9, 12, 18, 0.8);
+  border-radius: 12px;
+}
+
+/* Enhances the map layer to look like a screen */
+.crt-screen {
+  position: relative;
+  z-index: 1;
+  filter: contrast(1.1) brightness(1.1) saturate(1.1);
+  /* Window Mask Removed - now tracking image via .crt-map-image */
+}
+
+/* Force Leaflet to be transparent so we see the container background */
+.leaflet-container {
+  background: transparent !important;
+}
+
+/* Performance Optimization for Smooth Zoom */
+.leaflet-zoom-animated {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  /* Force HW accel */
+}
+
+/* 
+   Main Map Layer: Sharp, rounded corners.
+*/
+.crt-map-image {
+  /* No mask - sharp edges with rounding */
+  mask-image: none;
+  -webkit-mask-image: none;
+  border-radius: 40px;
+  /* Requested rounding */
+  z-index: 10;
+}
+
+/* Glow Layer removed */
+
+/* Common Overlay Base */
+.crt-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Vignette removed - using mask + background color instead */
+
+/* Scanlines: RGB TV Mask */
+.crt-scanlines {
+  background: linear-gradient(to bottom,
+      rgba(255, 0, 0, 0.15) 0%,
+      rgba(255, 0, 0, 0.15) 33.3%,
+      rgba(0, 255, 0, 0.15) 33.3%,
+      rgba(0, 255, 0, 0.15) 66.6%,
+      rgba(0, 0, 255, 0.15) 66.6%,
+      rgba(0, 0, 255, 0.15) 100%);
+  background-size: 100% 3px;
+  opacity: 0.5;
+  mix-blend-mode: hard-light;
+  pointer-events: none;
+}
+
+/* Flicker Animation to simulate refresh rate instability */
+.crt-flicker-anim {
+  animation: crt-flicker 0.15s infinite;
+  background: rgba(255, 255, 255, 0.02);
+  mix-blend-mode: overlay;
+  will-change: opacity;
+}
+
+/* Color Separation / Chromatic Aberration (Simulated via text shadow / border, or subtle gradient mix) */
+/* Real RGB shift is hard without Canvas/WebGL, but we can fake a "phosphor" grid or tint */
+.crt-phosphor {
+  /* Tiny grid pattern to simulate RGB mask */
+  background-image: radial-gradient(circle, rgba(20, 255, 20, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: screen;
+  opacity: 0.2;
+}
+
+/* Scanline Sweep Removed */
+/* Scanline Sweep Removed */
+
+/* Removed separate aberration - merged into scanlines/RGB effect */
+
+/* Optional: Slight color shift pulse */
+.crt-pulse {
+  animation: crt-color-pulse 8s infinite ease-in-out;
+  will-change: filter;
+}
+
+@keyframes crt-color-pulse {
+
+  0%,
+  100% {
+    filter: hue-rotate(0deg);
+  }
+
+  50% {
+    filter: hue-rotate(3deg);
+  }
+}
+
+/* =====================================================
+   Data Tab Secondary Navigation (Drop Registry / Heatmap)
+   ===================================================== */
+
+.data-tab-container {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.data-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Urbanist', system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.data-tab:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.data-tab-active {
+  color: #fff;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow:
+    0 0 20px rgba(16, 185, 129, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.data-tab-active::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), transparent 60%);
+  z-index: -1;
+  opacity: 0.5;
+}
+
+.data-tab-disabled {
+  color: rgba(161, 161, 170, 0.8);
+  background: rgba(63, 63, 70, 0.4);
+  border-color: rgba(63, 63, 70, 0.5);
+  cursor: not-allowed;
+}
+
+.data-tab-disabled:hover {
+  background: rgba(63, 63, 70, 0.5);
+  color: rgba(161, 161, 170, 0.9);
+}
+
+.data-tab-disabled .data-tab-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.2;
+}
+
+.data-tab-disabled .data-tab-sublabel {
+  font-size: 10px;
+  font-weight: 500;
+  font-style: italic;
+  color: rgba(161, 161, 170, 0.4);
+}
+
+.data-tab-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+}
+
+/* Desktop: Reduce card overlay elements by 15% */
+@media (min-width: 768px) {
+
+  /* Collected Badge - 20% smaller on desktop */
+  .collected-badge {
+    bottom: 4cqi;
+    right: 4cqi;
+    width: 11cqi;
+    height: 11cqi;
+  }
+
+  .collected-badge svg {
+    width: 7cqi;
+    height: 7cqi;
+  }
+
+  /* Wishlist Badge - 15% smaller on desktop */
+  .wishlist-badge {
+    bottom: 4cqi;
+    right: 4cqi;
+    width: 14cqi;
+    height: 14cqi;
+  }
+
+  .wishlist-badge svg {
+    width: 9cqi;
+    height: 9cqi;
+  }
+
+  /* Type Tab / Confidence Pill - 15% smaller on desktop */
+  .type-tab {
+    padding: 3.5cqi 4.5cqi;
+    gap: 3.5cqi;
+  }
+
+  .type-tab img {
+    width: 11cqi;
+    height: 11cqi;
+  }
+
+  .type-tab span {
+    font-size: 8cqi;
+  }
+
+  /* Spares Pill - 15% smaller on desktop */
+  .spares-pill {
+    top: 4cqi !important;
+    right: 4cqi !important;
+    padding: 4cqi 2.5cqi !important;
+    font-size: 7cqi !important;
+  }
 }

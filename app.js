@@ -1,9 +1,11 @@
-import { animate, stagger } from "motion";
+﻿import { animate, stagger } from "motion";
 import { auth, db, googleProvider } from "./firebase-config.js";
-import { onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const CSV_URL_DEFAULT = "./data.csv";
+let toastTimeout = null;
+let pendingBlueprintName = null;
 
 // Since we are now a module, we must attach global initialization to window if it's called from HTML
 // However, existing onclicks in HTML might break if functions aren't on window.
@@ -32,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   safeInit("Blueprint Submission", initBlueprintSubmission);
   safeInit("Wrapped", initWrapped);
   safeInit("Announcements", initAnnouncements);
+  safeInit("Sidebar", initSidebar);
   safeInit("Context Menu", initContextMenu);
 
   // loadData is core, but we wrap it too just in case
@@ -61,7 +64,7 @@ function normalizeWikiStem(stem) {
   // We match optional space before ( and inside the parentheses
   stem = stem.replace(/\s*\(/g, "_").replace(/\)/g, "_");
   // Trigger_'Nade -> Trigger_Nade
-  stem = stem.replace(/['’]/g, "");
+  stem = stem.replace(/['â€™]/g, "");
   // Spaces -> underscores (including non-breaking spaces)
   stem = stem.replace(/\s/g, "_");
   // Collapse multiple underscores into one
@@ -89,6 +92,11 @@ function loadCollectionState() {
       } else {
         if (parsed.collected) state.collectedItems = new Set(parsed.collected);
         if (parsed.wishlist) state.wishlistedItems = new Set(parsed.wishlist);
+
+        // Cleanup inconsistencies (Mutually exclusive: Collected trumps Wishlist)
+        state.collectedItems.forEach(item => {
+          if (state.wishlistedItems.has(item)) state.wishlistedItems.delete(item);
+        });
       }
     }
   } catch (e) {
@@ -141,7 +149,9 @@ function saveFilters() {
       conds: Array.from(state.filters.conds),
       confs: Array.from(state.filters.confs),
       collected: state.filters.collected,
-      sort: state.filters.sort
+      sort: state.filters.sort, // Legacy fallback
+      sortBlueprints: state.filters.sortBlueprints,
+      sortData: state.filters.sortData
     };
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -160,7 +170,9 @@ function loadFilters() {
       if (parsed.conds) state.filters.conds = new Set(parsed.conds);
       if (parsed.confs) state.filters.confs = new Set(parsed.confs);
       if (parsed.collected) state.filters.collected = parsed.collected;
-      if (parsed.sort) state.filters.sort = parsed.sort;
+      if (parsed.sort) state.filters.sortBlueprints = parsed.sort; // Legacy migration
+      if (parsed.sortBlueprints) state.filters.sortBlueprints = parsed.sortBlueprints;
+      if (parsed.sortData) state.filters.sortData = parsed.sortData;
     }
   } catch (e) {
     console.error("Failed to load filters:", e);
@@ -229,6 +241,19 @@ function updateCardVisuals(frame, itemName) {
       frame.appendChild(hint);
     }
   }
+
+  // Mass Collect Overlay Logic
+  // Overlay is now inside the frame (image/border area) so we query frame directly
+  let overlay = frame.querySelector(".mass-collect-overlay");
+  if (overlay) {
+    if (isCollected) {
+      overlay.classList.add("overlay-collected");
+      overlay.querySelector(".mass-collect-text").textContent = "Collected";
+    } else {
+      overlay.classList.remove("overlay-collected");
+      overlay.querySelector(".mass-collect-text").innerHTML = "Click to<br>Collect";
+    }
+  }
 }
 
 function cycleItemStatus(itemName, frame) {
@@ -245,8 +270,8 @@ function cycleItemStatus(itemName, frame) {
   } else {
     // Was Uncollected -> Make Collected
     state.collectedItems.add(itemName);
-    // Show toast asking for location data (only on collection tab)
-    if (state.currentTab === "collection") {
+    // Show toast asking for location data (only on blueprints tab now)
+    if (state.currentTab === "blueprints") {
       showCollectToast(itemName);
     }
   }
@@ -343,12 +368,12 @@ document.addEventListener("DOMContentLoaded", () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (bar) {
-            // Slower animation: 2.5s
-            bar.style.transition = "width 2.5s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 2.5s linear";
+            // Slower animation: 1.75s
+            bar.style.transition = "width 1.75s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 1.75s linear";
             updateProgress(); // Sets width and final color
           }
           if (pctEl) {
-            animateNumber(pctEl, 0, targetPercent, 2500);
+            animateNumber(pctEl, 0, targetPercent, 1750);
           }
         });
       });
@@ -370,6 +395,7 @@ async function syncToCloud() {
     await setDoc(userRef, {
       collectedItems: Array.from(state.collectedItems),
       wishlistedItems: Array.from(state.wishlistedItems),
+      spares: state.spares, // Save Spares to Cloud
       lastSync: new Date().toISOString(),
       updatedAt: new Date()
     }, { merge: true });
@@ -393,7 +419,10 @@ async function loadFromCloud(user) {
         // MERGE logic for Collected
         const cloudCollected = new Set(data.collectedItems);
         const preSize = state.collectedItems.size;
-        cloudCollected.forEach(item => state.collectedItems.add(item));
+        cloudCollected.forEach(item => {
+          state.collectedItems.add(item);
+          state.wishlistedItems.delete(item); // Enforce exclusivity
+        });
         if (state.collectedItems.size > preSize) changed = true;
       }
 
@@ -401,8 +430,27 @@ async function loadFromCloud(user) {
         // MERGE logic for Wishlist
         const cloudWish = new Set(data.wishlistedItems);
         const preSize = state.wishlistedItems.size;
-        cloudWish.forEach(item => state.wishlistedItems.add(item));
+        cloudWish.forEach(item => {
+          // Only add if not collected (Collected trumps Wishlist)
+          if (!state.collectedItems.has(item)) {
+            state.wishlistedItems.add(item);
+          }
+        });
         if (state.wishlistedItems.size > preSize) changed = true;
+        if (state.wishlistedItems.size > preSize) changed = true;
+      }
+
+      // Merge Spares
+      if (data.spares) {
+        // We will take the max of local vs cloud to be safe, or just cloud if simple
+        // Let's iterate cloud keys
+        Object.entries(data.spares).forEach(([item, count]) => {
+          const current = state.spares[item] || 0;
+          if (count > current) {
+            state.spares[item] = count;
+            changed = true;
+          }
+        });
       }
 
       if (changed) {
@@ -449,16 +497,19 @@ function initAuth() {
       console.log("Attempting Google Sign-in...");
       // FORCE "Local" Persistence (Keep logged in indefinitely)
       await setPersistence(auth, browserLocalPersistence);
+
+      // Attempt Popup Sign-in
       await signInWithPopup(auth, googleProvider);
       console.log("Sign-in successful!");
     } catch (error) {
       console.error("Firebase Auth Error:", error.code, error.message);
+
       if (error.code === 'auth/popup-closed-by-user') {
         console.warn("Popup was closed before finishing.");
       } else if (error.code === 'auth/operation-not-allowed') {
         alert("Google Sign-in is not enabled in the Firebase Console.");
       } else if (error.code === 'auth/unauthorized-domain') {
-        alert("This domain is not authorized for Firebase Auth. Check your Firebase Console settings.");
+        alert(`Domain unauthorized (${window.location.hostname}). To test mobile, use your LIVE site (arc-blueprint-tracker.web.app) or whitelist this IP in Firebase Console.`);
       } else {
         alert("Sign-in failed: " + error.message);
       }
@@ -496,6 +547,11 @@ function initAuth() {
       if (nameMob) nameMob.textContent = user.displayName || "Explorer";
 
       loadFromCloud(user);
+
+      // Fetch user submission stats if on progression tab
+      if (state.currentTab === "progression") {
+        fetchUserStats();
+      }
     } else {
       // Logged out
       if (loginBtn) loginBtn.classList.remove("hidden");
@@ -506,47 +562,685 @@ function initAuth() {
   });
 }
 
-function switchTab(tabName) {
-  state.currentTab = tabName;
+// =====================================================
+// Reusable Card Creation (for Recent Finds in Progression)
+// =====================================================
+function createCard(item, index) {
+  const card = document.createElement("div");
+  card.className = "card-compact bg-zinc-950 border border-zinc-800/50 rounded-2xl p-2";
+  card.style.position = "relative";
+  card.style.overflow = "visible";
+  card.style.setProperty("--glow-color", rarityColor(item.rarity));
+  card.dataset.name = item.name;
 
-  // Scroll to top when switching tabs (instant for mobile compatibility)
-  window.scrollTo(0, 0);
+  const frame = document.createElement("div");
+  frame.className = "rarity-frame rarity-glow relative overflow-hidden";
+  frame.style.borderColor = rarityColor(item.rarity);
 
-  // Update tab button states
-  const blueprintsBtn = document.getElementById("tabBlueprints");
-  const collectionBtn = document.getElementById("tabCollection");
-  const collectionOnlyElements = document.querySelectorAll(".collection-only");
-  const blueprintsOnlyElements = document.querySelectorAll(".blueprints-only:not(#eventBanner)");
-  const eventBanner = document.getElementById("eventBanner");
+  const imgWrap = document.createElement("div");
+  imgWrap.className = "relative aspect-square rounded-[16px] flex items-center justify-center overflow-hidden";
+  imgWrap.style.background = `
+    linear-gradient(to top right, ${rarityColor(item.rarity)}44 0%, rgba(24,24,27,0.5) 75%),
+    linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)),
+    url('Background/Arc BP Image Background.webp')
+  `;
+  imgWrap.style.backgroundSize = "cover, cover, cover";
+  imgWrap.style.backgroundPosition = "center, center, center";
+  imgWrap.style.backgroundBlendMode = "normal, normal, normal";
+  imgWrap.style.aspectRatio = "1 / 1";
+  imgWrap.style.width = "100%";
 
-  if (tabName === "blueprints") {
-    blueprintsBtn.classList.add("tab-button-active");
-    collectionBtn.classList.remove("tab-button-active");
-    document.body.classList.remove("collection-mode");
-    collectionOnlyElements.forEach(el => el.classList.add("hidden"));
-    blueprintsOnlyElements.forEach(el => el.classList.remove("hidden"));
-    if (!eventBannerDismissed && eventBanner && eventBanner.classList.contains("banner-active")) eventBanner.classList.remove("hidden");
-  } else {
-    blueprintsBtn.classList.remove("tab-button-active");
-    collectionBtn.classList.add("tab-button-active");
-    document.body.classList.add("collection-mode");
-    collectionOnlyElements.forEach(el => el.classList.remove("hidden"));
-    blueprintsOnlyElements.forEach(el => el.classList.add("hidden"));
-    if (eventBanner) eventBanner.classList.add("hidden");
+  const img = document.createElement("img");
+  img.src = item.img || "";
+  img.alt = item.name;
+  img.className = "w-full h-full object-contain p-2 relative z-10 pointer-events-none select-none";
+  img.style.width = "100%";
+  img.style.height = "100%";
+  img.style.objectFit = "contain";
+  img.style.padding = "8px";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitTouchCallout = "none";
+  img.style.userSelect = "none";
+
+  const corner = document.createElement("div");
+  corner.className = "rarity-corner";
+  corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${rarityColor(item.rarity)}66 60%, ${rarityColor(item.rarity)}cc 100%)`;
+
+  const tab = document.createElement("div");
+  tab.className = "type-tab";
+  tab.style.background = rarityColor(item.rarity) + "22";
+  tab.style.borderColor = rarityColor(item.rarity);
+
+  const tabIcon = document.createElement("img");
+  tabIcon.src = item.typeIcon;
+  tabIcon.alt = item.type;
+
+  const tabText = document.createElement("span");
+  tabText.textContent = item.type || "â€”";
+
+  tab.appendChild(tabIcon);
+  tab.appendChild(tabText);
+
+  imgWrap.appendChild(img);
+  imgWrap.appendChild(corner);
+  imgWrap.appendChild(tab);
+
+  const title = document.createElement("div");
+  title.className = "mt-2 px-1 pb-1";
+
+  const name = document.createElement("div");
+  name.className = "font-semibold leading-tight";
+  name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
+  name.textContent = item.name;
+  title.appendChild(name);
+
+  frame.appendChild(imgWrap);
+
+  // Add collected badge if collected
+  if (state.collectedItems.has(item.name)) {
+    const badge = document.createElement("div");
+    badge.className = "collected-badge";
+    badge.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    frame.appendChild(badge);
+
+    const glow = document.createElement("div");
+    glow.className = "collected-glow";
+    frame.appendChild(glow);
   }
 
-  applyFilters();
+  card.appendChild(frame);
+  card.appendChild(title);
+
+  return card;
 }
+
+// =====================================================
+// User Stats for Progression Page
+// =====================================================
+async function fetchUserStats() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.log("[UserStats] No user logged in, skipping fetch");
+    renderUserStats(0, "N/A", 0, []);
+    return;
+  }
+
+  try {
+    console.log("[UserStats] Fetching submissions for user:", user.uid);
+    const q = query(
+      collection(db, "blueprintSubmissions"),
+      where("userId", "==", user.uid)
+    );
+    const snapshot = await getDocs(q);
+
+    const submissions = [];
+    snapshot.forEach(doc => {
+      submissions.push({ id: doc.id, ...doc.data() });
+    });
+
+    console.log("[UserStats] Found", submissions.length, "submissions");
+
+    // Calculate stats
+    const count = submissions.length;
+
+    // Find best map (most submissions)
+    const mapCounts = {};
+    submissions.forEach(sub => {
+      if (sub.map && sub.map !== "N/A") {
+        mapCounts[sub.map] = (mapCounts[sub.map] || 0) + 1;
+      }
+    });
+
+    let bestMap = "N/A";
+    let bestMapCount = 0;
+    for (const [map, c] of Object.entries(mapCounts)) {
+      if (c > bestMapCount) {
+        bestMap = map;
+        bestMapCount = c;
+      }
+    }
+
+    // Get recent submissions (sorted by submittedAt, most recent first)
+    const sortedSubs = submissions
+      .filter(s => s.blueprintName) // Only include submissions with a blueprint name
+      .sort((a, b) => {
+        // Sort by submittedAt (ISO string) if available - newest first
+        if (a.submittedAt && b.submittedAt) {
+          return new Date(b.submittedAt) - new Date(a.submittedAt);
+        }
+        return 0;
+      })
+      .slice(0, 5);
+
+    console.log("[UserStats] sortedSubs:", sortedSubs.map(s => ({ name: s.blueprintName, date: s.submittedAt })));
+
+    // Auto-add submitted blueprints to collected
+    submissions.forEach(sub => {
+      if (sub.blueprintName) {
+        state.collectedItems.add(sub.blueprintName);
+      }
+    });
+    saveCollectionState();
+
+    renderUserStats(count, bestMap, bestMapCount, sortedSubs);
+
+  } catch (error) {
+    console.error("[UserStats] Error fetching user stats:", error);
+    renderUserStats(0, "N/A", 0, []);
+  }
+}
+
+function renderUserStats(count, bestMap, bestMapCount, recentItems) {
+  const section = document.getElementById("userStatsSection");
+  const countEl = document.getElementById("statSubmissionCount");
+  const mapEl = document.getElementById("statBestMap");
+  const mapCountEl = document.getElementById("statBestMapCount");
+  const grid = document.getElementById("recentFindsGrid");
+
+  if (!section || !countEl || !mapEl || !grid) return;
+
+  if (count === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  // Update Stats
+  countEl.textContent = count;
+  mapEl.textContent = bestMap;
+  if (mapCountEl) mapCountEl.textContent = `(${bestMapCount})`;
+  section.classList.remove("hidden");
+
+  // Render Recent Finds Grid
+  grid.innerHTML = "";
+
+  console.log("[UserStats] Rendering recent items:", recentItems.length);
+  console.log("[UserStats] state.all has", state.all.length, "items");
+
+  recentItems.forEach((sub, index) => {
+    // Find item data
+    const itemData = state.all.find(i => i.name === sub.blueprintName);
+    console.log(`[UserStats] Item ${index}: blueprintName="${sub.blueprintName}", found=${!!itemData}`);
+
+    // Only render if we have the full item data (needed for visuals)
+    if (itemData) {
+      // Use inline card creation (same as renderGrid)
+      const card = createCard(itemData, index);
+      grid.appendChild(card);
+    }
+  });
+
+  console.log("[UserStats] Grid now has", grid.children.length, "children");
+}
+
+function renderProgression() {
+  const container = document.getElementById("progressionTab");
+  const sidebar = document.getElementById("filtersSidebar");
+
+
+  // Hide sidebar logic moved to switchTab
+  // Old logic removed to prevent conflict with desktop toggle
+
+
+  if (!container || container.classList.contains("hidden")) return;
+
+  const total = state.all.length;
+  // Only count collected items that exist in state.all (excludes inactive items)
+  const activeItemNames = new Set(state.all.map(item => item.name));
+  const collected = state.collectedItems ? [...state.collectedItems].filter(name => activeItemNames.has(name)).length : 0;
+
+  if (total === 0) return;
+
+  const percent = Math.round((collected / total) * 100);
+
+  // Update Big Linear Bar
+  const bar = document.getElementById("progressionBarMain");
+  const sign = document.getElementById("progressionSign");
+  const countLabel = document.getElementById("progressionCount");
+  const totalLabel = document.getElementById("progressionTotal");
+
+  // Animate Percentage Hero - will be synced with bar below
+  // Set total immediately
+  if (totalLabel) totalLabel.textContent = total;
+
+  // Unified Animation: Bar + Percentage + Count all in sync
+  if (bar) {
+    // Reset bar
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+    bar.style.backgroundImage = "none";
+    bar.style.backgroundColor = "hsl(340, 80%, 50%)"; // Start red-purple
+    void bar.offsetWidth; // Force reflow
+
+    // JS Animation - all elements synced
+    // Duration scaled by percentage: 0% = 0s, 100% = 1.75s
+    const duration = (percent / 100) * 1750;
+    let startTime = null;
+
+    const animateAll = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+
+      // Ease-out: fast start, slows down at end (quadratic - faster ramp down)
+      let progress = Math.min(elapsed / duration, 1);
+      progress = 1 - Math.pow(1 - progress, 2); // Quadratic ease-out (faster ramp down)
+
+      const currentPercent = progress * percent;
+      const currentCount = Math.floor(progress * collected);
+
+      // Update bar width
+      bar.style.width = `${currentPercent}%`;
+
+      // Update percentage display (synced)
+      if (sign) sign.textContent = `${Math.floor(currentPercent)}%`;
+
+      // Update count display (synced)
+      if (countLabel) countLabel.textContent = currentCount;
+
+      // Smooth Color: Red-purple (340) -> Green (120)
+      // Linear interpolation through the hue wheel (going backwards: 340 -> 0 -> 120 would wrap)
+      // Instead, go 340 -> 360/0 -> 60 -> 120 smoothly
+      // Total hue distance: 340 to 0 = 20, then 0 to 120 = 120, total = 140 degrees
+      const hueProgress = currentPercent / 100;
+      // Map: 0% = 340, 100% = 120 (going 340 -> 480, then wrap 480 to 120)
+      let hue = 340 + (hueProgress * 140);
+      if (hue >= 360) hue -= 360;
+
+      bar.style.backgroundColor = `hsl(${hue}, 80%, 50%)`;
+      bar.style.boxShadow = `0 0 20px hsl(${hue}, 80%, 40%)`;
+
+      if (progress < 1) {
+        requestAnimationFrame(animateAll);
+      } else {
+        // Final values
+        if (sign) sign.textContent = `${percent}%`;
+        if (countLabel) countLabel.textContent = collected;
+      }
+    };
+    requestAnimationFrame(animateAll);
+  }
+
+  // Update Category Grid
+  const grid = document.getElementById("progressionCategories");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  // Color Mapping for Item Types (Custom Order: Augment, Weapon, Quick Use, Grenade, Mod, Material)
+  // Colors left to right: Gold, Pink, Cyan, Green, Grey, White
+  const typeColors = {
+    "Augment": { border: "rgba(251,199,0,0.5)", bg: "rgba(251,199,0,0.1)", barFrom: "#FBC700", barTo: "#f59e0b", icon: "rgba(251,199,0,0.2)", text: "#FBC700" },         // Gold
+    "Weapon": { border: "rgba(216,41,155,0.5)", bg: "rgba(216,41,155,0.1)", barFrom: "#D8299B", barTo: "#ec4899", icon: "rgba(216,41,155,0.2)", text: "#D8299B" },       // Pink
+    "Quick Use": { border: "rgba(30,203,252,0.5)", bg: "rgba(30,203,252,0.1)", barFrom: "#1ECBFC", barTo: "#06b6d4", icon: "rgba(30,203,252,0.2)", text: "#1ECBFC" },    // Cyan
+    "Grenade": { border: "rgba(65,235,106,0.5)", bg: "rgba(65,235,106,0.1)", barFrom: "#41EB6A", barTo: "#34d399", icon: "rgba(65,235,106,0.2)", text: "#41EB6A" },      // Green
+    "Mod": { border: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.05)", barFrom: "#ffffff", barTo: "#d4d4d8", icon: "rgba(255,255,255,0.15)", text: "#ffffff" },        // White
+    "Material": { border: "rgba(113,116,113,0.5)", bg: "rgba(113,116,113,0.1)", barFrom: "#717471", barTo: "#a1a1aa", icon: "rgba(113,116,113,0.2)", text: "#a1a1aa" }, // Grey
+    // Default fallback
+    "default": { border: "rgba(255,255,255,0.3)", bg: "rgba(255,255,255,0.05)", barFrom: "#52525b", barTo: "#a1a1aa", icon: "rgba(255,255,255,0.1)", text: "#d4d4d8" }
+  };
+
+  // Group items by Type
+  const typeCounts = {};
+  state.all.forEach(item => {
+    const t = item.type || "Unknown";
+    // Ensure structure exists
+    if (!typeCounts[t]) typeCounts[t] = { total: 0, collected: 0, icon: item.typeIcon };
+
+    typeCounts[t].total++;
+    // Check main collection
+    if (state.collectedItems && state.collectedItems.has(item.name)) {
+      typeCounts[t].collected++;
+    }
+  });
+
+  // Custom sort order
+  const typeOrder = ["Augment", "Weapon", "Quick Use", "Grenade", "Mod", "Material"];
+  const types = Object.keys(typeCounts).sort((a, b) => {
+    const aIndex = typeOrder.indexOf(a);
+    const bIndex = typeOrder.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
+
+  types.forEach(type => {
+    const data = typeCounts[type];
+    const p = Math.round((data.collected / data.total) * 100);
+
+    // DEBUG: Log the type being used
+    console.log("Category type:", type, "Has color?", !!typeColors[type]);
+
+    // Get color theme or default
+    const theme = typeColors[type] || typeColors["default"];
+
+    const card = document.createElement("div");
+    // Glassy Card Style with Colored Border and Background Tint (Inline Styles)
+    card.className = "relative overflow-hidden rounded-2xl backdrop-blur-xl p-4 flex flex-col gap-3 shadow-xl hover:brightness-110 transition-all duration-300 group";
+    card.style.border = `2px solid ${theme.border}`;
+    card.style.backgroundColor = theme.bg;
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "flex items-center gap-4 z-10";
+
+    const iconBox = document.createElement("div");
+    iconBox.className = "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border border-white/5 shadow-inner";
+    iconBox.style.backgroundColor = theme.icon;
+    if (data.icon) {
+      const img = document.createElement("img");
+      img.src = data.icon;
+      img.className = "w-7 h-7 opacity-90 drop-shadow-md";
+      iconBox.appendChild(img);
+    }
+
+    const textGroup = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "text-base font-bold tracking-wide";
+    title.style.color = theme.text;
+    title.textContent = type;
+    const sub = document.createElement("div");
+    sub.className = "text-sm text-zinc-500 font-mono";
+    sub.textContent = `${data.collected} / ${data.total}`;
+
+    textGroup.appendChild(title);
+    textGroup.appendChild(sub);
+    header.appendChild(iconBox);
+    header.appendChild(textGroup);
+
+    // Progress Bar (Pill Container)
+    const barWrap = document.createElement("div");
+    barWrap.className = "relative h-4 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 z-10";
+
+    // Colored Bar (Inline gradient)
+    const subBar = document.createElement("div");
+    subBar.className = "h-full rounded-full shadow-[0_0_10px_rgba(255,255,255,0.1)] transition-all duration-1000 ease-out";
+    subBar.style.background = `linear-gradient(to right, ${theme.barFrom}, ${theme.barTo})`;
+    subBar.style.width = "0%";
+
+    // Trigger animation next frame
+    requestAnimationFrame(() => {
+      subBar.style.width = `${p}%`;
+    });
+
+    barWrap.appendChild(subBar);
+
+    card.appendChild(header);
+    card.appendChild(barWrap);
+
+    // Add subtle gradient glow in background
+    const bgGlow = document.createElement("div");
+    bgGlow.className = `absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${theme.bar} opacity-5 blur-3xl rounded-full group-hover:opacity-10 transition-opacity pointer-events-none`;
+    card.appendChild(bgGlow);
+
+    grid.appendChild(card);
+  });
+}
+
+// Helper to swap sort options based on tab
+function updateSortOptions(tab) {
+  const sort1 = document.getElementById("sortSelect");
+  const sort2 = document.getElementById("sortSelectMobile");
+
+  let html = "";
+  if (tab === "data") {
+    html = `
+      <option value="rarity_desc">Rarity (High → Low)</option>
+      <option value="rarity_asc">Rarity (Low → High)</option>
+      <option value="conf_desc">Confidence (High → Low)</option>
+      <option value="conf_asc">Confidence (Low → High)</option>
+      <option value="name_asc">Name (A → Z)</option>
+      <option value="name_desc">Name (Z → A)</option>
+    `;
+  } else {
+    // Default Blueprints options
+    html = `
+      <option value="rarity_desc">Rarity (High → Low)</option>
+      <option value="rarity_asc">Rarity (Low → High)</option>
+      <option value="name_asc">Name (A → Z)</option>
+      <option value="name_desc">Name (Z → A)</option>
+      <option value="type_asc">Type (A → Z)</option>
+    `;
+  }
+
+  if (sort1) {
+    sort1.innerHTML = html;
+    if (tab === "data") {
+      sort1.value = state.filters.sortData || "rarity_desc";
+    } else {
+      sort1.value = state.filters.sortBlueprints || "rarity_desc";
+    }
+  }
+  if (sort2) {
+    sort2.innerHTML = html;
+    if (tab === "data") {
+      sort2.value = state.filters.sortData || "rarity_desc";
+    } else {
+      sort2.value = state.filters.sortBlueprints || "rarity_desc";
+    }
+  }
+}
+
+function switchTab(tabName) {
+  state.currentTab = tabName;
+  window.scrollTo(0, 0);
+
+  // Update Sort Options logic
+  updateSortOptions(tabName === "data" ? "data" : "blueprints");
+
+  // Update Grid/List Size Label
+  if (typeof updateGridSizeLabel === 'function') updateGridSizeLabel(tabName);
+
+  // Tab Buttons
+  const blueprintsBtn = document.getElementById("tabBlueprints");
+  const progressionBtn = document.getElementById("tabProgression");
+  const dataBtn = document.getElementById("tabData");
+
+  // Reset all active states
+  [blueprintsBtn, progressionBtn, dataBtn].forEach(btn => {
+    if (btn) btn.classList.remove("tab-button-active");
+  });
+
+  // Highlight active
+  if (tabName === "blueprints" && blueprintsBtn) blueprintsBtn.classList.add("tab-button-active");
+  if (tabName === "progression" && progressionBtn) progressionBtn.classList.add("tab-button-active");
+  if (tabName === "data" && dataBtn) dataBtn.classList.add("tab-button-active");
+
+  // View Containers
+  const gridSection = document.getElementById("gridSection"); // We might need to wrap the grid+filters in a div or manage visibility of elements
+  // simpler for now: toggle visibility of main interactive elements
+
+  // NOTE: For now, 'blueprints' is the only grid view. 
+  // We need to hide/show the Grid vs Progression Container vs Data Container.
+  // Since we haven't wrapped the grid yet, let's control the grid and filters visibility directly later.
+  // For this step, I will assume we are HIDING the Grid when NOT on blueprints.
+
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("emptyState");
+  const filtersDesktop = document.querySelectorAll(".filter-section-desktop"); // Pseudo-selector for desktop sidebars? No, they are in aside.
+  // Actually, the ASIDE is always visible on desktop?
+
+  // Let's control the "Main Content Area" visibility
+  // Current structure: <main> -> [Banner, Progress, Chips, Help, Grid/Empty]
+
+  // Create references to the new tab containers (will be added in index.html in next steps if not already)
+  const progressionTab = document.getElementById("progressionTab");
+  const dataTab = document.getElementById("dataTab");
+  const fab = document.getElementById("submitLocationFab");
+
+  // Toggle FAB Visibility
+  if (fab) {
+    if (tabName === "blueprints") {
+      fab.classList.remove("hidden");
+    } else {
+      fab.classList.add("hidden");
+    }
+  }
+
+  // Toggle Grid View Visibility
+  const showGrid = (tabName === "blueprints");
+
+  // Toggle Grid Header Visibility
+  const gridHeader = document.getElementById("gridHeader");
+  if (gridHeader) {
+    if (showGrid) {
+      gridHeader.classList.remove("hidden");
+      gridHeader.classList.add("flex");
+    } else {
+      gridHeader.classList.add("hidden");
+      gridHeader.classList.remove("flex");
+    }
+  }
+
+  // Toggle Blueprint Search Bar Visibility
+  const blueprintSearchBar = document.getElementById("blueprintSearchBar");
+  if (blueprintSearchBar) {
+    if (showGrid) {
+      blueprintSearchBar.classList.remove("hidden");
+    } else {
+      blueprintSearchBar.classList.add("hidden");
+    }
+  }
+
+
+
+  if (grid) {
+    if (showGrid) {
+      // Grid visibility is also handled by renderGrid based on filters, 
+      // but we force hide it if not on blueprints tab
+      applyFilters(); // Re-apply to show correct items
+      grid.classList.remove("hidden");
+    } else {
+      grid.classList.add("hidden");
+      if (empty) empty.classList.add("hidden");
+    }
+  }
+
+  // Toggle Progression Tab
+  if (progressionTab) {
+    if (tabName === "progression") {
+      progressionTab.classList.remove("hidden");
+      renderProgression();
+      fetchUserStats();
+    } else {
+      progressionTab.classList.add("hidden");
+    }
+  }
+
+  // Toggle Data Tab
+  if (dataTab) {
+    if (tabName === "data") {
+      dataTab.classList.remove("hidden");
+      if (typeof fetchDetailedData === 'function' && (!state.detailedData || state.detailedData.length === 0)) {
+        fetchDetailedData();
+      } else if (typeof renderDataRegistry === 'function') {
+        renderDataRegistry();
+      }
+    } else {
+      dataTab.classList.add("hidden");
+    }
+  }
+
+  // Filter Logic - Sidebar enabled on all tabs, but filter options hidden on progression
+  const desktopFilterBtn = document.getElementById("desktopFilterBtn");
+  const mobileFilterBtn = document.getElementById("mobileFilterBtn");
+  const sidebar = document.getElementById("filtersSidebar");
+  const drawer = document.getElementById("drawer");
+
+  // Toggle filter-options visibility based on tab
+  const hideFilters = tabName === "progression";
+
+  // Hide filter options in desktop sidebar
+  if (sidebar) {
+    sidebar.querySelectorAll(".filter-options").forEach(el => {
+      if (hideFilters) {
+        el.classList.add("hidden");
+      } else {
+        el.classList.remove("hidden");
+      }
+    });
+  }
+
+  // Hide filter options in mobile drawer
+  if (drawer) {
+    drawer.querySelectorAll(".filter-options").forEach(el => {
+      if (hideFilters) {
+        el.classList.add("hidden");
+      } else {
+        el.classList.remove("hidden");
+      }
+    });
+  }
+
+  // Toggle Grid Size Visibility (Hide on Data tab)
+  const gridSizeContainer = document.getElementById("gridSize")?.closest(".filter-options");
+  // Assuming Mobile duplicated structure or unique ID. Let's try to target by input ID if unique.
+  // Actually, ID in DOM must be unique. The mobile drawer likely has a different ID or is generated.
+  // Looking at index.html, there might only be one gridSize input if the sidebar is shared?
+  // No, sidebar is likely cloned or separate. Let's check IDs.
+  // If IDs are duplicate (bad practice), getElementById gets first.
+  // Let's assume we need to target both containers if they exist.
+  // For now, let's target the known one and any sibling in drawer.
+
+  // Actually, simplest way without IDs:
+  // Find all inputs with type range or specific label?
+  // Let's settle for `gridSize` ID. If there's a mobile specific one, we need its ID.
+  // Based on reading: `gridSize` input is in the sidebar.
+
+  if (gridSizeContainer) {
+    if (tabName === "data") {
+      gridSizeContainer.classList.add("hidden");
+    } else if (!hideFilters) {
+      // Only show if NOT on progression (which hides all filters)
+      gridSizeContainer.classList.remove("hidden");
+    }
+  }
+
+  // Mobile Grid Size
+  const gridSizeContainerMobile = document.getElementById("gridSizeMobile")?.closest(".filter-options");
+  if (gridSizeContainerMobile) {
+    if (tabName === "data") {
+      gridSizeContainerMobile.classList.add("hidden");
+    } else if (!hideFilters) {
+      gridSizeContainerMobile.classList.remove("hidden");
+    }
+  }
+
+  if (sidebar) {
+    // Enable filter buttons on all tabs (no greying)
+    if (desktopFilterBtn) {
+      desktopFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+      desktopFilterBtn.classList.add("cursor-pointer");
+    }
+    if (mobileFilterBtn) {
+      mobileFilterBtn.classList.remove("opacity-50", "pointer-events-none");
+      mobileFilterBtn.classList.add("cursor-pointer");
+    }
+
+    // Restore state based on user preference
+    if (state.filtersOpen) {
+      // Fix: Ensure hidden on mobile, visible on desktop
+      sidebar.classList.add("hidden");
+      sidebar.classList.remove("md:hidden");
+      sidebar.classList.add("md:block");
+    } else {
+      sidebar.classList.add("hidden");
+      sidebar.classList.remove("md:block");
+    }
+  }
+}
+
 
 // Initialize tab navigation
 function initTabNavigation() {
   const blueprintsBtn = document.getElementById("tabBlueprints");
-  const collectionBtn = document.getElementById("tabCollection");
+  const progressionBtn = document.getElementById("tabProgression");
+  const dataBtn = document.getElementById("tabData");
   const logoHome = document.getElementById("logoHome");
   const logoHomeMobile = document.getElementById("logoHomeMobile");
 
   if (blueprintsBtn) blueprintsBtn.onclick = () => switchTab("blueprints");
-  if (collectionBtn) collectionBtn.onclick = () => switchTab("collection");
+  if (progressionBtn) progressionBtn.onclick = () => switchTab("progression");
+  if (dataBtn) dataBtn.onclick = () => switchTab("data");
 
   // Logo home navigation
   if (logoHome) logoHome.onclick = () => switchTab("blueprints");
@@ -555,6 +1249,59 @@ function initTabNavigation() {
 
 // Event Banner Management (Dynamic from Firestore)
 let eventBannerDismissed = false; // Temporary state, clears on refresh
+window.menuCloseTimer = null;
+
+// Helper to clear all selection states (Details & Context Menu)
+function deselectAll() {
+  // Close Details Overlays
+  document.querySelectorAll(".details-overlay:not(.hidden)").forEach(d => {
+    d.classList.add("hidden");
+    d.style.transform = "";
+  });
+
+  // Reset Card States
+  document.querySelectorAll(".card-open").forEach(c => {
+    c.classList.remove("card-open");
+    c.style.zIndex = "";
+  });
+
+  document.querySelectorAll(".card-selected").forEach(c => {
+    c.classList.remove("card-selected");
+  });
+
+  const menu = document.getElementById("itemContextMenu");
+  if (menu && !menu.classList.contains("hidden")) {
+    menu.classList.add("opacity-0");
+    if (window.menuCloseTimer) clearTimeout(window.menuCloseTimer);
+    window.menuCloseTimer = setTimeout(() => {
+      menu.classList.add("hidden");
+      window.menuCloseTimer = null;
+    }, 150);
+  }
+}
+
+// Helper to set selection state (Status = Banner + Glow)
+function selectCard(card, type = "details") {
+  // 1. Clear everything first
+  deselectAll();
+
+  if (!card) return;
+
+  // 2. Apply "Selected" status
+  card.classList.add("card-selected");
+
+  // 3. Show appropriate banner
+  if (type === "details") {
+    const details = card.querySelector(".details-overlay");
+    if (details) {
+      details.classList.remove("hidden");
+      card.classList.add("card-open");
+      card.style.zIndex = "50";
+    }
+  }
+  // Note: Context menu positioning logic is handled by showMenu, 
+  // so showMenu will call selectCard(card, "menu") just to set the state.
+}
 
 function initEventBanner() {
   const banner = document.getElementById("eventBanner");
@@ -587,9 +1334,6 @@ function initEventBanner() {
 }
 
 // Blueprint Submission System
-let toastTimeout = null;
-let pendingBlueprintName = null;
-
 function initBlueprintSubmission() {
   const fab = document.getElementById("submitLocationFab");
   const toast = document.getElementById("collectToast");
@@ -634,6 +1378,12 @@ function initBlueprintSubmission() {
       await submitBlueprintLocation();
     };
   }
+
+  // Initialize container picker
+  initContainerPicker();
+
+  // Initialize map picker
+  initMapPicker();
 }
 
 function populateBlueprintPicklist() {
@@ -690,6 +1440,309 @@ function closeSubmissionModal() {
     if (q) q.checked = false;
   }
   pendingBlueprintName = null;
+
+  // Reset container picker
+  clearContainerSelection();
+  hideCustomContainerForm();
+
+  // Reset map picker
+  if (window.clearMapSelection) window.clearMapSelection();
+}
+
+// ==========================================
+// CONTAINER PICKER SYSTEM
+// ==========================================
+
+const CONTAINER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQbaBK3sAyL1kD1-NanKQgkyzerRXtQUReQu57W_xn68GxST_A4Ws1z3iwOAOZJ52-ZBztvGiDq16Go/pub?output=csv";
+const CONTAINER_IMAGE_BASE = "./images/Containers/";
+
+async function fetchContainers() {
+  // Initialize state properties lazily on first call
+  if (!state.containers) {
+    state.containers = [];
+    state.containersLoaded = false;
+  }
+
+  if (state.containersLoaded && state.containers.length > 0) return;
+
+  try {
+    const response = await fetch(CONTAINER_CSV_URL);
+    const text = await response.text();
+
+    // Parse CSV
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) return;
+
+    // Skip header row
+    state.containers = [];
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCSVRow(lines[i]);
+      if (row.length >= 4 && row[0]) {
+        state.containers.push({
+          name: row[0].trim(),
+          lootPool: row[1]?.trim() || "Standard",
+          tags: row[2]?.trim().toLowerCase() || "",
+          image: row[3]?.trim() || ""
+        });
+      }
+    }
+
+    state.containersLoaded = true;
+  } catch (error) {
+    console.error("Failed to fetch containers:", error);
+  }
+}
+
+// Simple CSV row parser that handles quoted fields
+function parseCSVRow(row) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function initContainerPicker() {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const clearBtn = document.getElementById("clearContainerBtn");
+  const pickerModal = document.getElementById("containerPickerModal");
+  const closePickerBtn = document.getElementById("closeContainerPickerBtn");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+  const pickerGrid = document.getElementById("containerPickerGrid");
+  const customBtn = document.getElementById("containerPickerCustomBtn");
+  const hideCustomBtn = document.getElementById("hideCustomContainerBtn");
+
+  // Open picker button
+  if (openBtn) {
+    openBtn.addEventListener("click", async () => {
+      await openContainerPicker();
+    });
+  }
+
+  // Selected display click - reopen picker
+  if (selectedDisplay) {
+    selectedDisplay.addEventListener("click", async (e) => {
+      // Don't open if clicking clear button
+      if (e.target.closest("#clearContainerBtn")) return;
+      await openContainerPicker();
+    });
+  }
+
+  // Close picker button
+  if (closePickerBtn) {
+    closePickerBtn.addEventListener("click", () => {
+      closeContainerPicker();
+    });
+  }
+
+  // Clear selection button
+  if (clearBtn) {
+    clearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearContainerSelection();
+    });
+  }
+
+  // Search input
+  if (pickerSearch) {
+    pickerSearch.addEventListener("input", (e) => {
+      renderContainerPickerGrid(e.target.value);
+    });
+  }
+
+  // Custom container button
+  if (customBtn) {
+    customBtn.addEventListener("click", () => {
+      closeContainerPicker();
+      showCustomContainerForm();
+    });
+  }
+
+  // Hide custom form button
+  if (hideCustomBtn) {
+    hideCustomBtn.addEventListener("click", () => {
+      hideCustomContainerForm();
+    });
+  }
+
+  // Close on escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && pickerModal && !pickerModal.classList.contains("hidden")) {
+      closeContainerPicker();
+    }
+  });
+}
+
+async function openContainerPicker() {
+  const pickerModal = document.getElementById("containerPickerModal");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+
+  if (!pickerModal) return;
+
+  // Load containers
+  await fetchContainers();
+
+  // Show modal (submission modal already has body overflow hidden)
+  pickerModal.classList.remove("hidden");
+  pickerModal.classList.add("flex");
+
+  // Render initial grid
+  renderContainerPickerGrid("");
+
+  // Focus search after short delay for animation
+  setTimeout(() => {
+    if (pickerSearch) pickerSearch.focus();
+  }, 200);
+}
+
+function closeContainerPicker() {
+  const pickerModal = document.getElementById("containerPickerModal");
+  const pickerSearch = document.getElementById("containerPickerSearch");
+
+  if (!pickerModal) return;
+
+  pickerModal.classList.add("hidden");
+  pickerModal.classList.remove("flex");
+  // Don't reset body overflow since submission modal is still open
+
+  // Clear search
+  if (pickerSearch) pickerSearch.value = "";
+}
+
+function renderContainerPickerGrid(query) {
+  const grid = document.getElementById("containerPickerGrid");
+  if (!grid || !state.containers) return;
+
+  const q = query.toLowerCase().trim();
+
+  // Filter containers by name or tags
+  const filtered = state.containers.filter(c => {
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.tags.includes(q);
+  });
+
+  grid.innerHTML = "";
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full py-12 text-center text-zinc-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <p class="text-sm">No containers found for "${query}"</p>
+      </div>
+    `;
+    return;
+  }
+
+  for (const container of filtered) {
+    const card = document.createElement("div");
+    card.className = "container-picker-card";
+    card.innerHTML = `
+      <img src="${CONTAINER_IMAGE_BASE}${container.image}" alt="${container.name}" loading="lazy" class="w-full h-24 object-cover rounded-lg mb-1.5" />
+      <div class="card-name text-white leading-tight font-bold">${container.name}</div>
+      <div class="card-pool text-zinc-400 mt-0.5">${container.lootPool}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      selectContainerFromPicker(container);
+    });
+
+    grid.appendChild(card);
+  }
+}
+
+function selectContainerFromPicker(container) {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const selectedImg = document.getElementById("selectedContainerImg");
+  const selectedName = document.getElementById("selectedContainerName");
+  const hiddenInput = document.getElementById("submitContainer");
+
+  // Update UI
+  if (openBtn) openBtn.classList.add("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.remove("hidden");
+    selectedDisplay.classList.add("flex");
+  }
+
+  // Set selected container info
+  if (selectedImg) selectedImg.src = CONTAINER_IMAGE_BASE + container.image;
+  if (selectedName) selectedName.textContent = container.name;
+  if (hiddenInput) hiddenInput.value = container.name;
+
+  // Close picker
+  closeContainerPicker();
+
+  // Hide custom form if open
+  hideCustomContainerForm();
+}
+
+function clearContainerSelection() {
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+  const hiddenInput = document.getElementById("submitContainer");
+
+  if (openBtn) openBtn.classList.remove("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.add("hidden");
+    selectedDisplay.classList.remove("flex");
+  }
+  if (hiddenInput) hiddenInput.value = "";
+}
+
+function showCustomContainerForm() {
+  const form = document.getElementById("customContainerForm");
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const selectedDisplay = document.getElementById("selectedContainerDisplay");
+
+  if (form) form.classList.remove("hidden");
+  if (openBtn) openBtn.classList.add("hidden");
+  if (selectedDisplay) {
+    selectedDisplay.classList.add("hidden");
+    selectedDisplay.classList.remove("flex");
+  }
+}
+
+function hideCustomContainerForm() {
+  const form = document.getElementById("customContainerForm");
+  const openBtn = document.getElementById("openContainerPickerBtn");
+  const customName = document.getElementById("customContainerName");
+  const customDesc = document.getElementById("customContainerDescription");
+  const customScreenshot = document.getElementById("customContainerScreenshot");
+
+  if (form) form.classList.add("hidden");
+  if (openBtn) openBtn.classList.remove("hidden");
+  if (customName) customName.value = "";
+  if (customDesc) customDesc.value = "";
+  if (customScreenshot) customScreenshot.value = "";
+}
+
+function getContainerValue() {
+  // Check if custom container form is visible and has a value
+  const customForm = document.getElementById("customContainerForm");
+  const customName = document.getElementById("customContainerName");
+
+  if (customForm && !customForm.classList.contains("hidden") && customName?.value.trim()) {
+    return `CUSTOM: ${customName.value.trim()}`;
+  }
+
+  // Otherwise return the selected container
+  const hiddenInput = document.getElementById("submitContainer");
+  return hiddenInput?.value || "";
 }
 
 function initWrapped() {
@@ -722,7 +1775,7 @@ function initWrapped() {
         inner.style.setProperty('transform-origin', 'top center', 'important');
         inner.style.setProperty('gap', '0', 'important');
         const heightAdjustment = 896 * (1 - scale);
-        inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+        inner.style.setProperty('margin-bottom', `- ${heightAdjustment} px`, 'important');
       }
       if (content) content.style.setProperty('border-radius', '0', 'important');
       if (shimmer) shimmer.classList.add("hidden");
@@ -745,7 +1798,7 @@ function initWrapped() {
           inner.style.setProperty('transform-origin', 'top center', 'important');
           inner.style.removeProperty('gap');
           const heightAdjustment = 896 * (1 - scale);
-          inner.style.setProperty('margin-bottom', `-${heightAdjustment}px`, 'important');
+          inner.style.setProperty('margin-bottom', `- ${heightAdjustment} px`, 'important');
         }
       } else {
         if (inner) {
@@ -783,7 +1836,7 @@ function initWrapped() {
   if (isMobile && downloadBtn) {
     const newBtn = downloadBtn.cloneNode(true);
     downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
-    newBtn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Fullscreen for Screenshot`;
+    newBtn.innerHTML = `< svg class="w-5 h-5" fill = "none" viewBox = "0 0 24 24" stroke = "currentColor" ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg > Fullscreen for Screenshot`;
     newBtn.className = "flex-[2] md:flex-none px-8 py-3 h-14 md:h-auto text-xl md:text-base rounded-full bg-emerald-600 text-white font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-emerald-400/30 flex items-center justify-center gap-2 active:scale-95 transition-transform";
     newBtn.onclick = () => toggleCaptureMode(true);
   }
@@ -799,7 +1852,7 @@ function initWrapped() {
       showBtn.textContent = "Loading Data...";
       await fetchUserContributions();
       showBtn.disabled = false;
-      showBtn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg> View My Blueprint Wrapped 2025`;
+      showBtn.innerHTML = `< svg class= "w-4 h-4" fill = "none" viewBox = "0 0 24 24" stroke = "currentColor" > <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg > View My Blueprint Wrapped 2025`;
       // Ensure the button keeps its responsive classes if modified by textContent earlier
       showBtn.className = "flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-[10px] sm:text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95";
     }
@@ -812,9 +1865,9 @@ function initWrapped() {
     const percent = total > 0 ? Math.round((collected / total) * 100) : 0;
 
     // Update Percentage and Progress Bar
-    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+    document.getElementById("wrappedPercent").textContent = `${percent}% `;
     const progressBar = document.getElementById("wrappedProgressBar");
-    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (progressBar) progressBar.style.width = `${percent}% `;
 
     // Calculate Weapon/Augment stats
     const weaponsAll = state.all.filter(it => /weapon/i.test(it.type)).length;
@@ -833,7 +1886,7 @@ function initWrapped() {
     }
     const bestMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0];
 
-    document.getElementById("wrappedPercent").textContent = `${percent}%`;
+    document.getElementById("wrappedPercent").textContent = `${percent}% `;
 
     // Build dynamic stats array
     const statsGrid = document.getElementById("wrappedStatsGrid");
@@ -847,7 +1900,7 @@ function initWrapped() {
         value: state.wrappedData.contributionCount,
         label: "Locations<br>Reported",
         color: "text-emerald-400",
-        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`
+        icon: `< svg class="w-4 h-4" fill = "currentColor" viewBox = "0 0 24 24" > <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg > `
       });
     }
 
@@ -857,7 +1910,7 @@ function initWrapped() {
         value: bestMap[0],
         label: "Best<br>Map",
         color: "text-purple-400",
-        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>`,
+        icon: `< svg class="w-4 h-4" fill = "currentColor" viewBox = "0 0 24 24" > <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" /></svg > `,
         smallText: true
       });
     }
@@ -921,8 +1974,8 @@ function initWrapped() {
         <div class="${stat.color} mb-1 drop-shadow-md">
           ${largerIcon}
         </div>
-        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-black ${stat.color} drop-shadow-lg">${stat.value}</span>
-        <div class="text-xs text-zinc-300 uppercase font-black tracking-wider text-center leading-tight drop-shadow-md opacity-90">${stat.label}</div>
+        <span class="${stat.smallText ? 'text-xl' : 'text-3xl'} font-hud font-bold ${stat.color} drop-shadow-lg">${stat.value}</span>
+        <div class="text-xs text-zinc-300 uppercase font-tabs font-bold tracking-wider text-center leading-tight drop-shadow-md opacity-90">${stat.label}</div>
       `;
 
       statsGrid.appendChild(pill);
@@ -1149,9 +2202,9 @@ function initWrapped() {
       modal.classList.remove("flex", "items-center", "justify-center");
       document.body.style.overflow = "";
 
-      // Restore Submit FAB if on collection tab
+      // Restore Submit FAB if on blueprints tab
       const fab = document.getElementById("submitLocationFab");
-      if (fab && state.currentTab === "collection") {
+      if (fab && state.currentTab === "blueprints") {
         fab.classList.remove("hidden");
       }
     };
@@ -1542,6 +2595,7 @@ function showCollectToast(blueprintName) {
   const toast = document.getElementById("collectToast");
   const toastText = document.getElementById("collectToastText");
   const toastProgress = document.getElementById("collectToastProgress");
+  const fab = document.getElementById("submitLocationFab");
 
   if (!toast || !toastText || !toastProgress) return;
 
@@ -1561,6 +2615,9 @@ function showCollectToast(blueprintName) {
 
   toast.classList.remove("hidden");
 
+  // Hide FAB while toast is visible (mobile only)
+  if (fab && window.innerWidth <= 768) fab.classList.add("hidden");
+
   // Hide after 10 seconds
   toastTimeout = setTimeout(() => {
     hideToast();
@@ -1570,9 +2627,13 @@ function showCollectToast(blueprintName) {
 function hideToast() {
   const toast = document.getElementById("collectToast");
   const toastProgress = document.getElementById("collectToastProgress");
+  const fab = document.getElementById("submitLocationFab");
 
   if (toast) toast.classList.add("hidden");
   if (toastProgress) toastProgress.classList.remove("animate");
+
+  // Show FAB again when toast is hidden (only on blueprints tab and mobile)
+  if (fab && state.currentTab === "blueprints" && window.innerWidth <= 768) fab.classList.remove("hidden");
 
   if (toastTimeout) {
     clearTimeout(toastTimeout);
@@ -1582,10 +2643,17 @@ function hideToast() {
 
 async function submitBlueprintLocation() {
   const blueprintName = document.getElementById("submitBlueprintName")?.value;
-  const map = document.getElementById("submitMap")?.value;
+
+  // New Map Fields
+  const mapId = document.getElementById("submitMapId")?.value;
+  const mapX = document.getElementById("submitMapX")?.value;
+  const mapY = document.getElementById("submitMapY")?.value;
+
   const condition = document.getElementById("submitCondition")?.value;
-  const location = document.getElementById("submitLocation")?.value;
-  const container = document.getElementById("submitContainer")?.value;
+  // Notes replaces Location
+  const notes = document.getElementById("submitNotes")?.value;
+
+  const container = getContainerValue(); // Use container picker value
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
 
@@ -1594,26 +2662,49 @@ async function submitBlueprintLocation() {
     return;
   }
 
-  // Require at least one data field (Map/Cond/Loc/Cont/Trials/Quest)
-  // Submitting ONLY a blueprint name is not useful.
-  const hasData = map || condition || location || container || trialsReward || questReward;
+  // Require at least one data field
+  const hasData = mapId || condition || notes || container || trialsReward || questReward;
 
   if (!hasData) {
-    alert("Please provide at least one detail (Map, Condition, Location, Container, or Reward Type).");
+    alert("Please provide at least one detail (Map, Condition, Notes, Container, or Reward Type).");
     return;
   }
 
   try {
+    // Check for Custom Container Submission
+    const customForm = document.getElementById("customContainerForm");
+    const customNameInput = document.getElementById("customContainerName");
+    const customDescInput = document.getElementById("customContainerDescription");
+
+    // If using custom container, save it to separate collection
+    if (customForm && !customForm.classList.contains("hidden") && customNameInput?.value.trim()) {
+      try {
+        await addDoc(collection(db, "containerSubmissions"), {
+          name: customNameInput.value.trim(),
+          description: customDescInput?.value.trim() || "",
+          submittedAt: new Date().toISOString(),
+          userId: auth.currentUser?.uid || "anonymous"
+        });
+        console.log("Custom container submitted successfully");
+      } catch (err) {
+        console.error("Failed to submit custom container:", err);
+        // Continue with blueprint submission anyway
+      }
+    }
+
     await addDoc(collection(db, "blueprintSubmissions"), {
       blueprintName: blueprintName || "",
-      map: map || "",
+      map: mapId || "",
       condition: condition || "",
-      location: location || "",
-      container: container || "",
+      location: notes || "", // Mapped from "Location Notes" input
+      container: container.replace("CUSTOM: ", "") || "", // Clean up custom prefix
       trialsReward: trialsReward,
       questReward: questReward,
       submittedAt: new Date().toISOString(),
-      userId: auth.currentUser?.uid || "anonymous"
+      userId: auth.currentUser?.uid || "anonymous",
+      // Coordinates moved to bottom
+      mapX: mapX || "",
+      mapY: mapY || ""
     });
 
     closeSubmissionModal();
@@ -1729,7 +2820,7 @@ const CONFIDENCE_COLORS = {
   "Not Enough Data": "#E11D48" // Red
 };
 
-// Item Type → local icon filename mapping.
+// Item Type â†’ local icon filename mapping.
 // You provided these files:
 //   ItemCategory_Misc.png
 //   ItemCategory_Material.png
@@ -1876,7 +2967,8 @@ const state = {
     contributionCount: 0,
     loading: false
   },
-  spares: {} // Item name -> count of spare blueprints
+  spares: {}, // Item name -> count of spare blueprints
+  massCollectMode: false,
 };
 
 function getCsvUrl() {
@@ -1889,6 +2981,54 @@ function setMetaLine(text) {
   const elM = document.getElementById("metaLineMobile");
   if (el) el.textContent = text;
   if (elM) elM.textContent = text;
+}
+
+function toggleMassCollectMode() {
+  state.massCollectMode = !state.massCollectMode;
+  const btn = document.getElementById("toggleMassCollectBtn");
+  const grid = document.getElementById("grid");
+
+  if (state.massCollectMode) {
+    if (btn) {
+      btn.innerHTML = `
+        <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <div class="flex flex-col text-left leading-none text-emerald-400 whitespace-nowrap">
+          <span>Done</span>
+          <span>Collecting</span>
+        </div>
+      `;
+      btn.classList.add("bg-emerald-500/10", "border-emerald-500/50");
+      btn.classList.remove("bg-zinc-900/80", "border-zinc-800", "hover:bg-zinc-800");
+    }
+    if (grid) grid.classList.add("mass-collect-mode");
+    // Force re-render visuals to show overlays
+    document.querySelectorAll(".card-compact .rarity-frame").forEach(frame => {
+      const name = frame.parentNode.dataset.name;
+      if (name) updateCardVisuals(frame, name);
+    });
+  } else {
+    if (btn) {
+      btn.innerHTML = `
+        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+        <div class="flex flex-col text-left leading-none whitespace-nowrap">
+          <span>Mark items</span>
+          <span>as Collected</span>
+        </div>
+      `;
+      btn.classList.remove("bg-emerald-500/10", "border-emerald-500/50");
+      btn.classList.add("bg-zinc-900/80", "border-zinc-800", "hover:bg-zinc-800");
+    }
+    if (grid) grid.classList.remove("mass-collect-mode");
+    // Force re-render to hide overlays
+    document.querySelectorAll(".card-compact .rarity-frame").forEach(frame => {
+      const name = frame.parentNode.dataset.name;
+      if (name) updateCardVisuals(frame, name);
+    });
+  }
 }
 
 function initUI() {
@@ -1916,6 +3056,47 @@ function initUI() {
   if (openBtn) openBtn.onclick = openDrawer;
   const mobileFilterBtn = document.getElementById("mobileFilterBtn");
   if (mobileFilterBtn) mobileFilterBtn.onclick = toggleDrawer;
+
+  const toggleMassCollectBtn = document.getElementById("toggleMassCollectBtn");
+  if (toggleMassCollectBtn) toggleMassCollectBtn.onclick = toggleMassCollectMode;
+
+  // Desktop Filter Sidebar Logic
+  const desktopFilterBtn = document.getElementById("desktopFilterBtn");
+  const sidebar = document.getElementById("filtersSidebar");
+
+  // Initialize state (default true)
+  if (typeof state.filtersOpen === 'undefined') {
+    state.filtersOpen = sessionStorage.getItem("filtersOpen") !== "false";
+  }
+
+  const updateSidebarVisibility = () => {
+    if (!sidebar) return;
+    sidebar.classList.add("hidden"); // Ensure base hidden state (for mobile)
+
+    if (state.filtersOpen) {
+      sidebar.classList.add("md:block"); // Show on desktop
+    } else {
+      sidebar.classList.remove("md:block"); // Hide on desktop
+    }
+  };
+
+  // Initial check (only if on desktop, or relying on CSS media queries hiding it on mobile anyway)
+  // We only run this if we are NOT on a tab that force-hides it. 
+  // Initial load is likely Blueprints tab.
+  updateSidebarVisibility();
+
+  if (desktopFilterBtn) {
+    desktopFilterBtn.onclick = () => {
+      // Toggle state
+      state.filtersOpen = !state.filtersOpen;
+      sessionStorage.setItem("filtersOpen", state.filtersOpen);
+      updateSidebarVisibility();
+
+      // Ensure Correct Label on Open
+      updateGridSizeLabel(state.currentTab);
+    };
+  }
+
   if (closeBtn) closeBtn.onclick = closeDrawer;
   if (backdrop) backdrop.onclick = closeDrawer;
 
@@ -1928,14 +3109,55 @@ function initUI() {
   const sort1 = document.getElementById("sortSelect");
   const sort2 = document.getElementById("sortSelectMobile");
   const onSort = (v) => {
-    state.filters.sort = v;
+    // state.filters.sort = v; // Deprecated single source
+
+    if (state.currentTab === "data") {
+      state.filters.sortData = v;
+      if (v === 'entries_asc') state.dataSort = { column: 'rarity', direction: 'asc' }; // Fallback
+      if (v === 'entries_desc') state.dataSort = { column: 'rarity', direction: 'desc' }; // Fallback
+      if (v === 'name_asc') state.dataSort = { column: 'name', direction: 'asc' };
+      if (v === 'name_desc') state.dataSort = { column: 'name', direction: 'desc' };
+
+      // Confidence Logic
+      if (v === 'conf_asc') state.dataSort = { column: 'confidence', direction: 'asc' };
+      if (v === 'conf_desc') state.dataSort = { column: 'confidence', direction: 'desc' };
+
+      // New Rarity logic for Data Registry
+      if (v === 'rarity_asc') state.dataSort = { column: 'rarity', direction: 'asc' };
+      if (v === 'rarity_desc') state.dataSort = { column: 'rarity', direction: 'desc' };
+
+      renderDataRegistry();
+    } else {
+      state.filters.sortBlueprints = v;
+      applyFilters();
+    }
+
+    // Update dropdowns immediately? No, we might be switching logic. 
+    // Actually yes, the dropdown triggered this, so it should be fine.
     if (sort1) sort1.value = v;
     if (sort2) sort2.value = v;
-    applyFilters();
+
     saveFilters();
   };
   if (sort1) sort1.onchange = (e) => onSort(e.target.value);
   if (sort2) sort2.onchange = (e) => onSort(e.target.value);
+
+  // Correctly sync UI values with loaded state
+  if (state.filters.search) {
+    if (s1) s1.value = state.filters.search;
+    if (s2) s2.value = state.filters.search;
+  }
+  if (state.currentTab === "data") {
+    if (state.filters.sortData) {
+      if (sort1) sort1.value = state.filters.sortData;
+      if (sort2) sort2.value = state.filters.sortData;
+    }
+  } else {
+    if (state.filters.sortBlueprints) {
+      if (sort1) sort1.value = state.filters.sortBlueprints;
+      if (sort2) sort2.value = state.filters.sortBlueprints;
+    }
+  }
 
   const resetAll = () => {
     state.filters.rarities.clear();
@@ -1945,19 +3167,33 @@ function initUI() {
     state.filters.conds.clear();
     state.filters.confs.clear();
     state.filters.search = "";
-    state.filters.sort = "rarity_desc";
+    // state.filters.sort = "rarity_desc"; // Deprecated
+    // state.filters.sort = "rarity_desc"; // Deprecated
+    state.filters.sortBlueprints = "rarity_desc";
+    state.filters.sortData = "rarity_desc";
     if (s1) s1.value = "";
     if (s2) s2.value = "";
-    if (sort1) sort1.value = "rarity_desc";
-    if (sort2) sort2.value = "rarity_desc";
+
+    // Reset dropdown to current tab's default
+    const defaultSort = "rarity_desc";
+    if (sort1) sort1.value = defaultSort;
+    if (sort2) sort2.value = defaultSort;
     state.filters.collected = "all";
-    applyFilters();
+
+    // Reset Data Sort
+    state.dataSort = { column: 'rarity', direction: 'desc' };
+
+    if (state.currentTab === "data") {
+      renderDataRegistry();
+    } else {
+      applyFilters();
+    }
     renderFacets();
     // Re-sync collection buttons visually since they might be "collected" or "not-collected"
     initCollectionFilters(); // This re-binds but also re-syncs visual state based on state.filters.collected
     saveFilters();
   };
-  ["resetBtn", "resetBtn2", "resetBtnMobile"].forEach(id => {
+  ["resetBtn", "resetBtn2"].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.onclick = resetAll;
   });
@@ -1972,35 +3208,17 @@ function initUI() {
 
   bindAll("condAllBtn", state.filters.conds);
   bindAll("confAllBtn", state.filters.confs);
-  bindAll("rarityAllBtnMobile", state.filters.rarities);
-  bindAll("typeAllBtnMobile", state.filters.types);
-  bindAll("mapAllBtnMobile", state.filters.maps);
-  bindAll("condAllBtnMobile", state.filters.conds);
-  bindAll("confAllBtnMobile", state.filters.confs);
 
-  // Grid size slider (desktop + mobile), persisted in localStorage
-  const gs1 = document.getElementById("gridSize");
-  const gs2 = document.getElementById("gridSizeMobile");
-  const initial = loadGridSize();
-  setGridSize(initial);
-  if (gs1) {
-    gs1.min = String(GRID.min); gs1.max = String(GRID.max); gs1.step = String(GRID.step);
-    gs1.value = String(initial);
-    gs1.addEventListener("input", (e) => {
-      const v = e.target.value;
-      if (gs2) gs2.value = v;
-      setGridSize(v);
-    });
-  }
-  if (gs2) {
-    gs2.min = String(GRID.min); gs2.max = String(GRID.max); gs2.step = String(GRID.step);
-    gs2.value = String(initial);
-    gs2.addEventListener("input", (e) => {
-      const v = e.target.value;
-      if (gs1) gs1.value = v;
-      setGridSize(v);
-    });
-  }
+  // --- Grid Size Logic (Adaptive Buttons) ---
+  // Grid Size Logic moved to unified initGridSizeController
+
+
+  // Helper for window resize
+  window.addEventListener("resize", () => {
+    applyGridSize(currentGridSize);
+  });
+
+
   // Collapsible sections
   const setupCollapsible = (toggleId, contentId, iconId) => {
     const toggle = document.getElementById(toggleId);
@@ -2017,6 +3235,7 @@ function initUI() {
   // Desktop
   setupCollapsible("toggleRarity", "rarityFilters", "iconRarity");
   setupCollapsible("toggleType", "typeFilters", "iconType");
+  setupCollapsible("disclaimerHeader", "disclaimerContent", "disclaimerIcon");
   setupCollapsible("toggleMap", "mapFilters", "iconMap");
   setupCollapsible("toggleCond", "condFilters", "iconCond");
   setupCollapsible("toggleConf", "confFilters", "iconConf");
@@ -2026,6 +3245,36 @@ function initUI() {
   setupCollapsible("toggleMapMobile", "mapFiltersMobile", "iconMapMobile");
   setupCollapsible("toggleCondMobile", "condFiltersMobile", "iconCondMobile");
   setupCollapsible("toggleConfMobile", "confFiltersMobile", "iconConfMobile");
+
+  // Data Registry Headers Sort
+  document.querySelectorAll('[data-sort]').forEach(el => {
+    el.onclick = () => {
+      const field = el.dataset.sort;
+      let newSort = state.filters.sortData; // Default to current
+
+      if (field === 'name') {
+        // Toggle A-Z / Z-A
+        newSort = (state.filters.sortData === 'name_asc') ? 'name_desc' : 'name_asc';
+      } else if (field === 'confidence') {
+        // Toggle High-Low / Low-High
+        newSort = (state.filters.sortData === 'conf_desc') ? 'conf_asc' : 'conf_desc';
+      }
+      /* Entries removed */
+      /* else if (field === 'entries') { ... } */
+
+
+      // Update dropdowns and trim state
+      const sort1 = document.getElementById("sortSelect");
+      const sort2 = document.getElementById("sortSelectMobile");
+
+      if (sort1) sort1.value = newSort;
+      if (sort2) sort2.value = newSort;
+
+      // Trigger the standard onSort flow to handle state updates & re-render
+      // This ensures consistency between dropdown and header clicks
+      if (sort1) sort1.onchange({ target: { value: newSort } });
+    };
+  });
 }
 
 async function loadData() {
@@ -2091,7 +3340,7 @@ async function loadData() {
       // Helper to parse boolean checkbox values from CSV
       const parseBoolField = (val) => {
         const v = norm(val).toLowerCase();
-        return v === "true" || v === "yes" || v === "1" || v === "x" || v === "✓";
+        return v === "true" || v === "yes" || v === "1" || v === "x" || v === "âœ“";
       };
 
       state.columns = { name: colName, type: colType, typeIcon: colTypeIcon, map: colMap, cond: colCond, loc: colLoc, cont: colCont, img: colImg, rarity: colRarity, conf: colConf, wiki: colWiki };
@@ -2118,7 +3367,13 @@ async function loadData() {
         const questReward = colQuestReward ? parseBoolField(r[colQuestReward]) : false;
         const description = colDescription ? norm(r[colDescription]) : "";
         const active = colActive ? parseBoolField(r[colActive]) : true; // Default to true if column missing
-        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description, active });
+
+        // Parse list-based fields (Map, Condition) for filtering
+        // Split by comma, trim, and filter out empty strings
+        const mapList = map.split(',').map(s => s.trim()).filter(s => s);
+        const condList = cond.split(',').map(s => s.trim()).filter(s => s);
+
+        items.push({ name, type, map, cond, loc, cont, img, rarity, conf, wiki, typeIcon, trialsReward, questReward, description, active, mapList, condList });
       }
 
       // Filter out inactive items from state - they won't appear anywhere on the site
@@ -2127,7 +3382,7 @@ async function loadData() {
       initUI();
       applyFilters();
       renderFacets();
-      setMetaLine(`${items.length} items • live from Sheets`);
+      setMetaLine("");
     },
     error: (err) => {
       console.error(err);
@@ -2159,6 +3414,30 @@ const TYPE_ORDER = [
   "Material"
 ];
 
+const ALLOWED_MAPS = [
+  "Dam Battlegrounds",
+  "Blue Gate",
+  "Buried City",
+  "Spaceport",
+  "Stella Montis"
+];
+
+const ALLOWED_CONDITIONS = [
+  "Day",
+  "Night",
+  "Storm",
+  "Cold Snap",
+  "Harvester",
+  "Matriarch",
+  "Hidden Bunker",
+  "Husk Graveyard",
+  "Launch Tower Loot",
+  "Locked Gate",
+  "Prospecting Probes",
+  "Lush Blooms",
+  "N/A"
+];
+
 function buildFacets() {
   state.facets.rarities = uniqSorted(state.all.map(i => i.rarity)).sort((a, b) => rarityRank(b) - rarityRank(a));
   state.facets.types = uniqSorted(state.all.map(i => i.type))
@@ -2169,9 +3448,26 @@ function buildFacets() {
       if (ib === -1) ib = 999;
       return ia - ib || a.localeCompare(b);
     });
-  state.facets.maps = uniqSorted(state.all.map(i => i.map));
 
-  state.facets.conds = uniqSorted(state.all.map(i => i.cond));
+  // Maps: Collect all split values, filter by ALLOWED_MAPS
+  const allMaps = new Set();
+  state.all.forEach(i => {
+    i.mapList.forEach(m => {
+      if (ALLOWED_MAPS.includes(m)) allMaps.add(m);
+    });
+  });
+  state.facets.maps = Array.from(allMaps).sort((a, b) => a.localeCompare(b));
+
+  // Conditions: Collect all split values, filter by ALLOWED_CONDITIONS
+  const allConds = new Set();
+  state.all.forEach(i => {
+    i.condList.forEach(c => {
+      if (ALLOWED_CONDITIONS.includes(c)) allConds.add(c);
+      // Special case: N/A is allowed, but norm() might filter it out elsewhere? 
+      // uniqSorted filters falsy. Here we explicitly check inclusions.
+    });
+  });
+  state.facets.conds = Array.from(allConds).sort((a, b) => a.localeCompare(b));
   // Sort confidence by predefined order
   state.facets.confs = uniqSorted(state.all.map(i => i.conf))
     .sort((a, b) => {
@@ -2292,16 +3588,22 @@ function renderFacets() {
 }
 
 function renderActiveChips() {
-  const wrap = document.getElementById("activeChips");
-  if (!wrap) return;
-  wrap.innerHTML = "";
+  // We now have TWO places for chips: Blueprints tab (#activeChips) and Data tab (#dataActiveChips)
+  const wraps = [
+    document.getElementById("activeChips"),
+    document.getElementById("dataActiveChips")
+  ].filter(el => !!el);
+
+  wraps.forEach(wrap => wrap.innerHTML = "");
 
   const push = (label, clearFn) => {
-    const b = document.createElement("button");
-    b.className = "chip chip-active";
-    b.textContent = label + " ✕";
-    b.onclick = clearFn;
-    wrap.appendChild(b);
+    wraps.forEach(wrap => {
+      const b = document.createElement("button");
+      b.className = "chip chip-active";
+      b.textContent = label + " \u2715";
+      b.onclick = clearFn;
+      wrap.appendChild(b);
+    });
   };
 
   if (state.filters.rarities.size) push(`Rarity: ${Array.from(state.filters.rarities).join(", ")}`, () => { state.filters.rarities.clear(); applyFilters(); renderFacets(); saveFilters(); });
@@ -2352,8 +3654,8 @@ function applyFilters() {
   let out = state.all.filter(it => {
     if (hasR && !state.filters.rarities.has(it.rarity)) return false;
     if (hasT && !state.filters.types.has(it.type)) return false;
-    if (hasM && !state.filters.maps.has(it.map)) return false;
-    if (hasC && !state.filters.conds.has(it.cond)) return false;
+    if (hasM && !it.mapList.some(m => state.filters.maps.has(m))) return false;
+    if (hasC && !it.condList.some(c => state.filters.conds.has(c))) return false;
     if (hasConf && !state.filters.confs.has(it.conf)) return false;
 
     // Collection filter (works in both tabs)
@@ -2376,18 +3678,23 @@ function applyFilters() {
     return true;
   });
 
-  const sort = state.filters.sort;
+  const sort = state.filters.sortBlueprints || "rarity_desc";
   out.sort((a, b) => {
     if (sort === "name_asc") return a.name.localeCompare(b.name);
     if (sort === "name_desc") return b.name.localeCompare(a.name);
     if (sort === "type_asc") return (a.type || "").localeCompare(b.type || "");
-    if (sort === "rarity_desc") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
     if (sort === "rarity_asc") return rarityRank(a.rarity) - rarityRank(b.rarity) || a.name.localeCompare(b.name);
-    return a.name.localeCompare(b.name);
+    // Default: rarity_desc
+    return rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
   });
 
   state.filtered = out;
   renderGrid();
+
+  // Also update Data Registry if we are on that tab
+  if (state.currentTab === "data") {
+    renderDataRegistry();
+  }
 }
 
 function renderGrid() {
@@ -2399,23 +3706,27 @@ function renderGrid() {
   grid.innerHTML = "";
   if (count) count.textContent = `${state.filtered.length} / ${state.all.length}`;
 
-  if (!state.filtered.length) {
+  if (!state.filtered.length || state.currentTab !== "blueprints") {
     grid.classList.add("hidden");
-    if (empty) empty.classList.remove("hidden");
+    if (empty && state.currentTab === "blueprints") empty.classList.remove("hidden");
     return;
   } else {
     grid.classList.remove("hidden");
     if (empty) empty.classList.add("hidden");
   }
 
+  // Reverted to hardcoded default (Medium) to fix regression
+  grid.className = "grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-5";
 
   const cards = [];
 
   for (const it of state.filtered) {
     const card = document.createElement("div");
-    card.className = "card-compact bg-zinc-950 border border-zinc-800 rounded-2xl p-2 opacity-0"; // Start invisible
+    card.className = "card-compact border border-zinc-800/50 rounded-2xl p-2 opacity-0"; // Start invisible
+    card.style.backgroundColor = "#0C0C0F"; // Custom dark background
     card.style.position = "relative";
     card.style.overflow = "visible";
+    card.style.setProperty("--glow-color", rarityColor(it.rarity));
     card.dataset.name = it.name; // For context menu
     // Reuse style settings
 
@@ -2442,38 +3753,42 @@ function renderGrid() {
     const img = document.createElement("img");
     img.src = it.img || "";
     img.alt = it.name;
-    img.className = "w-full h-full object-contain p-2 relative z-10";
+    img.className = "w-full h-full object-contain p-2 relative z-10 pointer-events-none select-none";
     img.style.width = "100%";
     img.style.height = "100%";
     img.style.objectFit = "contain";
     img.style.padding = "8px";
     img.loading = "lazy";
+    img.draggable = false; // Disable native drag
+    img.style.webkitTouchCallout = "none"; // Disable iOS context menu
+    img.style.userSelect = "none";
 
-    // Hover effect: Expand image slightly when card is hovered
-    card.style.transition = "transform 0.2s"; // Ensure smooth scaling if using CSS, but here we use motion animate
-    card.addEventListener("mouseenter", () => animate(img, { scale: 1.1 }));
-    card.addEventListener("mouseleave", () => animate(img, { scale: 1 }));
+    // Hover effect: Expand image slightly when card is hovered (CSS handled)
+    img.classList.add("transition-transform", "duration-200", "ease-out", "group-hover:scale-110");
+    card.classList.add("group"); // Ensure card is group parent
 
     const corner = document.createElement("div");
     corner.className = "rarity-corner";
     // Concave ramp: Center shifted out, hard stop for sharpness (60% -> 60%)
     corner.style.background = `radial-gradient(circle at 120% -20%, transparent 0%, transparent 60%, ${rarityColor(it.rarity)}66 60%, ${rarityColor(it.rarity)}cc 100%)`;
 
+    // --- Pill: Confidence ---
     const tab = document.createElement("div");
     tab.className = "type-tab";
-    tab.style.background = rarityColor(it.rarity) + "22";
-    tab.style.borderColor = rarityColor(it.rarity);
 
-    const tabIcon = document.createElement("img");
-    tabIcon.src = it.typeIcon;
-    tabIcon.alt = it.type;
+    // Use global CONFIDENCE_COLORS (exact rarity colors)
+    const confColor = CONFIDENCE_COLORS[it.conf] || "#E11D48"; // Default red for N/A
 
-    const tabText = document.createElement("span");
-    tabText.className = "";
-    tabText.textContent = it.type || "—";
+    // Glassy background + border colored by confidence
+    tab.style.background = confColor + "9E"; // ~62% opacity
+    tab.style.borderColor = confColor;
 
-    tab.appendChild(tabIcon);
-    tab.appendChild(tabText);
+    const confText = document.createElement("span");
+    confText.className = "text-white font-semibold";
+    confText.style.textShadow = "0 1px 2px rgba(0,0,0,0.5)"; // Shadow for readability
+    confText.textContent = it.conf || "N/A";
+
+    tab.appendChild(confText);
 
     imgWrap.appendChild(img);
     imgWrap.appendChild(corner);
@@ -2483,16 +3798,25 @@ function renderGrid() {
     title.className = "mt-2 px-1 pb-1";
 
     const name = document.createElement("div");
-    name.className = "font-semibold leading-tight";
-    name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)";
+    name.className = "font-semibold leading-tight transition-all duration-200";
+
+    // Dynamic Text Size
+    const bpSize = state.blueprintGridSize || 'M';
+    if (bpSize === 'S') name.classList.add("text-xs");
+    else if (bpSize === 'L') name.classList.add("text-base"); // Large
+    else name.classList.add("text-sm"); // Medium (Default)    
+
+    // name.style.fontSize = "clamp(13px, calc(var(--cardSize)/18), 16px)"; // Removed clamp
     name.textContent = it.name;
     title.appendChild(name);
     const details = document.createElement("div");
-    details.className = "details-overlay hidden";
+    // Standard Glass Style (Works because parent card is opaque)
+    details.className = "details-overlay hidden backdrop-blur-md bg-zinc-900/40 border border-white/10 shadow-2xl rounded-2xl";
 
     // -- "Most Likely" Group Container --
     const spawnGroup = document.createElement("div");
-    spawnGroup.className = "bg-zinc-900/50 rounded-lg p-3 border border-zinc-800 mb-3";
+    // Changed to 20% opacity black + glassy border
+    spawnGroup.className = "bg-black/20 rounded-lg p-3 border border-white/10 mb-3";
 
     // Group Header
     const groupHeader = document.createElement("div");
@@ -2603,8 +3927,6 @@ function renderGrid() {
       details.appendChild(row);
     }
 
-
-
     // Description (if present) - Standard Row Layout
     if (it.description) {
       const row = document.createElement("div");
@@ -2639,35 +3961,54 @@ function renderGrid() {
       details.appendChild(a);
     }
 
+    // -- Link to Data Registry (Detailed Data) --
+    const dataLink = document.createElement("div");
+    // Changed to 20% opacity black + glassy border
+    dataLink.className = "mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black/20 border border-white/10 hover:border-emerald-400 hover:bg-black/30 rounded-lg cursor-pointer transition-all group/link shadow-sm";
+    dataLink.onclick = (e) => {
+      e.stopPropagation();
+      if (window.openDataDetail) window.openDataDetail(it.name);
+    };
+
+    dataLink.innerHTML = `
+      <span class="text-xs font-bold text-zinc-300 group-hover/link:text-white uppercase tracking-wider">Detailed Data</span>
+      <svg class="w-4 h-4 text-zinc-500 group-hover/link:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+      </svg>
+    `;
+    details.appendChild(dataLink);
+
     frame.style.cursor = "pointer";
     frame.onclick = (e) => {
-      // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
       e.stopPropagation();
+
+      if (state.massCollectMode) {
+        // Toggle Collected Status
+        if (state.collectedItems.has(it.name)) {
+          state.collectedItems.delete(it.name);
+          hideToast(); // Hide toast if uncollecting
+        } else {
+          state.collectedItems.add(it.name);
+          state.wishlistedItems.delete(it.name);
+          // Show toast in mass mode too
+          if (state.currentTab === "blueprints") {
+            showCollectToast(it.name);
+          }
+        }
+        saveCollectionState();
+        updateCardVisuals(frame, it.name);
+        debouncedSyncToCloud();
+        return;
+      }
 
       const isOpen = !details.classList.contains("hidden");
 
-      // close any other open overlays
-      document.querySelectorAll(".details-overlay").forEach(d => {
-        if (d !== details) {
-          d.classList.add("hidden");
-          d.style.transform = ""; // reset shift
-          const parent = d.closest(".card-compact");
-          if (parent) {
-            parent.classList.remove("card-open");
-            parent.style.zIndex = ""; // Reset z-index
-          }
-        }
-      });
-
       if (isOpen) {
-        details.classList.add("hidden");
-        details.style.transform = "";
-        card.classList.remove("card-open");
-        card.style.zIndex = "";
+        deselectAll();
       } else {
-        details.classList.remove("hidden");
-        card.classList.add("card-open");
-        card.style.zIndex = "50"; // Bring to front
+        selectCard(card, "details");
+
+        // Overflow check
 
         // Overflow check
         requestAnimationFrame(() => {
@@ -2697,73 +4038,27 @@ function renderGrid() {
     const sparesCount = state.spares[it.name] || 0;
     if (sparesCount > 0) {
       const pill = document.createElement("div");
-      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.className = "spares-pill absolute top-[5cqi] right-[5cqi] z-20 px-[5cqi] py-[3cqi] rounded-full text-[8cqi] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
       pill.innerHTML = `Spares: <span class="font-bold">${sparesCount}</span>`;
       pill.dataset.itemName = it.name;
       frame.appendChild(pill);
     }
 
-    // Different click behavior based on tab
-    if (state.currentTab === "collection") {
-      // Collection mode: Click entire card to cycle state
-      frame.style.cursor = "pointer";
-      frame.onclick = (e) => {
-        e.stopPropagation();
-        cycleItemStatus(it.name, frame);
-        // UI update is handled by applyFilters() called inside cycleItemStatus
-      };
-    } else {
-      // Blueprint mode: Click to show details
-      frame.style.cursor = "pointer";
-      frame.onclick = (e) => {
-        // prevent bubbling if needed, though here we want card to capture? No, frame is inside card.
-        e.stopPropagation();
-
-        const isOpen = !details.classList.contains("hidden");
-
-        // close any other open overlays
-        document.querySelectorAll(".details-overlay").forEach(d => {
-          if (d !== details) {
-            d.classList.add("hidden");
-            d.style.transform = ""; // reset shift
-            const parent = d.closest(".card-compact");
-            if (parent) {
-              parent.classList.remove("card-open");
-              parent.style.zIndex = ""; // Reset z-index
-            }
-          }
-        });
-
-        if (isOpen) {
-          details.classList.add("hidden");
-          details.style.transform = "";
-          card.classList.remove("card-open");
-          card.style.zIndex = "";
-        } else {
-          details.classList.remove("hidden");
-          card.classList.add("card-open");
-          card.style.zIndex = "50"; // Bring to front
-
-          // Overflow check
-          requestAnimationFrame(() => {
-            const rect = details.getBoundingClientRect();
-            const margin = 12; // padding from screen edge
-
-            let shiftX = 0;
-            if (rect.left < margin) {
-              shiftX = (margin - rect.left);
-            } else if (rect.right > window.innerWidth - margin) {
-              shiftX = (window.innerWidth - margin - rect.right);
-            }
-
-            if (shiftX !== 0) {
-              // Apply shift on top of the existing centering (-50%)
-              details.style.transform = `translateX(calc(-50% + ${shiftX}px))`;
-            }
-          });
-        }
-      };
-    }
+    // Inject Mass Collect Overlay - INSIDE THE FRAME
+    const overlay = document.createElement("div");
+    overlay.className = "mass-collect-overlay";
+    overlay.innerHTML = `
+      <span class="mass-collect-text">Click to<br>Collect</span>
+      <div class="mass-collect-icons">
+        <svg class="mass-collect-icon icon-plus w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        <svg class="mass-collect-icon icon-check w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+    `;
+    frame.appendChild(overlay);
 
     card.appendChild(frame);
     card.appendChild(title);
@@ -2830,84 +4125,138 @@ function initCollectionFilter() {
 
 
 
+// Unified Sidebar Logic
+// Unified Sidebar Logic
+// Unified Sidebar Logic
+function initSidebar() {
+  const sidebar = document.getElementById("filtersSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  const openBtn = document.getElementById("desktopFilterBtn");
+  const closeBtn = document.getElementById("closeSidebarBtn");
+
+  if (!sidebar) console.error("Sidebar not found");
+
+  const openSidebar = () => {
+    if (sidebar) {
+      // Force inline style execution
+      sidebar.style.transform = "translateX(0)";
+      sidebar.style.display = "block";
+
+      // Mobile: Slide in
+      sidebar.classList.remove("-translate-x-full", "hidden");
+      sidebar.classList.add("translate-x-0");
+      sidebar.classList.remove("pointer-events-none");
+      sidebar.classList.add("pointer-events-auto");
+
+      // Desktop: Explicitly Switch to Block
+      sidebar.classList.remove("md:hidden");
+      sidebar.classList.add("md:block");
+    }
+    if (window.innerWidth < 768) {
+      if (backdrop) backdrop.classList.remove("hidden");
+      document.body.classList.add("overflow-hidden"); // Lock scroll
+    }
+  };
+
+  const closeSidebar = () => {
+    if (sidebar) {
+      // Clean up inline styles
+      sidebar.style.transform = "";
+      sidebar.style.display = "";
+
+      // Mobile: Slide out
+      sidebar.classList.add("-translate-x-full");
+      sidebar.classList.remove("translate-x-0");
+
+      sidebar.classList.remove("pointer-events-auto");
+      sidebar.classList.add("pointer-events-none");
+
+      // Desktop: Explicitly Hide
+      if (window.innerWidth >= 768) {
+        sidebar.classList.remove("md:block");
+        sidebar.classList.add("md:hidden");
+        sidebar.classList.add("hidden");
+        sidebar.style.display = "none"; // FORCE HIDE
+      }
+    }
+    if (backdrop) backdrop.classList.add("hidden");
+    document.body.classList.remove("overflow-hidden"); // Unlock scroll
+  };
+
+  const toggleSidebar = () => {
+    if (!sidebar) return;
+
+    // Robust Visibility Check
+    // If display is none, it is hidden.
+    const style = window.getComputedStyle(sidebar);
+    const isHidden = style.display === 'none';
+
+    // On mobile, it might be display:block but translated off-screen.
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // For mobile, check translation class
+      if (sidebar.classList.contains("-translate-x-full")) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    } else {
+      // Desktop
+      if (isHidden) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    }
+  };
+
+  if (openBtn) {
+    openBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSidebar();
+    });
+  }
+
+  if (closeBtn) closeBtn.onclick = closeSidebar;
+  if (backdrop) backdrop.onclick = closeSidebar;
+}
+
 // Update initCollectionFilters to handle both tabs
+// Update initCollectionFilters to handle unified grid
 function initCollectionFilters() {
-  // Collection tab filters
   const allBtn = document.getElementById("collectedAll");
   const yesBtn = document.getElementById("collectedYes");
+  const wishlistBtn = document.getElementById("collectedWish");
   const noBtn = document.getElementById("collectedNo");
-
-  // Blueprints tab filters
-  const allBtnBP = document.getElementById("collectedAllBlueprints");
-  const yesBtnBP = document.getElementById("collectedYesBlueprints");
-  const wishlistBtnBP = document.getElementById("collectedWishBlueprints");
-  const noBtnBP = document.getElementById("collectedNoBlueprints");
-  const sparesBtnBP = document.getElementById("collectedSparesBlueprints");
-
-  // Mobile filters
-  const allBtnMob = document.getElementById("collectedAllMobile");
-  const yesBtnMob = document.getElementById("collectedYesMobile");
-  const wishlistBtnMob = document.getElementById("collectedWishMobile");
-  const noBtnMob = document.getElementById("collectedNoMobile");
-  const sparesBtnMob = document.getElementById("collectedSparesMobile");
+  const sparesBtn = document.getElementById("collectedSpares");
 
   const setFilter = (value) => {
     state.filters.collected = value;
 
-    // Synchronize all instances of these buttons
-    const allSets = [
-      [allBtn, yesBtn, null, noBtn, null],
-      [allBtnBP, yesBtnBP, wishlistBtnBP, noBtnBP, sparesBtnBP],
-      [allBtnMob, yesBtnMob, wishlistBtnMob, noBtnMob, sparesBtnMob]
-    ];
+    // Synchronize buttons
+    const buttons = {
+      all: allBtn,
+      collected: yesBtn,
+      wishlist: wishlistBtn,
+      "not-collected": noBtn,
+      "spares": sparesBtn
+    };
 
-    allSets.forEach(set => {
-      const [a, y, w, n, s] = set;
-      if (a) {
-        a.classList.remove("chip-active");
-        if (value === "all") a.classList.add("chip-active");
-      }
-      if (y) {
-        y.classList.remove("chip-active");
-        if (value === "collected") y.classList.add("chip-active");
-      }
-      if (w) {
-        w.classList.remove("chip-active");
-        if (value === "wishlist") w.classList.add("chip-active");
-      }
-      if (n) {
-        n.classList.remove("chip-active");
-        if (value === "not-collected") n.classList.add("chip-active");
-      }
-      if (s) {
-        s.classList.remove("chip-active");
-        if (value === "spares") s.classList.add("chip-active");
-      }
-    });
+    Object.values(buttons).forEach(btn => btn?.classList.remove("chip-active"));
+
+    // Activate correct button
+    if (buttons[value]) buttons[value].classList.add("chip-active");
 
     applyFilters();
     renderFacets(); // To update the chips
     saveFilters();
   };
 
-  // Collection tab (No wishlist button here yet, or standard 3-set)
-  // Actually, UI has 3 buttons. Let's assume standard behavior.
   if (allBtn) allBtn.onclick = () => setFilter("all");
   if (yesBtn) yesBtn.onclick = () => setFilter("collected");
+  if (wishlistBtn) wishlistBtn.onclick = () => setFilter("wishlist");
   if (noBtn) noBtn.onclick = () => setFilter("not-collected");
-
-  // Blueprints tab
-  if (allBtnBP) allBtnBP.onclick = () => setFilter("all");
-  if (yesBtnBP) yesBtnBP.onclick = () => setFilter("collected");
-  if (wishlistBtnBP) wishlistBtnBP.onclick = () => setFilter("wishlist");
-  if (noBtnBP) noBtnBP.onclick = () => setFilter("not-collected");
-  if (sparesBtnBP) sparesBtnBP.onclick = () => setFilter("spares");
-
-  if (allBtnMob) allBtnMob.onclick = () => setFilter("all");
-  if (yesBtnMob) yesBtnMob.onclick = () => setFilter("collected");
-  if (wishlistBtnMob) wishlistBtnMob.onclick = () => setFilter("wishlist");
-  if (noBtnMob) noBtnMob.onclick = () => setFilter("not-collected");
-  if (sparesBtnMob) sparesBtnMob.onclick = () => setFilter("spares");
+  if (sparesBtn) sparesBtn.onclick = () => setFilter("spares");
 
   // Initial sync on load
   setFilter(state.filters.collected);
@@ -2924,10 +4273,19 @@ function initContextMenu() {
 
   let activeCard = null;
   let longPressTimer = null;
+  let contextMenuOpened = false;
   const LONG_PRESS_DURATION = 500; // ms
 
   // Show menu beneath the card
   const showMenu = (card) => {
+    selectCard(card, "menu");
+
+    // Stop any pending close since we are showing it now
+    if (window.menuCloseTimer) {
+      clearTimeout(window.menuCloseTimer);
+      window.menuCloseTimer = null;
+    }
+
     activeCard = card;
     if (!card) return;
 
@@ -2947,7 +4305,7 @@ function initContextMenu() {
     }
 
     // Vertical safety check: if it would go off the bottom, show it above the item instead
-    const estimatedHeight = 240; // Approx height including all options and stepper
+    const estimatedHeight = 150; // Approx height including all options and stepper
     if (top + estimatedHeight > window.innerHeight - margin) {
       top = cardRect.top - estimatedHeight - 8;
       // Ensure it doesn't go off the top either
@@ -2956,7 +4314,7 @@ function initContextMenu() {
 
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    menu.classList.remove("hidden");
+    menu.classList.remove("hidden", "pointer-events-none");
     requestAnimationFrame(() => menu.classList.remove("opacity-0"));
 
     // Update spares count display for this item
@@ -2966,48 +4324,86 @@ function initContextMenu() {
       const count = state.spares[itemName] || 0;
       contextSparesCount.textContent = count;
     }
+
+    // Update collected/wishlisted button text & visual state based on item status
+    const itemName = card.dataset.name;
+    const collectedText = document.getElementById("contextCollectedText");
+    const wishlistText = document.getElementById("contextWishlistText");
+    const collectedBtn = document.getElementById("contextCollectedBtn");
+    const wishlistBtn = document.getElementById("contextWishlistBtn");
+
+    if (state.collectedItems.has(itemName)) {
+      if (collectedText) collectedText.textContent = "Mark as Uncollected";
+      if (collectedBtn) collectedBtn.classList.add("bg-emerald-500/20", "text-emerald-400");
+    } else {
+      if (collectedText) collectedText.textContent = "Mark as Collected";
+      if (collectedBtn) collectedBtn.classList.remove("bg-emerald-500/20", "text-emerald-400");
+    }
+
+    if (state.wishlistedItems.has(itemName)) {
+      if (wishlistText) wishlistText.textContent = "Remove from Wishlist";
+      if (wishlistBtn) wishlistBtn.classList.add("bg-amber-500/20", "text-amber-400");
+    } else {
+      if (wishlistText) wishlistText.textContent = "Add to Wishlist";
+      if (wishlistBtn) wishlistBtn.classList.remove("bg-amber-500/20", "text-amber-400");
+    }
   };
 
   // Hide menu
   const hideMenu = () => {
-    menu.classList.add("opacity-0");
+    menu.classList.add("opacity-0", "pointer-events-none");
     setTimeout(() => menu.classList.add("hidden"), 150);
+    if (activeCard) activeCard.classList.remove("card-selected");
     activeCard = null;
   };
 
-  // Right-click handler (Desktop) - Only for Collection tab
+  // Right-click handler (Desktop) - Global on Grid
   grid.addEventListener("contextmenu", (e) => {
-    if (state.currentTab !== "collection") return; // Only on Collection tab
+    // if (state.currentTab !== "collection") return; // Enabled globally now
     const card = e.target.closest(".card-compact");
     if (!card) return;
     e.preventDefault();
     showMenu(card);
   });
 
-  // Long-press handlers (Mobile) - Only for Collection tab
+  // Long-press handlers (Mobile) - Global on Grid
   grid.addEventListener("touchstart", (e) => {
-    if (state.currentTab !== "collection") return; // Only on Collection tab
+    // if (state.currentTab !== "collection") return; // Enabled globally now
     const card = e.target.closest(".card-compact");
     if (!card) return;
 
     longPressTimer = setTimeout(() => {
+      contextMenuOpened = true;
       showMenu(card);
       // Vibrate if supported
       if (navigator.vibrate) navigator.vibrate(50);
     }, LONG_PRESS_DURATION);
   }, { passive: true });
 
-  grid.addEventListener("touchend", () => {
+  grid.addEventListener("touchend", (e) => {
     clearTimeout(longPressTimer);
-  }, { passive: true });
+    if (contextMenuOpened) {
+      if (e.cancelable) e.preventDefault();
+      contextMenuOpened = false;
+    }
+  }, { passive: false });
 
   grid.addEventListener("touchmove", () => {
     clearTimeout(longPressTimer);
   }, { passive: true });
 
-  // Hide menu on click outside
+  // Hide menu/details on click outside
   document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target)) hideMenu();
+    // Don't close if clicking inside the context menu
+    if (menu.contains(e.target)) return;
+
+    // Don't close if clicking inside a details overlay
+    if (e.target.closest(".details-overlay")) return;
+
+    // Don't close if clicking inside a selected card
+    if (e.target.closest(".card-selected")) return;
+
+    deselectAll();
   });
 
   // Spares pill click handler (event delegation) - open context menu
@@ -3053,7 +4449,7 @@ function initContextMenu() {
     const count = state.spares[itemName] || 0;
     if (count > 0) {
       const pill = document.createElement("div");
-      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.className = "spares-pill absolute top-[5cqi] right-[5cqi] z-20 px-[5cqi] py-[3cqi] rounded-full text-[8cqi] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
       pill.innerHTML = `Spares: <span class="font-bold">${count}</span>`;
       pill.dataset.itemName = itemName;
       frame.appendChild(pill);
@@ -3112,11 +4508,17 @@ function initContextMenu() {
       // Toggle collected state
       if (state.collectedItems.has(itemName)) {
         state.collectedItems.delete(itemName);
+        hideToast(); // Hide toast if uncollecting
       } else {
         state.wishlistedItems.delete(itemName); // Remove from wishlist if present
         state.collectedItems.add(itemName);
+        // Show toast asking for location data (only on blueprints tab)
+        if (state.currentTab === "blueprints") {
+          showCollectToast(itemName);
+        }
       }
       saveCollectionState();
+      debouncedSyncToCloud();
       if (frame) updateCardVisuals(frame, itemName);
       updateProgress();
       hideMenu();
@@ -3144,6 +4546,1168 @@ function initContextMenu() {
   });
 }
 
+// ==========================================
+// DATA REGISTRY & ANALYTICS
+// ==========================================
+
+const DATA_CSV_URL = "./data_registry.csv";
+
+state.detailedData = [];
+state.dataSort = { column: 'rarity', direction: 'desc' }; // Default sort
+state.dataSearch = "";
+
+async function fetchDetailedData() {
+  const container = document.getElementById("dataRows");
+  if (!container) return;
+
+  // Show loading if empty
+  if (state.detailedData.length === 0) {
+    container.innerHTML = `
+      <div class="py-20 text-center">
+        <div class="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p class="text-zinc-500">Fetching live data...</p>
+      </div>`;
+  }
+
+  try {
+    const response = await fetch(DATA_CSV_URL);
+    const csvText = await response.text();
+
+    Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        processDataResults(results.data);
+      },
+      error: (err) => {
+        console.error("CSV Parse Error:", err);
+        container.innerHTML = `<div class="py-10 text-center text-red-500">Failed to load data.</div>`;
+      }
+    });
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    container.innerHTML = `<div class="py-10 text-center text-red-500">Network error.</div>`;
+  }
+}
+
+function processDataResults(rawData) {
+  // Map CSV fields to our internal structure
+  state.detailedData = rawData.map(row => {
+    // Normalize keys if needed, but CSV headers seem clean
+    // "Blueprint Name", "Most Likely Map", "Most Likely Condition", "Total Entries", "Data Confidence"
+
+    // Parse Maps
+    const maps = [
+      { name: "Spaceport", count: parseInt(row["Spaceport"] || 0) },
+      { name: "Stella Montis", count: parseInt(row["Stella Montis"] || 0) },
+      { name: "Blue Gate", count: parseInt(row["Blue Gate"] || 0) },
+      { name: "Dam Battlegrounds", count: parseInt(row["Dam Battlegrounds"] || 0) },
+      { name: "Buried City", count: parseInt(row["Buried City"] || 0) }
+    ].sort((a, b) => b.count - a.count);
+
+    // Parse Conditions
+    const conditions = [
+      { name: "Day", count: parseInt(row["Day"] || 0) },
+      { name: "Night", count: parseInt(row["Night"] || 0) },
+      { name: "Storm", count: parseInt(row["Storm"] || 0) },
+      { name: "Cold Snap", count: parseInt(row["Cold Snap"] || 0) },
+      { name: "Hidden Bunker", count: parseInt(row["Hidden Bunker"] || 0) },
+      { name: "Locked Gate", count: parseInt(row["Locked Gate"] || 0) }
+    ].sort((a, b) => b.count - a.count);
+
+    const totalEntries = parseInt(row["Total Entries"] || 0);
+
+    return {
+      name: row["Blueprint Name"],
+      confidence: row["Data Confidence"],
+      bestMap: row["Most Likely Map"],
+      bestCondition: row["Most Likely Condition"],
+      entries: totalEntries,
+      maps: maps,
+      conditions: conditions
+    };
+  });
+
+  renderDataRegistry();
+}
+
+function renderDataRegistry() {
+  const container = document.getElementById("dataRows");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Filter
+  // Filter
+  let filtered = state.detailedData.filter(item => {
+    // Global text search (Main Search Bar)
+    const q = (state.filters.search || "").toLowerCase();
+
+    // Attempt to match with local blueprint data for robust filtering
+    let localBP = state.all.find(bp => bp.name === item.name);
+    // Fallback for naming mismatches (e.g. "Light Stick")
+    if (!localBP && item.name.includes("Light Stick")) {
+      localBP = state.all.find(bp => bp.name.includes("Light Stick"));
+    }
+
+    // USER REQUEST: Apply "Active Only" filter logic.
+    // Since state.all ONLY contains active items (filtered during load), 
+    // any item that does not resolve to a localBP should be hidden.
+    if (!localBP) return false;
+
+    // Default values if localBP not found
+    const rarity = localBP ? localBP.rarity : 'common';
+    const type = localBP ? localBP.type : 'Unknown';
+    const map = localBP ? localBP.map : '';
+    const cond = localBP ? localBP.cond : '';
+    const conf = item.confidence || (localBP ? localBP.conf : '');
+
+    // 1. Facet Filters
+    if (state.filters.rarities.size > 0 && !state.filters.rarities.has(rarity)) return false;
+    if (state.filters.types.size > 0 && !state.filters.types.has(type)) return false;
+    if (state.filters.maps.size > 0 && !state.filters.maps.has(map)) return false;
+    if (state.filters.conds.size > 0 && !state.filters.conds.has(cond)) return false;
+    if (state.filters.confs.size > 0 && !state.filters.confs.has(conf)) return false;
+
+    // 2. Collection Filters
+    const isCollected = state.collectedItems.has(item.name);
+    const isWishlisted = state.wishlistedItems.has(item.name);
+
+    if (state.filters.collected === "collected" && !isCollected) return false;
+    if (state.filters.collected === "wishlist" && !isWishlisted) return false;
+    if (state.filters.collected === "not-collected" && isCollected) return false;
+    if (state.filters.collected === "spares" && !(state.spares[item.name] > 0)) return false;
+
+    // 3. Search Query
+    if (q) {
+      // Search against Name, Best Map, Best Condition, Type
+      const doc = (item.name + " " + type + " " + item.bestMap + " " + item.bestCondition).toLowerCase();
+      if (!doc.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    const dir = state.dataSort.direction === 'asc' ? 1 : -1;
+    const col = state.dataSort.column;
+
+    if (col === 'name') return a.name.localeCompare(b.name) * dir;
+
+    if (col === 'rarity') {
+      const getRarity = (item) => {
+        let bp = state.all.find(bi => bi.name === item.name);
+        if (!bp && item.name.includes("Light Stick")) bp = state.all.find(bi => bi.name.includes("Light Stick"));
+        return bp ? bp.rarity : 'common';
+      };
+      const rA = rarityRank(getRarity(a));
+      const rB = rarityRank(getRarity(b));
+      return (rA - rB) * dir;
+    }
+
+    if (col === 'confidence') {
+      const getConfRank = (c) => {
+        const idx = CONFIDENCE_ORDER.indexOf(c);
+        return idx === -1 ? 999 : idx;
+      };
+      // CONFIDENCE_ORDER: Confirmed (0) -> Not Enough Data (4).
+      // Descending (High->Low) means 0 comes first.
+      // Ascending (Low->High) means 4 comes first.
+      // Default array index sort (a-b) puts 0 first.
+      // So 'asc' direction (1) should yield 0->4? No...
+      // Let's define: High=Confirmed, Low=NotEnoughData.
+      // 'conf_desc' (High->Low) => Confirmed first.
+      // 'conf_asc' (Low->High) => NotEnoughData first.
+
+      const rankA = getConfRank(a.confidence);
+      const rankB = getConfRank(b.confidence);
+
+      // Primary: Confidence
+      if (rankA !== rankB) {
+        // High->Low (desc) means Confirmed (0) first for direction desc?
+        // Wait, earlier logic: (rankA - rankB) * dir works if rank 0 is "High".
+        // Let's verify direction. 
+        // If sorting Numbers (0, 1, 2) Ascension: 0, 1, 2. Descension: 2, 1, 0.
+        // We want Confirmed (0) first when "High -> Low".
+        // "High -> Low" implies Descending. 
+        // If dir is -1 (desc), (0-2)*-1 = 2 (positive). B comes first? 
+        // No, standard sort(a,b): result < 0 => a first.
+        // If dir is -1: (0 - 4)*-1 = 4 (>0) => b first. So NotEnoughData first. That's wrong.
+        // We want 0 first when DESC.
+        // So behavior is actually Ascending index for "High Confidence".
+        // Let's just hardcode the logic:
+        // 'conf_desc' (High->Low): 0 -> 4.
+        // 'conf_asc' (Low->High): 4 -> 0.
+        // In onSort map: 'conf_desc' -> direction 'desc'.
+
+        // If direction is 'desc', we want a-b (0 first).
+        // If direction is 'asc', we want b-a (4 first).
+        if (state.dataSort.direction === 'desc') {
+          return rankA - rankB;
+        } else {
+          return rankB - rankA;
+        }
+      }
+
+      // Secondary: Rarity (High -> Low)
+      // Rarity Rank: 0 (Exotic) -> 4 (Common)
+      const getRarity = (item) => {
+        let bp = state.all.find(bi => bi.name === item.name);
+        if (!bp && item.name.includes("Light Stick")) bp = state.all.find(bi => bi.name.includes("Light Stick"));
+        return bp ? bp.rarity : 'common';
+      };
+
+      const rA = rarityRank(getRarity(a));
+      const rB = rarityRank(getRarity(b));
+
+      // Secondary is always High->Low (Exotic first) unless... ?
+      // Let's stick to High->Low (0 first) for secondary.
+      return rA - rB;
+    }
+
+
+    // Simple string sorts for others
+    return String(a[col]).localeCompare(String(b[col])) * dir;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="py-10 text-center text-zinc-500">No matching records found.</div>`;
+    return;
+  }
+
+  // Determine density classes based on dataGridSize
+  const size = state.dataGridSize || 'medium';
+  let densityClass = "py-3 md:py-4 text-xs md:text-sm"; // Default (Medium)
+  // rowGap unused in header class but good to have if we used it later
+
+  if (size === 'small') {
+    densityClass = "py-1.5 md:py-2 text-[10px] md:text-xs";
+  } else if (size === 'large') {
+    // Reduced from py-6 to keep it tighter while keeping wider layout
+    densityClass = "py-3 md:py-4 text-sm md:text-base";
+  }
+
+  // Define Image and Text sizes
+  let imgSizeClass = "w-10 h-10"; // Medium
+  let textSizeClass = "text-sm";  // Medium
+
+  if (size === 'small') {
+    imgSizeClass = "w-8 h-8";
+    textSizeClass = "text-xs";
+  } else if (size === 'large') {
+    // Reduced from w-14/text-base to prevent cutoff
+    imgSizeClass = "w-12 h-12";
+    textSizeClass = "text-sm md:text-base";
+  }
+
+  filtered.forEach((item, index) => {
+    // Attempt to find matching blueprint in our local state to get image/rarity
+    let localBP = state.all.find(bp => bp.name === item.name);
+    // Fallback for Light Sticks (CSV often uses generic "Light Stick")
+    if (!localBP && item.name.includes("Light Stick")) {
+      localBP = state.all.find(bp => bp.name.includes("Light Stick"));
+    }
+    const rarity = localBP ? localBP.rarity : 'common';
+    const icon = localBP ? localBP.img : 'icons/ItemCategory_Weapon.webp'; // Fallback
+    const typeIcon = localBP ? localBP.typeIcon : '';
+
+    const row = document.createElement("div");
+    row.className = "group relative flex flex-col bg-zinc-900/70 border border-zinc-800/50 hover:border-zinc-700 rounded-xl overflow-hidden transition-all duration-200 backdrop-blur-md";
+
+    // Header (The Row itself)
+    const header = document.createElement("div");
+
+    // Dynamic Grid Cols - same for all sizes on desktop
+    // Default: [2fr,1fr,1fr,1fr,40px]
+    const colClass = "md:grid-cols-[2fr,1fr,1fr,1fr,40px]";
+
+    // Mobile: Increased item col (100px), shrunk condition col (0.5fr), added gap
+    header.className = `group grid grid-cols-[100px,0.7fr,0.9fr,0.5fr,0.4fr,18px] ${colClass} gap-x-2 md:gap-4 ${densityClass} px-3 md:px-4 border-b border-white/5 hover:bg-white/5 transition-colors items-center cursor-pointer`;
+
+    const miniCardId = `mini-card-${index}`;
+
+    header.innerHTML = `
+      <!-- Item Name & Icon (Col 1) -->
+      <div class="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-4 overflow-hidden md:border-r border-white/5 pr-0 h-full min-w-0">
+        <div id="${miniCardId}" class="shrink-0 relative flex items-center justify-center ${imgSizeClass}">
+            ${!localBP ? `
+            <div class="${imgSizeClass} rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden" 
+                 style="border-color: ${rarityColor(rarity)}66">
+              <img src="${icon}" class="w-full h-full object-contain p-1" loading="lazy">
+              <div class="absolute inset-0 bg-${rarityColor(rarity)}/10"></div>
+            </div>` : ''}
+        </div>
+        <div class="flex flex-col min-w-0 w-full">
+          <!-- Text wrap enabled, sized down on mobile, type removed -->
+          <span class="font-bold ${textSizeClass} text-zinc-200 break-words leading-tight group-hover:text-emerald-400 transition-colors">${item.name}</span>
+        </div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="border-r border-white/5 h-full flex items-center pl-0 pr-1 md:pl-2 overflow-hidden">${getConfidenceBadges(item.confidence)}</div>
+
+      <!-- Best Map -->
+      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestMap}</div>
+
+      <!-- Best Condition -->
+      <div class="text-[10px] md:text-xs text-zinc-200 break-words leading-tight font-medium md:border-r border-white/5 h-full flex items-center pl-1 md:pl-2">${item.bestCondition}</div>
+
+      <!-- Arrow (Grid Column) -->
+      <div class="flex justify-end items-center h-full text-zinc-600 group-hover:text-zinc-300">
+        <svg class="w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 transform expand-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    `;
+
+    // Inject Scaled Card logic
+    if (localBP) {
+      const wrapper = header.querySelector(`#${miniCardId}`);
+      if (wrapper) {
+        // Dynamic Scale based on state.dataGridSize
+        // BaseW is 200px.
+        // Small: 50px (0.25)
+        // Medium: 84px (0.42) - Default
+        // Large: 130px (0.65)
+        let scale = 0.42;
+        if (state.dataGridSize === 'small') scale = 0.25;
+        if (state.dataGridSize === 'large') scale = 0.50;
+
+        const baseW = 200;
+
+        // Adjust wrapper to fit
+        wrapper.style.width = (baseW * scale) + "px";
+        wrapper.style.height = (baseW * scale) + "px";
+
+        const card = createCard(localBP, 0);
+
+        // Custom styling for Mini-View: Remove container and name
+        card.className = ""; // Remove base styles (bg, border, p-2)
+        card.style.background = "transparent";
+        card.style.border = "none";
+        card.style.padding = "0";
+        // Restore container query support for rarity-corner
+        card.style.containerType = "inline-size";
+
+        if (card.lastChild) card.lastChild.remove(); // Remove title/name
+
+        // Remove Type Pill/Icon
+        const typeTab = card.querySelector(".type-tab");
+        if (typeTab) typeTab.remove();
+
+        const badges = card.querySelectorAll(".collected-badge, .wishlist-badge");
+        badges.forEach(b => {
+          b.style.transform = "scale(1.8) translateY(-10px)"; // Adjusted position
+          b.style.transformOrigin = "top right";
+          b.style.zIndex = "50";
+        });
+
+        card.style.width = baseW + "px";
+        card.style.transform = `scale(${scale})`;
+        card.style.transformOrigin = "top left";
+        card.style.position = "absolute";
+        card.style.top = "0";
+        card.style.left = "0";
+        card.style.pointerEvents = "none";
+
+        wrapper.appendChild(card);
+      }
+    }
+
+    // Detail Section (Initially Hidden)
+    const detail = document.createElement("div");
+    detail.className = "hidden border-t border-zinc-800/50 bg-black/20";
+    detail.innerHTML = `
+      <div class="p-4 md:p-6">
+        <!-- Analytics Only -->
+        <div class="space-y-6 w-full min-w-0">
+          <!-- Maps Chart -->
+          <div>
+            <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Map Distribution</h4>
+            <div class="space-y-2">
+              ${renderDistBars(item.maps, item.entries)}
+            </div>
+          </div>
+          
+          <!-- Conditions Chart -->
+           <div>
+            <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Condition Distribution</h4>
+            <div class="space-y-2">
+              ${renderDistBars(item.conditions, item.entries)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Click to toggle
+    header.onclick = () => {
+      const isHidden = detail.classList.contains("hidden");
+
+      if (isHidden) {
+        detail.classList.remove("hidden");
+        header.querySelectorAll(".expand-arrow").forEach(el => el.classList.add("rotate-180"));
+        header.classList.add("bg-white/[0.02]"); // Active state
+      } else {
+        detail.classList.add("hidden");
+        header.querySelectorAll(".expand-arrow").forEach(el => el.classList.remove("rotate-180"));
+        header.classList.remove("bg-white/[0.02]");
+      }
+    };
+
+    header.dataset.itemName = item.name;
+    row.appendChild(header);
+    row.appendChild(detail);
+    container.appendChild(row);
+  });
+
+  // Handle Cross-Tab Linking (Detailed Data)
+  if (state.dataTabTarget) {
+    setTimeout(() => {
+      // Find the header element with the matching name
+      // Since header has the dataset, we query for that.
+      // Note: container contains 'row' divs. The 'header' is a child of 'row'.
+      // Querying container directly finds the header.
+      const targetHeader = container.querySelector(`div[data-item-name="${state.dataTabTarget}"]`);
+
+      if (targetHeader) {
+        targetHeader.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Trigger click to expand
+        targetHeader.click();
+        // Highlight
+        targetHeader.classList.add("bg-emerald-500/10");
+        setTimeout(() => targetHeader.classList.remove("bg-emerald-500/10"), 1500);
+      }
+      state.dataTabTarget = null;
+    }, 300); // Slight delay for render/tab switch
+  }
+}
+
+// Global function to link to Data Tab
+window.openDataDetail = function (itemName) {
+  state.dataTabTarget = itemName;
+
+  // Clear Data Registry filters to ensure visibility
+  state.dataSearch = "";
+  const searchInput = document.getElementById("dataSearch");
+  if (searchInput) searchInput.value = "";
+
+  switchTab('data');
+};
+
+function getConfidenceBadges(confidence) {
+  let color = "bg-zinc-800 text-zinc-400 border-zinc-700";
+  // "Low", "Medium", "High", "Very High", "Confirmed", "Confident"
+  // Map strings from CSV to styles
+  const c = confidence.toLowerCase();
+
+  // Color Mapping Per User Request:
+  // Gold = Confirmed
+  if (c.includes("confirmed")) color = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+  // Pink = Very High
+  else if (c.includes("very high")) color = "bg-pink-500/10 text-pink-400 border-pink-500/20";
+  // High -> Pink (Assumed)
+  else if (c.includes("high")) color = "bg-pink-500/10 text-pink-400 border-pink-500/20";
+  // Blue = Confident
+  else if (c.includes("confident")) color = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  // Medium -> Blue (Assumed)
+  else if (c.includes("medium")) color = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  // Emerald = Low
+  else if (c.includes("low")) color = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  // Grey = Not Enough Data / Default (handled by initial 'color' set to zinc)
+
+  return `<span class="flex flex-wrap justify-center text-center leading-none px-1 py-0.5 rounded-md text-[9px] md:text-[10px] font-bold border ${color} uppercase tracking-wide w-full h-auto break-words whitespace-normal">${confidence}</span>`;
+}
+
+function renderDistBars(data, total) {
+  // data is array of {name, count}
+  const max = Math.max(...data.map(d => d.count)) || 1;
+
+  // Rarity-based color system - moderately desaturated and darkened
+  const distColors = [
+    "#AA8900", // 1: Legendary (Balanced Muted Gold)
+    "#8E1C66", // 2: Epic (Balanced Muted Magenta)
+    "#15839E", // 3: Rare (Balanced Muted Cyan)
+    "#2E9949", // 4: Uncommon (Balanced Muted Green)
+    "#525452", // 5: Common (Balanced Gray)
+    "#911331", // 6: Not Enough Data (Balanced Muted Red)
+    "#52269A", // 7: Purple (Balanced Muted)
+    "#A74F0F"  // 8: Orange (Balanced Muted)
+  ];
+
+  return data.map((d, index) => {
+    if (d.count === 0) return ''; // Skip empty
+    const percent = Math.round((d.count / total) * 100);
+    const width = Math.max((d.count / max) * 100, 2); // Min width for visibility
+    const color = distColors[index] || "#3f3f46"; // Default Zinc-700
+
+    return `
+      <div class="flex items-center gap-3 text-xs">
+        <div class="w-24 shrink-0 text-zinc-300 text-right truncate" title="${d.name}">${d.name}</div>
+        <div class="flex-1 h-6 bg-zinc-900 rounded-md overflow-hidden relative group/bar">
+          <div class="absolute inset-y-0 left-0 rounded-md transition-all duration-200 opacity-90 group-hover/bar:opacity-100 group-hover/bar:brightness-110" 
+               style="width: ${width}%; background-color: ${color};"></div>
+          <div class="absolute inset-0 flex items-center px-2">
+             <span class="font-mono text-white z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] font-bold">${d.count} <span class="text-white/80 ml-1">(${percent}%)</span></span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+// Event Listeners for Data Tab
+document.addEventListener("DOMContentLoaded", () => {
+  // Search
+  const searchInput = document.getElementById("dataSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      state.dataSearch = e.target.value;
+      renderDataRegistry();
+    });
+  }
+
+  // Sort Headers: Removed redundant listener. Handled in initUI.
+  // Visual feedback: Removed. Handled via filter state.
+
+
+  // Refresh Btn
+  const refreshBtn = document.getElementById("dataRefreshBtn");
+  if (refreshBtn) {
+    refreshBtn.onclick = () => {
+      fetchDetailedData();
+    };
+  }
+
+  // Disclaimer Toggle
+  const disclaimerBtn = document.getElementById("disclaimerToggleBtn");
+  const disclaimerContent = document.getElementById("disclaimerContent");
+  const disclaimerIcon = document.getElementById("disclaimerIcon");
+
+  if (disclaimerBtn && disclaimerContent && disclaimerIcon) {
+    disclaimerBtn.addEventListener("click", () => {
+      disclaimerContent.classList.toggle("hidden");
+      disclaimerIcon.classList.toggle("rotate-180");
+    });
+  }
+});
+
+/* ==========================================================================
+   INTERACTIVE MAP PICKER
+   ========================================================================== */
+
+const MAP_CONFIG = {
+  "dam_battlegrounds": {
+    name: "Dam Battlegrounds",
+    url: "/images/maps/dam_battlegrounds.webp",
+    bounds: [[0, 0], [1000, 1095]] // 4260x3890 (~1.095 aspect)
+  },
+  "the_spaceport": {
+    name: "The Spaceport",
+    url: "/images/maps/the_spaceport.webp",
+    bounds: [[0, 0], [1000, 1000]] // Square
+  },
+  "buried_city": {
+    name: "Buried City",
+    url: "/images/maps/buried_city.webp",
+    bounds: [[0, 0], [1000, 1000]] // Square
+  },
+  "the_blue_gate": {
+    name: "The Blue Gate",
+    url: "/images/maps/the_blue_gate.webp",
+    bounds: [[0, 0], [1000, 1333]] // 4096x3072 (~1.33 aspect)
+  },
+  "stella_montis_upper": {
+    name: "Stella Montis (Upper)",
+    url: "/images/maps/stella_montis_lower.webp", // Swapped
+    bounds: [[0, 0], [1000, 1667]] // Swapped bounds
+  },
+  "stella_montis_lower": {
+    name: "Stella Montis (Lower)",
+    url: "/images/maps/stella_montis_upper.webp", // Swapped
+    bounds: [[0, 0], [1000, 1333]] // Swapped bounds
+  }
+};
+
+let mapPickerState = {
+  map: null,
+  currentPin: null,
+  currentMapId: "dam_battlegrounds",
+  stellaLevel: "upper", // Default
+  selectedLocation: null
+};
+
+function initMapPicker() {
+  const openBtn = document.getElementById("mapLocationDisplay");
+  const closeBtn = document.getElementById("closeMapPickerBtn");
+  const confirmBtn = document.getElementById("confirmPinBtn");
+  const modal = document.getElementById("mapPickerModal");
+
+  if (openBtn) {
+    openBtn.onclick = openMapPicker;
+    openBtn.style.cursor = "pointer";
+  }
+  if (closeBtn) closeBtn.onclick = closeMapPicker;
+  if (confirmBtn) confirmBtn.onclick = confirmMapSelection;
+
+  // Close on backdrop click
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) closeMapPicker();
+
+      // Close dropdown if clicking outside
+      if (!e.target.closest('#stellaDropdownMenu') && !e.target.closest('#map-tab-stella')) {
+        toggleStellaDropdown(false);
+      }
+    };
+  }
+}
+
+function openMapPicker() {
+  const modal = document.getElementById("mapPickerModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  // Use flex to show it (overriding hidden)
+  modal.classList.add("flex");
+
+  // Determine valid map ID
+  const currentMapInput = document.getElementById("submitMapId");
+  let mapId = currentMapInput && currentMapInput.value ? currentMapInput.value : "dam_battlegrounds";
+  if (!mapId) mapId = "dam_battlegrounds";
+  const validMapId = MAP_CONFIG[mapId] ? mapId : "dam_battlegrounds";
+
+  // Initialize map if first time
+  if (!mapPickerState.map) {
+    // Wait for modal transition/render
+    setTimeout(() => {
+      initLeafletMap();
+      loadMap(validMapId);
+    }, 50);
+  } else {
+    // Refresh layout (needed because modal was hidden)
+    setTimeout(() => {
+      mapPickerState.map.invalidateSize();
+      loadMap(validMapId);
+    }, 100);
+  }
+
+  // Update button text state
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) {
+    if (mapPickerState.selectedLocation) {
+      btnText.textContent = "Confirm Location";
+    } else {
+      btnText.textContent = "Submit Map (No Pin)";
+    }
+  }
+
+  // Ensure button is enabled
+  const confirmBtn = document.getElementById("confirmPinBtn");
+  if (confirmBtn) confirmBtn.disabled = false;
+
+  // Initial Remove Pin Button State
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) {
+    if (mapPickerState.selectedLocation) {
+      removeBtn.classList.remove("hidden");
+    } else {
+      removeBtn.classList.add("hidden");
+    }
+    removeBtn.onclick = removePin;
+  }
+}
+
+function removePin(e) {
+  if (e) e.stopPropagation();
+
+  // Remove layer
+  if (mapPickerState.currentPin) {
+    mapPickerState.map.removeLayer(mapPickerState.currentPin);
+    mapPickerState.currentPin = null;
+  }
+
+  // Clear state
+  mapPickerState.selectedLocation = null;
+  document.getElementById("coordinatesDisplay").textContent = "No location selected";
+
+  // Update UI Text
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) btnText.textContent = "Submit Map (No Pin)";
+
+  // Hide Remove Button
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) removeBtn.classList.add("hidden");
+
+  // Show instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) {
+    instructions.style.opacity = '1';
+    instructions.textContent = "Click or tap anywhere to place a pin";
+  }
+}
+
+function closeMapPicker() {
+  const modal = document.getElementById("mapPickerModal");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+}
+
+function initLeafletMap() {
+  // Check if L exists
+  if (typeof L === 'undefined') {
+    console.error("Leaflet not loaded");
+    return;
+  }
+
+  // Init map container
+  mapPickerState.map = L.map('leafletMap', {
+    crs: L.CRS.Simple,
+    minZoom: -1,
+    maxZoom: 2,
+    zoomSnap: 0,       // Allow fractional zoom levels (smooth zoom)
+    zoomDelta: 0.1,    // Small zoom steps for wheel/pinch
+    wheelPxPerZoomLevel: 120, // Slower, smoother wheel zooming
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.control.zoom({
+    position: 'bottomright'
+  }).addTo(mapPickerState.map);
+
+  // Click handler
+  mapPickerState.map.on('click', onMapClick);
+
+  // Render tabs
+  renderMapTabs();
+}
+
+function renderMapTabs() {
+  const container = document.getElementById("mapTabsContainer");
+  if (!container) return;
+
+  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => !id.includes("stella"));
+
+  // Render standard tabs
+  let html = visibleMaps.map(([id, config]) => `
+    <button onclick="loadMap('${id}')" 
+      class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white"
+      id="map-tab-${id}">
+      ${config.name}
+    </button>
+  `).join('');
+
+  // Add Stella Montis Dropdown Tab
+  const currentStellaLevel = mapPickerState.stellaLevel || "upper";
+
+  html += `
+    <div class="relative inline-block text-left" id="stellaDropdownContainer">
+      <button onclick="toggleStellaDropdown()" 
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2"
+        id="map-tab-stella">
+        Stella Montis
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </button>
+      
+      <div id="stellaDropdownMenu" class="hidden absolute right-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
+        <div class="py-1">
+          <button onclick="loadMap('stella_montis_upper'); toggleStellaDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'upper' ? 'text-emerald-500 font-bold' : ''}">
+            Upper Level
+          </button>
+          <button onclick="loadMap('stella_montis_lower'); toggleStellaDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'lower' ? 'text-emerald-500 font-bold' : ''}">
+            Lower Level
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+window.toggleStellaDropdown = (forceState) => {
+  const menu = document.getElementById("stellaDropdownMenu");
+  const btn = document.getElementById("map-tab-stella");
+  if (!menu || !btn) return;
+
+  const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
+
+  if (show) {
+    // Calculate position
+    const rect = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 8}px`; // 8px gap
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${Math.max(rect.width, 160)}px`; // At least button width or 160px
+    menu.style.zIndex = '9999'; // Very high z-index
+
+    // Remove hidden
+    menu.classList.remove("hidden");
+  } else {
+    menu.classList.add("hidden");
+  }
+};
+
+function loadMap(mapId) {
+  // Handle Stella Montis consolidation
+  let actualMapId = mapId;
+  const isStella = mapId.includes("stella");
+
+  // Close dropdown if clicking away or loading another map
+  if (!isStella) toggleStellaDropdown(false);
+
+  // If switching TO Stella (generic or upper), verify state
+  if (isStella) {
+    if (mapId === "stella_montis_upper") mapPickerState.stellaLevel = "upper";
+    if (mapId === "stella_montis_lower") mapPickerState.stellaLevel = "lower";
+    actualMapId = `stella_montis_${mapPickerState.stellaLevel}`;
+  }
+
+  // Config Validation
+  const config = MAP_CONFIG[actualMapId];
+  if (!config) return;
+
+  mapPickerState.currentMapId = actualMapId;
+
+  // Update tabs styles
+  document.querySelectorAll('#mapTabsContainer > button').forEach(btn => {
+    btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white";
+  });
+
+  // Stella Tab Highlight
+  const stellaBtn = document.getElementById(`map-tab-stella`);
+  if (isStella && stellaBtn) {
+    stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 flex items-center gap-2";
+  } else if (!isStella) {
+    // Normal Tab Highlight
+    const activeBtn = document.getElementById(`map-tab-${actualMapId}`);
+    if (activeBtn) {
+      activeBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+    }
+    if (stellaBtn) {
+      stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2";
+    }
+  }
+
+  // Remove existing layers (images)
+  mapPickerState.map.eachLayer(layer => {
+    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
+      mapPickerState.map.removeLayer(layer);
+    }
+  });
+
+  // Remove old in-map toggle if exists
+  const oldToggle = document.getElementById("stellaLevelToggle");
+  if (oldToggle) oldToggle.remove();
+
+  // Clear pin state
+  mapPickerState.currentPin = null;
+  mapPickerState.selectedLocation = null;
+  document.getElementById("confirmPinBtn").disabled = true;
+  document.getElementById("coordinatesDisplay").textContent = "No location selected";
+
+  // Add image overlay with specific bounds
+  const bounds = config.bounds;
+  L.imageOverlay(config.url, bounds, { className: 'crt-map-image' }).addTo(mapPickerState.map);
+
+  // Fit bounds
+  mapPickerState.map.fitBounds(bounds);
+
+  // Show instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) instructions.style.opacity = '1';
+
+  // Re-render tabs to update dropdown highlight state if needed (optional, but good for active state in dropdown)
+  // Actually renderMapTabs calls loadMap so don't call it here to avoid loop. 
+  // Just manual update of dropdown items if we want.
+  const dropItems = document.querySelectorAll("#stellaDropdownMenu button");
+  dropItems.forEach(btn => {
+    if (btn.innerText.includes("Upper") && mapPickerState.stellaLevel === 'upper') btn.classList.add("text-emerald-500", "font-bold");
+    else if (btn.innerText.includes("Lower") && mapPickerState.stellaLevel === 'lower') btn.classList.add("text-emerald-500", "font-bold");
+    else {
+      btn.classList.remove("text-emerald-500", "font-bold");
+      btn.classList.add("text-zinc-300");
+    }
+  });
+
+  // Reset confirmation state on map change (optional, but consistent)
+  removePin();
+}
+
+function onMapClick(e) {
+  const { lat, lng } = e.latlng;
+  const config = MAP_CONFIG[mapPickerState.currentMapId];
+
+  if (!config) return;
+
+  // Bounds check (dynamic based on map)
+  const [maxY, maxX] = config.bounds[1];
+
+  if (lat < 0 || lat > maxY || lng < 0 || lng > maxX) return;
+
+  // Remove old pin
+  if (mapPickerState.currentPin) {
+    mapPickerState.map.removeLayer(mapPickerState.currentPin);
+  }
+
+  // Add new pin with SVG icon - Standard Pin (Larger ~45px)
+  const customIcon = L.divIcon({
+    className: 'custom-pin-icon',
+    html: `
+      <div class="relative">
+        <svg class="w-[45px] h-[45px] text-emerald-500 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [45, 45],
+    iconAnchor: [22.5, 45]
+  });
+
+  mapPickerState.currentPin = L.marker([lat, lng], { icon: customIcon }).addTo(mapPickerState.map);
+
+
+  // Update UI
+  const x = Math.round(lng);
+  const y = Math.round(lat);
+
+  mapPickerState.selectedLocation = { x, y, mapId: mapPickerState.currentMapId };
+
+  document.getElementById("coordinatesDisplay").textContent = `X: ${x}, Y: ${y}`;
+  document.getElementById("confirmPinBtn").disabled = false;
+
+  const btnText = document.getElementById("confirmBtnText");
+  if (btnText) btnText.textContent = "Submit Pinned Location";
+
+  // Show Remove Pin button
+  const removeBtn = document.getElementById("removePinBtn");
+  if (removeBtn) removeBtn.classList.remove("hidden");
+
+  // Hide instructions
+  const instructions = document.getElementById("mapInstructions");
+  if (instructions) instructions.style.opacity = '0';
+}
+
+function confirmMapSelection() {
+  // Use selected location OR current map ID if no pin
+  const mapId = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.mapId : mapPickerState.currentMapId;
+  const x = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.x : null;
+  const y = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.y : null;
+
+  // New hidden inputs
+  const idInput = document.getElementById("submitMapId");
+  const xInput = document.getElementById("submitMapX");
+  const yInput = document.getElementById("submitMapY");
+
+  if (idInput) idInput.value = mapId || "";
+  if (xInput) xInput.value = x !== null ? x : "";
+  if (yInput) yInput.value = y !== null ? y : "";
+
+  // Update Display
+  let mapName = MAP_CONFIG[mapId]?.name || "Map";
+  // Simplify Stella names
+  if (mapId === "stella_montis_upper") mapName = "Stella Upper";
+  if (mapId === "stella_montis_lower") mapName = "Stella Lower";
+
+  const displayVal = x !== null && y !== null ? `${mapName} (${x}, ${y})` : mapName;
+  const displayEl = document.getElementById("mapDisplayValue");
+  if (displayEl) {
+    displayEl.textContent = displayVal;
+    displayEl.classList.remove("text-zinc-500");
+    displayEl.classList.add("text-white", "font-medium");
+  }
+
+  // Show Clear Button
+  const clearBtn = document.getElementById("clearMapBtn");
+  if (clearBtn) clearBtn.classList.remove("hidden");
+
+  // Highlight container
+  const container = document.getElementById("mapLocationDisplay");
+  if (container) {
+    container.classList.add("border-emerald-500", "bg-emerald-500/10");
+    setTimeout(() => container.classList.remove("bg-emerald-500/10"), 500);
+  }
+
+  closeMapPicker();
+}
+
+window.clearMapSelection = (e) => {
+  if (e) e.stopPropagation(); // prevent opening picker
+  const idInput = document.getElementById("submitMapId");
+  const xInput = document.getElementById("submitMapX");
+  const yInput = document.getElementById("submitMapY");
+
+  if (idInput) idInput.value = "";
+  if (xInput) xInput.value = "";
+  if (yInput) yInput.value = "";
+
+  const displayEl = document.getElementById("mapDisplayValue");
+  if (displayEl) {
+    displayEl.textContent = "Select Map Location...";
+    displayEl.classList.add("text-zinc-500");
+    displayEl.classList.remove("text-white", "font-medium");
+  }
+
+  const clearBtn = document.getElementById("clearMapBtn");
+  if (clearBtn) clearBtn.classList.add("hidden");
+
+  const container = document.getElementById("mapLocationDisplay");
+  if (container) container.classList.remove("border-emerald-500");
+};
+
+window.loadMap = loadMap;
+window.openMapPicker = openMapPicker;
+
+// Data Grid Size Logic
+const STORAGE_KEY_DATA_GRID = "arc_dataGridSize_v1";
+
+function updateGridSizeLabel(tab) {
+  const labelDesktop = document.getElementById("gridSizeLabelKey"); // We need to add ID to HTML first? No, let's use querySelector
+  // The label is inside ".filter-options h3"
+  // Let's rely on IDs: gridSizeLabel (desktop) and gridSizeLabelMobile (mobile)
+  // Wait, index.html doesn't have IDs for the H3 headers. 
+  // We need to add IDs to index.html or use robust selector.
+  // Actually, let's use the ID "lblGridSize" if we add it, or search for text.
+
+  const labels = document.querySelectorAll(".filter-options h3");
+  labels.forEach(lbl => {
+    if (lbl.textContent.includes("Grid Size") || lbl.textContent.includes("List Size")) {
+      lbl.textContent = (tab === 'data') ? "List Size" : "Grid Size";
+    }
+  });
+}
+
+function initGridSizeController() {
+  const btns = {
+    small: document.getElementById("btnGridSmall"),
+    medium: document.getElementById("btnGridMedium"),
+    large: document.getElementById("btnGridLarge")
+  };
+
+  // Load from Storage
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_DATA_GRID);
+    if (saved) state.dataGridSize = saved;
+  } catch (e) {
+    console.debug("Failed to load data grid size", e);
+  }
 
 
 
+
+
+
+
+  // --- Unified Logic ---
+  const BP_STORAGE_KEY = "gridSizePreference";
+  let bpSize = localStorage.getItem(BP_STORAGE_KEY) || "M";
+
+  function setBlueprintGridSize(sizeKey) {
+    const isMobile = window.innerWidth <= 768;
+    let sizePx = 150;
+
+    if (isMobile) {
+      if (sizeKey === "S") sizePx = 90;
+      else if (sizeKey === "M") sizePx = 120;
+      else if (sizeKey === "L") sizePx = 140;
+    } else {
+      if (sizeKey === "S") sizePx = 110;
+      else if (sizeKey === "M") sizePx = 150;
+      else if (sizeKey === "L") sizePx = 220;
+    }
+
+    document.documentElement.style.setProperty("--cardSize", sizePx + "px");
+    try { localStorage.setItem(BP_STORAGE_KEY, sizeKey); } catch (e) { }
+    bpSize = sizeKey;
+    state.blueprintGridSize = sizeKey;
+    updateVisuals();
+    if (typeof renderGrid === 'function') renderGrid();
+  }
+
+  function setDataGridSize(size) {
+    state.dataGridSize = size;
+    try { localStorage.setItem(STORAGE_KEY_DATA_GRID, size); } catch (e) { }
+    updateVisuals();
+    if (typeof renderDataRegistry === 'function') renderDataRegistry();
+  }
+
+  function updateVisuals() {
+    // Reset all buttons to inactive state
+    Object.values(btns).forEach(btn => {
+      if (!btn) return;
+      btn.classList.remove("bg-emerald-600", "text-white", "font-bold");
+      btn.classList.remove("bg-zinc-600", "text-white", "border-zinc-500");
+      btn.classList.add("bg-zinc-800", "text-zinc-400", "border-transparent");
+    });
+
+    let activeBtn = null;
+
+    if (state.currentTab === 'data') {
+      // Data tab
+      const active = state.dataGridSize || 'medium';
+      activeBtn = btns[active];
+    } else {
+      // Blueprints tab (and others)
+      const activeKey = state.blueprintGridSize || bpSize || 'M';
+      if (activeKey === 'S') activeBtn = btns.small;
+      else if (activeKey === 'M') activeBtn = btns.medium;
+      else if (activeKey === 'L') activeBtn = btns.large;
+    }
+
+    // Apply grey highlight to active button (same for both tabs)
+    if (activeBtn) {
+      activeBtn.classList.remove("bg-zinc-800", "text-zinc-400", "border-transparent");
+      activeBtn.classList.add("bg-zinc-600", "text-white", "border-zinc-500");
+    }
+  }
+
+  const handleClick = (sizeName) => {
+    if (state.currentTab === 'data') {
+      setDataGridSize(sizeName);
+    } else {
+      const map = { small: 'S', medium: 'M', large: 'L' };
+      setBlueprintGridSize(map[sizeName]);
+    }
+  };
+
+  if (btns.small) btns.small.onclick = () => handleClick('small');
+  if (btns.medium) btns.medium.onclick = () => handleClick('medium');
+  if (btns.large) btns.large.onclick = () => handleClick('large');
+
+  // Initial Apply
+  setBlueprintGridSize(bpSize);
+  window.updateGridVisuals = updateVisuals;
+
+  // Initialize Default
+  if (!state.dataGridSize) state.dataGridSize = 'medium';
+}
+
+// Hook into DOMContentLoaded
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    initGridSizeController();
+    // Hook ALL tab buttons to update visuals on switch
+    const tabBtns = [
+      document.getElementById("tabBlueprints"),
+      document.getElementById("tabData"),
+      document.getElementById("tabProgression")
+    ];
+    tabBtns.forEach(tabBtn => {
+      if (tabBtn) {
+        tabBtn.addEventListener("click", () => {
+          setTimeout(() => {
+            if (typeof window.updateGridVisuals === 'function') {
+              window.updateGridVisuals();
+            }
+          }, 50);
+        });
+      }
+    });
+  }, 150);
+});
