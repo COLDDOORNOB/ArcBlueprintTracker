@@ -162,21 +162,47 @@ window.TutorialSlideshow = {
         const modal = overlay.querySelector(".tutorial-modal");
         if (!modal) return;
 
+        // Compact, glassmorphic styles
+        modal.style.maxWidth = "360px";
+        modal.style.width = "90%";
+        modal.style.height = "auto";
+        modal.style.minHeight = "auto";
+        modal.style.background = "rgba(24, 24, 27, 0.4)";
+        modal.style.backdropFilter = "blur(12px)";
+        modal.style.webkitBackdropFilter = "blur(12px)";
+        modal.style.border = "1px solid rgba(255, 255, 255, 0.08)";
+        modal.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.4)";
+        modal.style.borderRadius = "16px";
+        modal.style.display = "flex";
+        modal.style.flexDirection = "column";
+        modal.style.overflow = "hidden";
+
         modal.innerHTML = `
-            <div style="padding: 2rem; text-align: center; color: white; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                <h3 style="font-size: 1.25rem; font-weight: bold; margin: 0;">Exit Tutorial?</h3>
-                <p style="color: #d4d4d8; font-size: 0.9rem; line-height: 1.5; margin: 0;">
-                    You can always restart this tutorial in the <br>
-                    <span style="color: #34d399; font-weight: bold;">Updates & News</span> tab.
-                </p>
-                <div style="margin-top: 0.5rem;">
-                    <button style="padding: 0.5rem 2rem; background: #f4f4f5; color: #18181b; font-weight: bold; border-radius: 0.5rem; border: none; cursor: pointer; transition: background 0.2s;" 
-                            onclick="window.TutorialSlideshow.close()"
-                            onmouseover="this.style.background='#ffffff'"
-                            onmouseout="this.style.background='#f4f4f5'">
-                        Okay
-                    </button>
+            <div style="padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #f4f4f5; margin: 0;">Exit Tutorial</h3>
+                    <p style="color: #a1a1aa; font-size: 0.85rem; line-height: 1.4; margin: 0;">
+                        You can always open this again from the <span style="color: #34d399; font-weight: 500;">Updates & News</span> tab.
+                    </p>
                 </div>
+                
+                <button style="
+                    width: 100%;
+                    padding: 0.6rem; 
+                    background: rgba(255, 255, 255, 0.08); 
+                    color: white; 
+                    font-size: 0.9rem;
+                    font-weight: 500; 
+                    border-radius: 8px; 
+                    border: 1px solid rgba(255, 255, 255, 0.05); 
+                    cursor: pointer; 
+                    transition: all 0.2s;
+                " 
+                onclick="window.TutorialSlideshow.close()"
+                onmouseover="this.style.background='rgba(255, 255, 255, 0.12)'"
+                onmouseout="this.style.background='rgba(255, 255, 255, 0.08)'">
+                    Okay
+                </button>
             </div>
         `;
     },
