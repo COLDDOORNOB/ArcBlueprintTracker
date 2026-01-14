@@ -5045,15 +5045,17 @@ function renderDistBars(data, total) {
   // data is array of {name, count}
   const max = Math.max(...data.map(d => d.count)) || 1;
 
-  // User-requested colors for Top 4, plus creative fillers (Darkened for readability)
+  // Rarity-based color system for consistency across the app
+  // Top entries use premium colors (Legendary → Common), then creative extras
   const distColors = [
-    "#DC2626", // 1: Red (Darker)
-    "#D97706", // 2: Amber/Gold (Readable)
-    "#16A34A", // 3: Green (Darker)
-    "#0891B2", // 4: Cyan (Darker)
-    "#7E22CE", // 5: Purple (Darker)
-    "#BE185D", // 6: Pink (Darker)
-    "#1D4ED8"  // 7: Blue (Darker)
+    "#FBC700", // 1: Legendary (Gold) - Top result
+    "#D8299B", // 2: Epic (Pink/Magenta)
+    "#1ECBFC", // 3: Rare (Cyan/Blue)
+    "#41EB6A", // 4: Uncommon (Green)
+    "#717471", // 5: Common (Gray)
+    "#E11D48", // 6: Not Enough Data (Red) - Extended
+    "#7C3AED", // 7: Purple (Creative extension)
+    "#F97316"  // 8: Orange (Creative extension)
   ];
 
   return data.map((d, index) => {
