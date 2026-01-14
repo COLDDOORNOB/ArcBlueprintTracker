@@ -1,4 +1,5 @@
 ﻿import { animate, stagger } from "motion";
+import "./tutorial_slideshow.js";
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
