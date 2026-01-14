@@ -1222,18 +1222,9 @@ function switchTab(tabName) {
       sidebar.classList.add("hidden");
       sidebar.classList.remove("md:hidden");
       sidebar.classList.add("md:block");
-
-      if (desktopFilterBtn) {
-        desktopFilterBtn.classList.add("opacity-100");
-        desktopFilterBtn.classList.remove("opacity-50");
-      }
     } else {
       sidebar.classList.add("hidden");
       sidebar.classList.remove("md:block");
-      if (desktopFilterBtn) {
-        desktopFilterBtn.classList.remove("opacity-100");
-        desktopFilterBtn.classList.add("opacity-50");
-      }
     }
   }
 }
@@ -3084,16 +3075,8 @@ function initUI() {
 
     if (state.filtersOpen) {
       sidebar.classList.add("md:block"); // Show on desktop
-      if (desktopFilterBtn) {
-        desktopFilterBtn.classList.add("opacity-100");
-        desktopFilterBtn.classList.remove("opacity-50");
-      }
     } else {
       sidebar.classList.remove("md:block"); // Hide on desktop
-      if (desktopFilterBtn) {
-        desktopFilterBtn.classList.remove("opacity-100");
-        desktopFilterBtn.classList.add("opacity-50");
-      }
     }
   };
 
@@ -4055,7 +4038,7 @@ function renderGrid() {
     const sparesCount = state.spares[it.name] || 0;
     if (sparesCount > 0) {
       const pill = document.createElement("div");
-      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.className = "spares-pill absolute top-[5cqi] right-[5cqi] z-20 px-[5cqi] py-[3cqi] rounded-full text-[8cqi] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
       pill.innerHTML = `Spares: <span class="font-bold">${sparesCount}</span>`;
       pill.dataset.itemName = it.name;
       frame.appendChild(pill);
@@ -4466,7 +4449,7 @@ function initContextMenu() {
     const count = state.spares[itemName] || 0;
     if (count > 0) {
       const pill = document.createElement("div");
-      pill.className = "spares-pill absolute top-2 right-2 z-20 px-2 py-1 rounded-full text-[11px] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
+      pill.className = "spares-pill absolute top-[5cqi] right-[5cqi] z-20 px-[5cqi] py-[3cqi] rounded-full text-[8cqi] bg-sky-500/20 text-sky-400 border border-sky-500/30 backdrop-blur-sm cursor-pointer";
       pill.innerHTML = `Spares: <span class="font-bold">${count}</span>`;
       pill.dataset.itemName = itemName;
       frame.appendChild(pill);
@@ -4834,17 +4817,12 @@ function renderDataRegistry() {
     // Header (The Row itself)
     const header = document.createElement("div");
 
-    // Dynamic Grid Cols based on size
+    // Dynamic Grid Cols - same for all sizes on desktop
     // Default: [2fr,1fr,1fr,1fr,40px]
-    let colClass = "md:grid-cols-[2fr,1fr,1fr,1fr,40px]";
+    const colClass = "md:grid-cols-[2fr,1fr,1fr,1fr,40px]";
 
-    if (size === 'large') {
-      // Wide Name column (3fr), reduced Condition/Map columns to 0.8fr
-      colClass = "md:grid-cols-[3fr,0.8fr,1fr,0.8fr,40px]";
-    }
-
-    // Mobile remains: [90px,0.8fr,1fr,0.8fr,0.5fr,20px]
-    header.className = `group grid grid-cols-[90px,0.8fr,1fr,0.8fr,0.5fr,20px] ${colClass} gap-x-1 md:gap-4 ${densityClass} px-3 md:px-4 border-b border-white/5 hover:bg-white/5 transition-colors items-center cursor-pointer`;
+    // Mobile: Increased item col (100px), shrunk condition col (0.5fr), added gap
+    header.className = `group grid grid-cols-[100px,0.7fr,0.9fr,0.5fr,0.4fr,18px] ${colClass} gap-x-2 md:gap-4 ${densityClass} px-3 md:px-4 border-b border-white/5 hover:bg-white/5 transition-colors items-center cursor-pointer`;
 
     const miniCardId = `mini-card-${index}`;
 
@@ -4893,7 +4871,7 @@ function renderDataRegistry() {
         // Large: 130px (0.65)
         let scale = 0.42;
         if (state.dataGridSize === 'small') scale = 0.25;
-        if (state.dataGridSize === 'large') scale = 0.65;
+        if (state.dataGridSize === 'large') scale = 0.50;
 
         const baseW = 200;
 
@@ -4919,7 +4897,7 @@ function renderDataRegistry() {
 
         const badges = card.querySelectorAll(".collected-badge, .wishlist-badge");
         badges.forEach(b => {
-          b.style.transform = "scale(2.5) translateY(-12px)"; // Scale and nudge up significantly
+          b.style.transform = "scale(1.8) translateY(-10px)"; // Adjusted position
           b.style.transformOrigin = "top right";
           b.style.zIndex = "50";
         });
@@ -5045,17 +5023,16 @@ function renderDistBars(data, total) {
   // data is array of {name, count}
   const max = Math.max(...data.map(d => d.count)) || 1;
 
-  // Rarity-based color system for consistency across the app
-  // Top entries use premium colors (Legendary → Common), then creative extras
+  // Rarity-based color system - moderately desaturated and darkened
   const distColors = [
-    "#FBC700", // 1: Legendary (Gold) - Top result
-    "#D8299B", // 2: Epic (Pink/Magenta)
-    "#1ECBFC", // 3: Rare (Cyan/Blue)
-    "#41EB6A", // 4: Uncommon (Green)
-    "#717471", // 5: Common (Gray)
-    "#E11D48", // 6: Not Enough Data (Red) - Extended
-    "#7C3AED", // 7: Purple (Creative extension)
-    "#F97316"  // 8: Orange (Creative extension)
+    "#AA8900", // 1: Legendary (Balanced Muted Gold)
+    "#8E1C66", // 2: Epic (Balanced Muted Magenta)
+    "#15839E", // 3: Rare (Balanced Muted Cyan)
+    "#2E9949", // 4: Uncommon (Balanced Muted Green)
+    "#525452", // 5: Common (Balanced Gray)
+    "#911331", // 6: Not Enough Data (Balanced Muted Red)
+    "#52269A", // 7: Purple (Balanced Muted)
+    "#A74F0F"  // 8: Orange (Balanced Muted)
   ];
 
   return data.map((d, index) => {
