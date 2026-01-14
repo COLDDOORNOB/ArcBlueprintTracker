@@ -1,4 +1,3 @@
-
 window.TutorialSlideshow = {
     steps: [
         // --- 1. WELCOME ---
@@ -156,6 +155,32 @@ window.TutorialSlideshow = {
         localStorage.setItem("tutorial_slideshow_seen", "true");
     },
 
+    showExitPrompt() {
+        const overlay = document.getElementById("tutorialSlideshowOverlay");
+        if (!overlay) return;
+
+        const modal = overlay.querySelector(".tutorial-modal");
+        if (!modal) return;
+
+        modal.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: white; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                <h3 style="font-size: 1.25rem; font-weight: bold; margin: 0;">Exit Tutorial?</h3>
+                <p style="color: #d4d4d8; font-size: 0.9rem; line-height: 1.5; margin: 0;">
+                    You can always restart this tutorial in the <br>
+                    <span style="color: #34d399; font-weight: bold;">Updates & News</span> tab.
+                </p>
+                <div style="margin-top: 0.5rem;">
+                    <button style="padding: 0.5rem 2rem; background: #f4f4f5; color: #18181b; font-weight: bold; border-radius: 0.5rem; border: none; cursor: pointer; transition: background 0.2s;" 
+                            onclick="window.TutorialSlideshow.close()"
+                            onmouseover="this.style.background='#ffffff'"
+                            onmouseout="this.style.background='#f4f4f5'">
+                        Okay
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
     next() {
         if (this.currentIndex < this.steps.length - 1) {
             this.currentIndex++;
@@ -199,7 +224,7 @@ window.TutorialSlideshow = {
 
         overlay.innerHTML = `
             <div class="tutorial-modal">
-                <button class="tutorial-close-absolute" onclick="window.TutorialSlideshow.close()">&times;</button>
+                <button class="tutorial-close-absolute" onclick="window.TutorialSlideshow.showExitPrompt()">&times;</button>
                 
                 <div class="tutorial-image-container">
                     <img id="tutorialImage" src="" alt="Tutorial Slide" />
@@ -298,6 +323,17 @@ window.TutorialSlideshow = {
     }
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-    window.TutorialSlideshow.init();
-});
+const initTutorial = () => {
+    console.log("Initializing Tutorial Slideshow...");
+    if (window.TutorialSlideshow) {
+        window.TutorialSlideshow.init();
+    } else {
+        console.error("TutorialSlideshow not found on window!");
+    }
+};
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTutorial);
+} else {
+    initTutorial();
+}
