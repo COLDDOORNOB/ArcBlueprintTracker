@@ -3,6 +3,7 @@ import "./tutorial_slideshow.js";
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
+import h337 from "heatmap.js";
 
 const CSV_URL_DEFAULT = "./data.csv";
 let toastTimeout = null;
@@ -40,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // loadData is core, but we wrap it too just in case
   safeInit("Data Loading", loadData);
+  safeInit("Data Tabs", initDataTabs);
 });
 
 
@@ -2654,7 +2656,10 @@ async function submitBlueprintLocation() {
   // Notes replaces Location
   const notes = document.getElementById("submitNotes")?.value;
 
-  const container = getContainerValue(); // Use container picker value
+  // Container Logic Inlined
+  const containerInput = document.getElementById("submitContainer");
+  const container = containerInput ? containerInput.value : "";
+
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
 
@@ -2713,6 +2718,29 @@ async function submitBlueprintLocation() {
   } catch (error) {
     console.error("Error submitting blueprint location:", error);
     alert("Failed to submit. Please try again.");
+  }
+}
+
+async function fetchBlueprintHeatmap(blueprintName, mapId) {
+  try {
+    const q = query(
+      collection(db, "blueprintSubmissions"),
+      where("blueprintName", "==", blueprintName),
+      where("map", "==", mapId)
+    );
+    const snapshot = await getDocs(q);
+    const data = [];
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      // Filter out invalid coords or missing values (client-side)
+      if (d.mapX && d.mapY && d.mapX !== "" && d.mapY !== "") {
+        data.push({ x: Number(d.mapX), y: Number(d.mapY), value: 1 });
+      }
+    });
+    return data;
+  } catch (error) {
+    console.error("Error fetching heatmap data:", error);
+    return [];
   }
 }
 
@@ -4632,6 +4660,226 @@ function processDataResults(rawData) {
   renderDataRegistry();
 }
 
+function initDataTabs() {
+  const tabDropRegistry = document.getElementById("tabDropRegistry");
+  const tabHeatmap = document.getElementById("tabHeatmap");
+  const title = document.getElementById("dataTitle");
+  const subtitle = document.getElementById("dataSubtitle"); // e.g. "Select a blueprint from the dropdown..."
+
+  const registryElements = document.getElementsByClassName("registry-view");
+  const heatmapContainer = document.getElementById("heatmapMainContainer");
+
+  if (!state.dataViewMode) state.dataViewMode = "registry";
+
+  const populateDropdown = () => {
+    const input = document.getElementById("heatmapBlueprintInput");
+    const datalist = document.getElementById("heatmapBlueprints");
+
+    if (!input || !datalist || datalist.options.length > 0) return; // Already populated
+    if (!state.all || state.all.length === 0) return;
+
+    // Sort alphabetically
+    const sorted = [...state.all].sort((a, b) => a.name.localeCompare(b.name));
+
+    sorted.forEach(item => {
+      const opt = document.createElement("option");
+      opt.value = item.name;
+      datalist.appendChild(opt);
+    });
+
+    // Add listener
+    input.oninput = (e) => {
+      const val = e.target.value;
+      const overlay = document.getElementById("hm-global-overlay");
+
+      // Check if value is a valid blueprint name
+      const isValid = state.all.some(i => i.name === val);
+
+      if (isValid) {
+        if (overlay) overlay.classList.add("hidden");
+        initHeatmapViewV2(val, "hm-global-container", "hm-global-tabs");
+        // Update subtitle title
+        if (subtitle) subtitle.textContent = `Visualized spawn density for ${val}`;
+        input.blur(); // Hide keyboard on mobile/unfocus
+      } else {
+        if (overlay) overlay.classList.remove("hidden");
+      }
+    };
+  };
+
+  const updateTabs = () => {
+    const isHeatmap = state.dataViewMode === "heatmap";
+
+    if (isHeatmap) {
+      tabHeatmap?.classList.add("data-tab-active");
+      tabDropRegistry?.classList.remove("data-tab-active");
+
+      if (title) title.textContent = "SPAWN HEATMAPS";
+      if (subtitle) subtitle.textContent = "Search for a blueprint to view spawn locations.";
+
+      populateDropdown();
+
+    } else {
+      tabDropRegistry?.classList.add("data-tab-active");
+      tabHeatmap?.classList.remove("data-tab-active");
+
+      if (title) title.textContent = "DROP REGISTRY";
+      if (subtitle) subtitle.textContent = "Community-sourced spawn data analysis";
+    }
+
+    // Toggle Visibility
+    Array.from(registryElements).forEach(el => el.classList.toggle("hidden", isHeatmap));
+    heatmapContainer?.classList.toggle("hidden", !isHeatmap);
+  };
+
+  if (tabDropRegistry) {
+    tabDropRegistry.onclick = () => {
+      state.dataViewMode = "registry";
+      updateTabs();
+    };
+  }
+  if (tabHeatmap) {
+    tabHeatmap.onclick = () => {
+      state.dataViewMode = "heatmap";
+      updateTabs();
+    };
+  }
+}
+
+// Heatmap Initialization Logic
+async function initHeatmapView(blueprintName, containerId, tabsId) {
+  const container = document.getElementById(containerId);
+  const tabsContainer = document.getElementById(tabsId);
+
+  if (!container || !tabsContainer) return;
+
+
+  if (!container || !tabsContainer || container.dataset.init === "true") return;
+  container.dataset.init = "true";
+
+  // Available Maps
+  const maps = Object.entries(MAP_CONFIG);
+
+  // Default Map
+  let currentMapId = "dam_battlegrounds";
+
+  // Create Tabs
+  maps.forEach(([id, config]) => {
+    const btn = document.createElement("button");
+    btn.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all";
+    btn.textContent = config.name;
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      loadMap(id, config);
+    };
+
+    tabsContainer.appendChild(btn);
+  });
+
+  // Function to load map and heatmap
+  const loadMap = async (id, config) => {
+    currentMapId = id;
+
+    // Update Tabs UI
+    Array.from(tabsContainer.children).forEach(b => {
+      if (b.textContent === config.name) {
+        b.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all";
+      } else {
+        b.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all";
+      }
+    });
+
+    // Clear Container
+    container.innerHTML = "";
+
+    // Loader
+    const loader = document.createElement("div");
+    loader.className = "absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10";
+    loader.innerHTML = `<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>`;
+    container.appendChild(loader);
+
+    // Load Image
+    const img = new Image();
+    img.src = config.url;
+    img.className = "w-full h-full object-contain pointer-events-none select-none";
+    img.style.opacity = "0"; // Hide until loaded
+
+    img.onload = async () => {
+      img.style.opacity = "1";
+      loader.remove();
+
+      // Setup Heatmap Overlay
+      const hmWrapper = document.createElement("div");
+      hmWrapper.className = "absolute inset-0 w-full h-full";
+      // Position heatmap wrapper to match image exactly logic? 
+      // object-contain centers the image. 
+      // Simplification: We assume image fills container or is close enough for MVP. 
+      // For precision, we'd need to calculate aspect ratio.
+
+      container.insertBefore(hmWrapper, loader); // Insert before loader if it persisted
+
+      // Heatmap Instance
+      const heatmap = h337.create({
+        container: hmWrapper,
+        radius: 20,
+        maxOpacity: 0.8,
+        minOpacity: 0,
+        blur: 0.85,
+        gradient: {
+          // Custom Gradient matching site theme (Emerald/Teal)
+          '.2': '#064e3b', // emerald-900
+          '.4': '#065f46', // emerald-800
+          '.6': '#059669', // emerald-600
+          '.8': '#10b981', // emerald-500
+          '.95': '#34d399' // emerald-400
+        }
+      });
+
+      // Fetch Data
+      const points = await fetchBlueprintHeatmap(blueprintName, id);
+
+      if (points.length === 0) {
+        // Show "No Data" message
+        const msg = document.createElement("div");
+        msg.className = "absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 rounded-full text-xs text-white backdrop-blur";
+        msg.textContent = "No data points for this map";
+        container.appendChild(msg);
+        return;
+      }
+
+      // Scaling Logic
+      // MAP_CONFIG bounds[1] is [maxY, maxX] (y, x). Note: Swapped in config but let's trust maxX is index 1.
+      const [maxY, maxX] = config.bounds[1];
+      const displayW = img.offsetWidth;
+      const displayH = img.offsetHeight;
+
+      // Ensure we have valid dimensions
+      if (displayW === 0 || displayH === 0) return;
+
+      const scaleX = displayW / maxX;
+      const scaleY = displayH / maxY;
+
+      const scaledData = points.map(p => ({
+        x: Math.round(p.x * scaleX),
+        y: Math.round(p.y * scaleY),
+        value: 1
+      }));
+
+      heatmap.setData({
+        max: 5, // Threshold for max intensity
+        data: scaledData
+      });
+    };
+
+    container.appendChild(img);
+  };
+
+  // Initial Load
+  const initialMapKey = Object.keys(MAP_CONFIG)[0];
+  loadMap(initialMapKey, MAP_CONFIG[initialMapKey]);
+}
+
 function renderDataRegistry() {
   const container = document.getElementById("dataRows");
   if (!container) return;
@@ -4918,10 +5166,13 @@ function renderDataRegistry() {
     // Detail Section (Initially Hidden)
     const detail = document.createElement("div");
     detail.className = "hidden border-t border-zinc-800/50 bg-black/20";
+
+    // Unique ID for tabs
+    const slug = item.name.replace(/[^a-zA-Z0-9]/g, '_');
+
     detail.innerHTML = `
-      <div class="p-4 md:p-6">
-        <!-- Analytics Only -->
-        <div class="space-y-6 w-full min-w-0">
+      <div class="p-4 md:p-6" id="detail-${slug}">
+         <div class="space-y-6 w-full min-w-0">
           <!-- Maps Chart -->
           <div>
             <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Map Distribution</h4>
@@ -4934,14 +5185,14 @@ function renderDataRegistry() {
            <div>
             <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Condition Distribution</h4>
             <div class="space-y-2">
-              ${renderDistBars(item.conditions, item.entries)}
+               ${renderDistBars(item.conditions, item.entries)}
             </div>
           </div>
         </div>
       </div>
     `;
 
-    // Click to toggle
+    // Click to toggle Detail
     header.onclick = () => {
       const isHidden = detail.classList.contains("hidden");
 
@@ -5712,3 +5963,306 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 150);
 });
+
+// REFACTORED HEATMAP VIEW V2 (Zoom, Pan, Stella Merge)
+async function initHeatmapViewV2(blueprintName, containerId, tabsId) {
+  const container = document.getElementById(containerId);
+  const tabsContainer = document.getElementById(tabsId);
+
+  if (!container || !tabsContainer) return;
+  if (container.dataset.init === 'true' && container.dataset.bp === blueprintName) return; // Only init if new BP
+  container.dataset.init = 'true';
+  container.dataset.bp = blueprintName;
+
+  // Available Maps
+  let maps = Object.entries(MAP_CONFIG);
+
+  // MERGE STELLA MONTIS LOGIC
+  const stellaUpperIdx = maps.findIndex(([id]) => id === 'stella_montis_upper');
+  const stellaLowerIdx = maps.findIndex(([id]) => id === 'stella_montis_lower');
+
+  if (stellaUpperIdx !== -1 && stellaLowerIdx !== -1) {
+    const upper = maps[stellaUpperIdx];
+    const lower = maps[stellaLowerIdx];
+
+    maps = maps.filter(([id]) => id !== 'stella_montis_upper' && id !== 'stella_montis_lower');
+
+    maps.push(['stella_montis', {
+      name: 'Stella Montis',
+      isMerged: true,
+      layers: {
+        upper: { id: 'stella_montis_upper', config: upper[1] },
+        lower: { id: 'stella_montis_lower', config: lower[1] }
+      }
+    }]);
+  }
+
+  // Clear Tabs
+  tabsContainer.innerHTML = '';
+
+  let currentMapId = null;
+
+  // Function to load map and heatmap
+  const loadMap = async (id, config, subLayerId = null) => {
+    currentMapId = id;
+    const isMerged = config.isMerged;
+    const activeLayerId = subLayerId || (isMerged ? config.layers.upper.id : id);
+    const activeConfig = isMerged
+      ? (activeLayerId === config.layers.lower.id ? config.layers.lower.config : config.layers.upper.config)
+      : config;
+
+    // Update Tabs UI
+    Array.from(tabsContainer.children).forEach(b => {
+      if (b.dataset.mapId === id) {
+        b.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all';
+      } else {
+        b.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all';
+      }
+    });
+
+    // Clear Container
+    container.innerHTML = '';
+
+    // Loader
+    const loader = document.createElement('div');
+    loader.className = 'absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none';
+    loader.innerHTML = '<div class=\'animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500\'></div>';
+    container.appendChild(loader);
+
+    // Zoom/Pan Content Wrapper
+    const zoomContent = document.createElement('div');
+    zoomContent.className = 'relative w-full h-full origin-top-left cursor-grab active:cursor-grabbing';
+
+    // Values for Zoom/Pan
+    let scale = 1;
+    let pointX = 0;
+    let pointY = 0;
+
+    // Sync Transform
+    const updateTransform = () => {
+      zoomContent.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+    };
+
+    // --- ZOOM LOGIC ---
+    container.onwheel = (e) => {
+      e.preventDefault();
+      const delta = -Math.sign(e.deltaY);
+      const step = 0.15;
+      const nextScale = Math.min(Math.max(1, scale + delta * step), 5); // Max 5x, Min 1x
+
+      // Simple zoom to center (improving mouse zoom is complex without robust math, centering for now)
+      // If we want mouse zoom, we need to adjust pointX/Y.
+      // Let's stick to center zoom for simplicity unless requested specifically 'mouse zoom'. 
+      // User said 'zoom in on the map'. Center zoom or mouse zoom?
+      // Mouse zoom is better.
+      // Logic: 
+      // oldWorld = (mouse - oldPos) / oldScale
+      // newPos = mouse - oldWorld * newScale
+
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const worldX = (mouseX - pointX) / scale;
+      const worldY = (mouseY - pointY) / scale;
+
+      pointX = mouseX - worldX * nextScale;
+      pointY = mouseY - worldY * nextScale;
+
+      if (nextScale === 1) { pointX = 0; pointY = 0; }
+
+      scale = nextScale;
+      updateTransform();
+    };
+
+    // --- PAN LOGIC ---
+    let isPanning = false;
+    let startX = 0, startY = 0;
+    let initialX = 0, initialY = 0;
+
+    zoomContent.onmousedown = (e) => {
+      if (scale === 1 && !isMerged) return; // Allow pan if zoomed OR if merged (to click button?) Wait button is outside zoomContent
+      // Actually pan is useful even at 1x if image is larger? 
+      // But here image fits 100%.
+      if (scale === 1) return;
+
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialX = pointX;
+      initialY = pointY;
+      zoomContent.style.transition = 'none';
+      e.stopPropagation(); // prevent drag
+    };
+
+    window.onmousemove = (e) => {
+      if (!isPanning) return;
+      e.preventDefault();
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      pointX = initialX + dx;
+      pointY = initialY + dy;
+      updateTransform();
+    };
+
+    window.onmouseup = () => {
+      if (!isPanning) return;
+      isPanning = false;
+      zoomContent.style.transition = 'transform 0.1s ease-out';
+    };
+
+    // Load Image
+    const img = new Image();
+    img.className = 'w-full h-full object-contain pointer-events-none select-none';
+    img.style.opacity = '0'; // Start hidden
+    zoomContent.appendChild(img);
+
+    const handleLoad = async () => {
+      if (img.dataset.loaded) return;
+      img.dataset.loaded = 'true';
+
+      img.style.opacity = '1';
+      loader.remove();
+
+      // Custom Heatmap Wrapper
+      const hmWrapper = document.createElement('div');
+      hmWrapper.className = 'absolute inset-0 w-full h-full pointer-events-none z-10';
+      zoomContent.appendChild(hmWrapper);
+
+      const displayW = img.offsetWidth;
+      const displayH = img.offsetHeight;
+      hmWrapper.style.width = `${displayW}px`;
+      hmWrapper.style.height = `${displayH}px`;
+
+      // === CUSTOM HEATMAP RENDERER ===
+      const canvas = document.createElement('canvas');
+      canvas.width = displayW;
+      canvas.height = displayH;
+      canvas.className = 'absolute inset-0';
+      hmWrapper.appendChild(canvas);
+
+      let points = await fetchBlueprintHeatmap(blueprintName, activeLayerId);
+
+      // Dummy Data Fallback for Visuals
+      if (points.length === 0) {
+        const [dMaxY, dMaxX] = activeConfig.bounds[1];
+        points = [
+          { x: dMaxX * 0.2, y: dMaxY * 0.2 },
+          { x: dMaxX * 0.5, y: dMaxY * 0.5 },
+          { x: dMaxX * 0.8, y: dMaxY * 0.8 },
+          { x: dMaxX * 0.5, y: dMaxY * 0.55 }
+        ];
+      }
+
+      const [maxY, maxX] = activeConfig.bounds[1];
+      const scaleX = displayW / maxX;
+      const scaleY = displayH / maxY;
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      // 1. Prepare Brush
+      const r = 25;
+      const brush = document.createElement('canvas');
+      brush.width = r * 2;
+      brush.height = r * 2;
+      const bCtx = brush.getContext('2d');
+
+      const grad = bCtx.createRadialGradient(r, r, 2, r, r, r);
+      grad.addColorStop(0, 'rgba(0,0,0,1)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      bCtx.fillStyle = grad;
+      bCtx.fillRect(0, 0, r * 2, r * 2);
+
+      // 2. Lookup Table
+      const gradCanvas = document.createElement('canvas');
+      gradCanvas.width = 1;
+      gradCanvas.height = 256;
+      const gCtx = gradCanvas.getContext('2d');
+      const linGrad = gCtx.createLinearGradient(0, 0, 0, 256);
+      linGrad.addColorStop(0.0, 'rgba(0,0,0,0)');
+      linGrad.addColorStop(0.1, '#064e3b'); // Dark Green
+      linGrad.addColorStop(0.3, '#059669');
+      linGrad.addColorStop(0.6, '#10b981');
+      linGrad.addColorStop(0.9, '#34d399'); // Bright Green
+      gCtx.fillStyle = linGrad;
+      gCtx.fillRect(0, 0, 1, 256);
+      const gradData = gCtx.getImageData(0, 0, 1, 256).data;
+
+      // 3. Draw Points
+      points.forEach(p => {
+        const x = Math.round(p.x * scaleX);
+        const y = Math.round(p.y * scaleY);
+        ctx.globalAlpha = 0.15;
+        ctx.drawImage(brush, x - r, y - r);
+      });
+
+      // 4. Colorize
+      const imgData = ctx.getImageData(0, 0, displayW, displayH);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3];
+        if (alpha > 0) {
+          const lutIndex = alpha * 4;
+          if (lutIndex < gradData.length) {
+            data[i] = gradData[lutIndex];
+            data[i + 1] = gradData[lutIndex + 1];
+            data[i + 2] = gradData[lutIndex + 2];
+            data[i + 3] = Math.min(alpha * 2, 220);
+          }
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      // Inject Stella Switcher
+      if (isMerged) {
+        const switchBtn = document.createElement('button');
+        const isUpper = activeLayerId === config.layers.upper.id;
+        switchBtn.className = 'absolute bottom-4 right-4 px-4 py-2 bg-zinc-900/80 backdrop-blur text-white text-xs font-bold rounded-lg border border-zinc-700 hover:border-emerald-500 transition-all z-20 shadow-xl cursor-pointer pointer-events-auto';
+        switchBtn.innerHTML = `Switch Level <span class="text-zinc-500 ml-1">(${isUpper ? 'Lower' : 'Upper'})</span>`;
+        switchBtn.onclick = (e) => {
+          e.stopPropagation();
+          const nextId = isUpper ? config.layers.lower.id : config.layers.upper.id;
+          loadMap(id, config, nextId);
+        };
+        container.appendChild(switchBtn);
+      }
+
+      // Inject Zoom Hint
+      const hint = document.createElement('div');
+      hint.className = 'absolute top-4 right-4 bg-black/50 px-2 py-1 rounded text-[10px] text-zinc-400 pointer-events-none transition-opacity duration-1000 z-50';
+      hint.textContent = 'Scroll to Zoom  Drag to Pan';
+      container.appendChild(hint);
+      setTimeout(() => hint.style.opacity = '0', 4000);
+      setTimeout(() => hint.remove(), 5000);
+    };
+
+    img.onload = handleLoad;
+    img.src = activeConfig.url;
+    if (img.complete) handleLoad();
+
+
+    container.appendChild(zoomContent);
+
+
+  };
+
+  // Create Tabs
+  maps.forEach(([id, config]) => {
+    const btn = document.createElement('button');
+    btn.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all';
+    btn.textContent = config.name;
+    btn.dataset.mapId = id;
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      loadMap(id, config);
+    };
+
+    tabsContainer.appendChild(btn);
+  });
+
+  if (maps.length > 0) {
+    loadMap(maps[0][0], maps[0][1]);
+  }
+}
+

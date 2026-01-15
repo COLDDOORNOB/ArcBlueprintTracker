@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "firebase": "^12.7.0",
+        "heatmap.js": "^2.0.5",
         "motion": "^10.18.0",
         "picomatch": "^4.0.3"
     }
