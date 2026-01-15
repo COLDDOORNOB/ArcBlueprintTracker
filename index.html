@@ -665,26 +665,31 @@
 
   <!-- Floating Action Button (My Collection Only) - Outside drawer for global visibility -->
   <button id="submitLocationFab"
-    class="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-2.5 transition-all duration-300"
+    class="fixed bottom-5 right-5 z-50 px-5 py-3 md:px-6 md:py-3.5 rounded-full bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg flex items-center gap-3 md:gap-3.5 transition-all duration-300"
     aria-label="Submit Blueprint Location">
-    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="w-10 h-10 md:w-11 md:h-11 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+      <svg class="w-5 h-5 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
       </svg>
     </div>
     <div class="text-left leading-tight">
-      <div class="text-xs font-semibold">Submit Blueprint</div>
-      <div class="text-xs font-semibold">Location</div>
+      <div class="text-xs md:text-sm font-semibold">Submit Blueprint</div>
+      <div class="text-xs md:text-sm font-semibold">Location</div>
     </div>
   </button>
 
   <!-- Timed Toast Notification (My Collection Only) -->
-  <div id="collectToast" class="fixed bottom-24 right-5 z-50 hidden">
+  <div id="collectToast"
+    class="fixed bottom-5 left-5 right-5 md:bottom-24 md:left-auto md:right-5 md:w-auto z-50 hidden">
     <div
-      class="relative px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors">
-      <p id="collectToastText" class="text-sm font-medium text-white"></p>
-      <div id="collectToastProgress" class="absolute bottom-0 left-0 h-1 bg-white/40 rounded-b-xl transition-all"
-        style="width: 100%;"></div>
+      class="relative h-[54px] min-w-[200px] pl-5 pr-5 rounded-full bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/50 shadow-2xl cursor-pointer transition-colors flex items-center justify-center overflow-hidden">
+      <p id="collectToastText" class="text-sm font-bold text-white relative z-10 mb-1"></p>
+      <!-- Progress Bar Track -->
+      <div class="absolute bottom-0 left-6 right-6 h-1 bg-white/20 rounded-t-lg overflow-hidden">
+        <!-- Active Progress -->
+        <div id="collectToastProgress" class="w-full h-full bg-white rounded-t-lg" style="width: 100%">
+        </div>
+      </div>
     </div>
   </div>
 
@@ -765,6 +770,7 @@
             <input type="hidden" id="submitMapId" name="mapId">
             <input type="hidden" id="submitMapX" name="mapX">
             <input type="hidden" id="submitMapY" name="mapY">
+            <input type="hidden" id="submitMapLayer" name="mapLayer" value="0">
 
             <!-- Clear Button -->
             <button type="button" id="clearMapBtn" onclick="clearMapSelection(event)"
