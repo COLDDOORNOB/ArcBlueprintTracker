@@ -517,7 +517,8 @@
           </div>
 
           <!-- Heatmap Main View -->
-          <div id="heatmapMainContainer" class="hidden space-y-6 mt-4">
+          <div id="heatmapMainContainer"
+            class="hidden space-y-6 mt-4 w-full max-w-[calc(100vw-2rem)] overflow-x-hidden">
             <div
               class="flex flex-col md:flex-row items-center gap-4 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
               <label class="text-sm font-bold text-zinc-400 uppercase tracking-wider whitespace-nowrap">Search
@@ -542,11 +543,11 @@
             </div>
 
             <div class="flex flex-col gap-4">
-              <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-none" id="hm-global-tabs">
+              <div class="flex flex-wrap justify-center gap-2 pb-2" id="hm-global-tabs">
                 <!-- Tabs injected here -->
               </div>
               <div id="hm-global-container"
-                class="relative w-full aspect-[21/9] md:aspect-video rounded-xl overflow-hidden border border-zinc-700/30 bg-black/40 shadow-2xl">
+                class="relative w-full max-w-[calc(100vw-2rem)] aspect-square md:aspect-video rounded-xl overflow-hidden border border-zinc-700/30 bg-black/40 shadow-2xl">
                 <div id="hm-global-overlay"
                   class="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">Select a blueprint to
                   view heatmap</div>

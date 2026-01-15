@@ -18,6 +18,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Container submissions - allow authenticated users to submit new container types
+    match /containerSubmissions/{docId} {
+      // Anyone can submit (logged in or not)
+      allow create: if true;
+      
+      // Allow public read for moderation
+      allow read: if true;
+      
+      // No updates or deletes allowed
+      allow update, delete: if false;
+    }
+
     // Site Configuration (Banner etc)
     match /siteConfig/{docId} {
       allow read: if true;
