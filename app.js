@@ -4,6 +4,7 @@ import { auth, db, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 import h337 from "heatmap.js";
+import HeatmapOverlay from "./src/leaflet-heatmap.js";
 
 const CSV_URL_DEFAULT = "./data.csv";
 let toastTimeout = null;
@@ -4673,37 +4674,91 @@ function initDataTabs() {
 
   const populateDropdown = () => {
     const input = document.getElementById("heatmapBlueprintInput");
-    const datalist = document.getElementById("heatmapBlueprints");
+    const dropdown = document.getElementById("heatmapDropdown");
 
-    if (!input || !datalist || datalist.options.length > 0) return; // Already populated
-    if (!state.all || state.all.length === 0) return;
+    if (!input || !dropdown) return;
 
-    // Sort alphabetically
-    const sorted = [...state.all].sort((a, b) => a.name.localeCompare(b.name));
+    // Helper to render items
+    const renderItems = (items) => {
+      dropdown.innerHTML = "";
+      if (items.length === 0) {
+        const div = document.createElement("div");
+        div.className = "px-4 py-3 text-sm text-zinc-500 italic";
+        div.textContent = "No blueprints found";
+        dropdown.appendChild(div);
+        return;
+      }
 
-    sorted.forEach(item => {
-      const opt = document.createElement("option");
-      opt.value = item.name;
-      datalist.appendChild(opt);
+      items.forEach(item => {
+        const btn = document.createElement("button");
+        btn.className = "w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-white transition-colors flex items-center justify-between group";
+
+        // Name
+        const spanName = document.createElement("span");
+        spanName.textContent = item.name;
+        btn.appendChild(spanName);
+
+        // Optional: Add rarity dot or icon?
+        // Let's add a small rarity dot
+        const dot = document.createElement("span");
+        dot.className = "w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity";
+        dot.style.backgroundColor = rarityColor(item.rarity);
+        btn.appendChild(dot);
+
+        btn.onclick = () => {
+          input.value = item.name;
+          dropdown.classList.add("hidden");
+          const overlay = document.getElementById("hm-global-overlay");
+          if (overlay) overlay.classList.add("hidden");
+
+          initHeatmapViewV2(item.name, "hm-global-container", "hm-global-tabs");
+
+          if (subtitle) subtitle.textContent = `Visualized spawn density for ${item.name}`;
+        };
+        dropdown.appendChild(btn);
+      });
+    };
+
+    // Close on click outside
+    document.addEventListener("click", (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
     });
 
-    // Add listener
+    // Input Handler
     input.oninput = (e) => {
-      const val = e.target.value;
-      const overlay = document.getElementById("hm-global-overlay");
+      const val = e.target.value.toLowerCase();
 
-      // Check if value is a valid blueprint name
-      const isValid = state.all.some(i => i.name === val);
-
-      if (isValid) {
-        if (overlay) overlay.classList.add("hidden");
-        initHeatmapViewV2(val, "hm-global-container", "hm-global-tabs");
-        // Update subtitle title
-        if (subtitle) subtitle.textContent = `Visualized spawn density for ${val}`;
-        input.blur(); // Hide keyboard on mobile/unfocus
-      } else {
-        if (overlay) overlay.classList.remove("hidden");
+      if (!val) {
+        dropdown.classList.add("hidden");
+        return;
       }
+
+      const puncClean = (str) => str.replace(/['’]/g, ''); // Handle 'Nade vs Nade
+
+      const filtered = state.all.filter(i => {
+        // Simple fuzzy: includes
+        return puncClean(i.name.toLowerCase()).includes(puncClean(val));
+      }).sort((a, b) => a.name.localeCompare(b.name)); //.slice(0, 50); // Limit results for performance?
+
+      renderItems(filtered);
+      dropdown.classList.remove("hidden");
+    };
+
+    // Focus Handler (Show all or filtered)
+    input.onfocus = () => {
+      const val = input.value.toLowerCase();
+      let items = state.all;
+      if (val) {
+        const puncClean = (str) => str.replace(/['’]/g, '');
+        items = state.all.filter(i => puncClean(i.name.toLowerCase()).includes(puncClean(val)));
+      }
+      // Sort
+      items = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+      renderItems(items);
+      dropdown.classList.remove("hidden");
     };
   };
 
@@ -5965,14 +6020,28 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // REFACTORED HEATMAP VIEW V2 (Zoom, Pan, Stella Merge)
+// REFACTORED HEATMAP VIEW V2 (Leaflet + Heatmap.js)
+let heatmapMap = null; // Store map instance globally or in state
+
 async function initHeatmapViewV2(blueprintName, containerId, tabsId) {
   const container = document.getElementById(containerId);
   const tabsContainer = document.getElementById(tabsId);
 
   if (!container || !tabsContainer) return;
-  if (container.dataset.init === 'true' && container.dataset.bp === blueprintName) return; // Only init if new BP
-  container.dataset.init = 'true';
-  container.dataset.bp = blueprintName;
+
+  // If we are initializing a NEW blueprint, clear the old map state
+  if (container.dataset.bp !== blueprintName) {
+    if (heatmapMap) {
+      heatmapMap.remove();
+      heatmapMap = null;
+    }
+    container.dataset.bp = blueprintName;
+    container.innerHTML = ''; // Clear any leftover DOM
+  } else if (heatmapMap) {
+    // If same blueprint and map exists, we might just want to return or update?
+    // Let's allow re-init to handle tab switches or just return if it's already good.
+    // For now, full re-init is safer to ensure layer updates.
+  }
 
   // Available Maps
   let maps = Object.entries(MAP_CONFIG);
@@ -6013,256 +6082,136 @@ async function initHeatmapViewV2(blueprintName, containerId, tabsId) {
 
     // Update Tabs UI
     Array.from(tabsContainer.children).forEach(b => {
-      if (b.dataset.mapId === id) {
-        b.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all';
+      // Clear all active styles
+      b.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-400/50', 'shadow-[0_0_10px_rgba(16,185,129,0.3)]');
+      b.classList.add('bg-zinc-800', 'text-zinc-500');
+
+      // Check if button is for this map
+      // If it's a wrapper (div), we check children
+      if (b.tagName === 'DIV') {
+        Array.from(b.children).forEach(sub => {
+          sub.classList.remove('text-emerald-500', 'text-white');
+          sub.classList.add('text-zinc-400');
+          if ((activeLayerId.includes('upper') && sub.textContent.includes('Upper')) ||
+            (activeLayerId.includes('lower') && sub.textContent.includes('Lower'))) {
+            sub.classList.remove('text-zinc-400');
+            sub.classList.add('text-white', 'text-emerald-500');
+          }
+        });
+        // Highlight wrapper if map matches
+        // We can check if any child is matching
       } else {
-        b.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all';
+        if (b.dataset.mapId === id) {
+          b.classList.remove('bg-zinc-800', 'text-zinc-500');
+          b.classList.add('bg-emerald-500', 'text-white', 'border-emerald-400/50', 'shadow-[0_0_10px_rgba(16,185,129,0.3)]');
+        }
       }
     });
 
-    // Clear Container
+    // Destroy existing map if it exists
+    if (heatmapMap) {
+      heatmapMap.remove();
+      heatmapMap = null;
+    }
+
+    // Clear container content (text/loaders) EXCEPT if we want to handle loading smoothly
     container.innerHTML = '';
 
-    // Loader
-    const loader = document.createElement('div');
-    loader.className = 'absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10 pointer-events-none';
-    loader.innerHTML = '<div class=\'animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500\'></div>';
-    container.appendChild(loader);
+    // Initialize Leaflet
+    if (!container.id) container.id = "heatmap-leaflet-" + Math.random().toString(36).substr(2, 9);
 
-    // Zoom/Pan Content Wrapper
-    const zoomContent = document.createElement('div');
-    zoomContent.className = 'relative w-full h-full origin-top-left cursor-grab active:cursor-grabbing';
+    heatmapMap = L.map(container, {
+      crs: L.CRS.Simple,
+      minZoom: -2,
+      maxZoom: 2,
+      zoomSnap: 0.1,
+      center: [0, 0],
+      zoom: 0,
+      zoomControl: false,
+      attributionControl: false
+    });
 
-    // Values for Zoom/Pan
-    let scale = 1;
-    let pointX = 0;
-    let pointY = 0;
+    L.control.zoom({ position: 'bottomright' }).addTo(heatmapMap);
 
-    // Sync Transform
-    const updateTransform = () => {
-      zoomContent.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+    // Bounds: [[0,0], [height, width]]
+    const bounds = activeConfig.bounds;
+
+    // Add Image Overlay
+    L.imageOverlay(activeConfig.url, bounds).addTo(heatmapMap);
+
+    heatmapMap.fitBounds(bounds);
+
+    // Add Heatmap Layer
+    // Heatmap Config
+    const heatmapCfg = {
+      // radius should be small relative to map size
+      radius: 40,
+      maxOpacity: 0.7,
+      scaleRadius: true,
+      useLocalExtrema: false,
+      latField: 'lat',
+      lngField: 'lng',
+      valueField: 'count'
     };
 
-    // --- ZOOM LOGIC ---
-    container.onwheel = (e) => {
-      e.preventDefault();
-      const delta = -Math.sign(e.deltaY);
-      const step = 0.15;
-      const nextScale = Math.min(Math.max(1, scale + delta * step), 5); // Max 5x, Min 1x
+    const heatmapLayer = new HeatmapOverlay(heatmapCfg);
 
-      // Simple zoom to center (improving mouse zoom is complex without robust math, centering for now)
-      // If we want mouse zoom, we need to adjust pointX/Y.
-      // Let's stick to center zoom for simplicity unless requested specifically 'mouse zoom'. 
-      // User said 'zoom in on the map'. Center zoom or mouse zoom?
-      // Mouse zoom is better.
-      // Logic: 
-      // oldWorld = (mouse - oldPos) / oldScale
-      // newPos = mouse - oldWorld * newScale
+    // Fetch Data
+    let points = await fetchBlueprintHeatmap(blueprintName, activeLayerId);
 
-      const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const worldX = (mouseX - pointX) / scale;
-      const worldY = (mouseY - pointY) / scale;
-
-      pointX = mouseX - worldX * nextScale;
-      pointY = mouseY - worldY * nextScale;
-
-      if (nextScale === 1) { pointX = 0; pointY = 0; }
-
-      scale = nextScale;
-      updateTransform();
+    // Transform points for Leaflet (CRS Simple: y=lat, x=lng)
+    const heatData = {
+      max: 2, // Low max for higher sensitivity? Or 5?
+      data: points.map(p => ({
+        lat: p.y,
+        lng: p.x,
+        count: 1
+      }))
     };
 
-    // --- PAN LOGIC ---
-    let isPanning = false;
-    let startX = 0, startY = 0;
-    let initialX = 0, initialY = 0;
-
-    zoomContent.onmousedown = (e) => {
-      if (scale === 1 && !isMerged) return; // Allow pan if zoomed OR if merged (to click button?) Wait button is outside zoomContent
-      // Actually pan is useful even at 1x if image is larger? 
-      // But here image fits 100%.
-      if (scale === 1) return;
-
-      isPanning = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      initialX = pointX;
-      initialY = pointY;
-      zoomContent.style.transition = 'none';
-      e.stopPropagation(); // prevent drag
-    };
-
-    window.onmousemove = (e) => {
-      if (!isPanning) return;
-      e.preventDefault();
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      pointX = initialX + dx;
-      pointY = initialY + dy;
-      updateTransform();
-    };
-
-    window.onmouseup = () => {
-      if (!isPanning) return;
-      isPanning = false;
-      zoomContent.style.transition = 'transform 0.1s ease-out';
-    };
-
-    // Load Image
-    const img = new Image();
-    img.className = 'w-full h-full object-contain pointer-events-none select-none';
-    img.style.opacity = '0'; // Start hidden
-    zoomContent.appendChild(img);
-
-    const handleLoad = async () => {
-      if (img.dataset.loaded) return;
-      img.dataset.loaded = 'true';
-
-      img.style.opacity = '1';
-      loader.remove();
-
-      // Custom Heatmap Wrapper
-      const hmWrapper = document.createElement('div');
-      hmWrapper.className = 'absolute inset-0 w-full h-full pointer-events-none z-10';
-      zoomContent.appendChild(hmWrapper);
-
-      const displayW = img.offsetWidth;
-      const displayH = img.offsetHeight;
-      hmWrapper.style.width = `${displayW}px`;
-      hmWrapper.style.height = `${displayH}px`;
-
-      // === CUSTOM HEATMAP RENDERER ===
-      const canvas = document.createElement('canvas');
-      canvas.width = displayW;
-      canvas.height = displayH;
-      canvas.className = 'absolute inset-0';
-      hmWrapper.appendChild(canvas);
-
-      let points = await fetchBlueprintHeatmap(blueprintName, activeLayerId);
-
-      // Dummy Data Fallback for Visuals
-      if (points.length === 0) {
-        const [dMaxY, dMaxX] = activeConfig.bounds[1];
-        points = [
-          { x: dMaxX * 0.2, y: dMaxY * 0.2 },
-          { x: dMaxX * 0.5, y: dMaxY * 0.5 },
-          { x: dMaxX * 0.8, y: dMaxY * 0.8 },
-          { x: dMaxX * 0.5, y: dMaxY * 0.55 }
-        ];
-      }
-
-      const [maxY, maxX] = activeConfig.bounds[1];
-      const scaleX = displayW / maxX;
-      const scaleY = displayH / maxY;
-
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-      // 1. Prepare Brush
-      const r = 25;
-      const brush = document.createElement('canvas');
-      brush.width = r * 2;
-      brush.height = r * 2;
-      const bCtx = brush.getContext('2d');
-
-      const grad = bCtx.createRadialGradient(r, r, 2, r, r, r);
-      grad.addColorStop(0, 'rgba(0,0,0,1)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      bCtx.fillStyle = grad;
-      bCtx.fillRect(0, 0, r * 2, r * 2);
-
-      // 2. Lookup Table
-      const gradCanvas = document.createElement('canvas');
-      gradCanvas.width = 1;
-      gradCanvas.height = 256;
-      const gCtx = gradCanvas.getContext('2d');
-      const linGrad = gCtx.createLinearGradient(0, 0, 0, 256);
-      linGrad.addColorStop(0.0, 'rgba(0,0,0,0)');
-      linGrad.addColorStop(0.1, '#064e3b'); // Dark Green
-      linGrad.addColorStop(0.3, '#059669');
-      linGrad.addColorStop(0.6, '#10b981');
-      linGrad.addColorStop(0.9, '#34d399'); // Bright Green
-      gCtx.fillStyle = linGrad;
-      gCtx.fillRect(0, 0, 1, 256);
-      const gradData = gCtx.getImageData(0, 0, 1, 256).data;
-
-      // 3. Draw Points
-      points.forEach(p => {
-        const x = Math.round(p.x * scaleX);
-        const y = Math.round(p.y * scaleY);
-        ctx.globalAlpha = 0.15;
-        ctx.drawImage(brush, x - r, y - r);
-      });
-
-      // 4. Colorize
-      const imgData = ctx.getImageData(0, 0, displayW, displayH);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const alpha = data[i + 3];
-        if (alpha > 0) {
-          const lutIndex = alpha * 4;
-          if (lutIndex < gradData.length) {
-            data[i] = gradData[lutIndex];
-            data[i + 1] = gradData[lutIndex + 1];
-            data[i + 2] = gradData[lutIndex + 2];
-            data[i + 3] = Math.min(alpha * 2, 220);
-          }
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-
-      // Inject Stella Switcher
-      if (isMerged) {
-        const switchBtn = document.createElement('button');
-        const isUpper = activeLayerId === config.layers.upper.id;
-        switchBtn.className = 'absolute bottom-4 right-4 px-4 py-2 bg-zinc-900/80 backdrop-blur text-white text-xs font-bold rounded-lg border border-zinc-700 hover:border-emerald-500 transition-all z-20 shadow-xl cursor-pointer pointer-events-auto';
-        switchBtn.innerHTML = `Switch Level <span class="text-zinc-500 ml-1">(${isUpper ? 'Lower' : 'Upper'})</span>`;
-        switchBtn.onclick = (e) => {
-          e.stopPropagation();
-          const nextId = isUpper ? config.layers.lower.id : config.layers.upper.id;
-          loadMap(id, config, nextId);
-        };
-        container.appendChild(switchBtn);
-      }
-
-      // Inject Zoom Hint
-      const hint = document.createElement('div');
-      hint.className = 'absolute top-4 right-4 bg-black/50 px-2 py-1 rounded text-[10px] text-zinc-400 pointer-events-none transition-opacity duration-1000 z-50';
-      hint.textContent = 'Scroll to Zoom  Drag to Pan';
-      container.appendChild(hint);
-      setTimeout(() => hint.style.opacity = '0', 4000);
-      setTimeout(() => hint.remove(), 5000);
-    };
-
-    img.onload = handleLoad;
-    img.src = activeConfig.url;
-    if (img.complete) handleLoad();
-
-
-    container.appendChild(zoomContent);
-
-
+    heatmapLayer.setData(heatData);
+    heatmapLayer.addTo(heatmapMap);
   };
 
-  // Create Tabs
+  // Render Tabs
   maps.forEach(([id, config]) => {
-    const btn = document.createElement('button');
-    btn.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all';
-    btn.textContent = config.name;
-    btn.dataset.mapId = id;
+    if (config.isMerged) {
+      const wrapper = document.createElement('div');
+      wrapper.className = "flex items-center gap-1 bg-zinc-800 rounded-full border border-zinc-700/50 p-1";
 
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      loadMap(id, config);
-    };
+      const btnUpper = document.createElement('button');
+      btnUpper.textContent = "Stella Upper";
+      btnUpper.className = "px-3 py-1 rounded-full text-xs font-medium transition-colors hover:text-white text-zinc-400";
+      btnUpper.onclick = () => loadMap(id, config, config.layers.upper.id);
 
-    tabsContainer.appendChild(btn);
+      const btnLower = document.createElement('button');
+      btnLower.textContent = "Lower";
+      btnLower.className = "px-3 py-1 rounded-full text-xs font-medium transition-colors hover:text-white text-zinc-400";
+      btnLower.onclick = () => loadMap(id, config, config.layers.lower.id);
+
+      wrapper.appendChild(btnUpper);
+      wrapper.appendChild(btnLower);
+      tabsContainer.appendChild(wrapper);
+    } else {
+      const btn = document.createElement('button');
+      btn.textContent = config.name;
+      btn.dataset.mapId = id;
+      btn.className = 'whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all';
+
+      btn.onclick = () => loadMap(id, config);
+
+      tabsContainer.appendChild(btn);
+    }
   });
 
+  // Initial Load (First map)
   if (maps.length > 0) {
-    loadMap(maps[0][0], maps[0][1]);
+    const first = maps[0];
+    if (first[1].isMerged) {
+      loadMap(first[0], first[1], first[1].layers.upper.id);
+    } else {
+      loadMap(first[0], first[1]);
+    }
   }
 }
 

@@ -530,9 +530,14 @@
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
 
-                <input id="heatmapBlueprintInput" list="heatmapBlueprints" placeholder="Type to search..."
+                <input id="heatmapBlueprintInput" autocomplete="off" placeholder="Type to search..."
                   class="w-full bg-black/60 border border-zinc-700 text-white rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-600">
-                <datalist id="heatmapBlueprints"></datalist>
+
+                <!-- Custom Dropdown List -->
+                <div id="heatmapDropdown"
+                  class="hidden absolute top-full left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 divide-y divide-zinc-800/50 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                  <!-- Items injected by JS -->
+                </div>
               </div>
             </div>
 
