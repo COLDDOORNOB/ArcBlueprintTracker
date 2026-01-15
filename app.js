@@ -5274,6 +5274,12 @@ function closeMapPicker() {
     modal.classList.add("hidden");
     modal.classList.remove("flex");
   }
+  // Ensure dropdowns are closed
+  if (typeof toggleStellaDropdown === 'function') toggleStellaDropdown(false);
+  else if (window.toggleStellaDropdown) window.toggleStellaDropdown(false);
+
+  if (typeof toggleBgDropdown === 'function') toggleBgDropdown(false);
+  else if (window.toggleBgDropdown) window.toggleBgDropdown(false);
 }
 
 function initLeafletMap() {
