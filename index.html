@@ -71,8 +71,8 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="/assets/index-DdlV6qN4.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DJd3t-p6.css">
+  <script type="module" crossorigin src="/assets/index-Bp8PNGNz.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CMmxR29m.css">
 </head>
 
 <body class="bg-zinc-950 text-zinc-100">
@@ -157,6 +157,34 @@
             </svg>
           </button>
         </div>
+      </div>
+
+      <!-- Backup & Restore -->
+      <div class="mt-4 px-2">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Backup & Restore</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="exportDataBtn"
+            class="flex items-center justify-center gap-2 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 py-2 rounded-xl text-xs transition-colors group">
+            <svg class="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-500 transition-colors" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
+          </button>
+          <button id="importDataBtn"
+            class="flex items-center justify-center gap-2 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 py-2 rounded-xl text-xs transition-colors group">
+            <svg class="w-3.5 h-3.5 text-zinc-500 group-hover:text-blue-500 transition-colors" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import
+          </button>
+        </div>
+        <input type="file" id="importFile" class="hidden" accept=".json" />
       </div>
 
       <div class="filter-options mt-4">
