@@ -163,6 +163,99 @@ function saveFilters() {
   }
 }
 
+// === Data Export / Import ===
+
+function handleExportData() {
+  const exportData = {
+    version: "1.0",
+    timestamp: new Date().toISOString(),
+    collected: Array.from(state.collectedItems),
+    wishlist: Array.from(state.wishlistedItems),
+    spares: state.spares,
+    filters: {
+      rarities: Array.from(state.filters.rarities),
+      types: Array.from(state.filters.types),
+      maps: Array.from(state.filters.maps),
+      conds: Array.from(state.filters.conds),
+      confs: Array.from(state.filters.confs),
+      collected: state.filters.collected,
+      sortBlueprints: state.filters.sortBlueprints,
+      sortData: state.filters.sortData
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.href = url;
+  a.download = `arc_blueprint_tracker_backup_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleImportData(file) {
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      // Basic validation
+      if (!data.collected || !data.wishlist || !data.spares) {
+        throw new Error("Invalid backup file format.");
+      }
+
+      if (!confirm("Are you sure you want to import this data? This will overwrite your current progress.")) {
+        return;
+      }
+
+      // Overwrite local storage
+      localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify({
+        collected: data.collected,
+        wishlist: data.wishlist
+      }));
+      localStorage.setItem(SPARES_STORAGE_KEY, JSON.stringify(data.spares));
+
+      if (data.filters) {
+        localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(data.filters));
+      }
+
+      // Reload app state
+      loadCollectionState();
+      loadSpares();
+      loadFilters();
+
+      // Refresh UI
+      applyFilters();
+      renderFacets();
+      renderProgression();
+      if (typeof renderDataRegistry === 'function') renderDataRegistry();
+
+      // Sync to cloud if logged in
+      if (auth.currentUser) {
+        console.log("Imported data, syncing to cloud...");
+        syncToCloud();
+      }
+
+      // Show success toast
+      if (typeof showSuccessToast === 'function') {
+        showSuccessToast("Data Imported!", "Your local state has been updated ✨");
+      } else {
+        alert("Data imported successfully!");
+      }
+
+    } catch (err) {
+      console.error("Failed to import data:", err);
+      alert("Error: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function loadFilters() {
   try {
     const data = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -2827,11 +2920,15 @@ async function fetchBlueprintHeatmap(blueprintName, mapId) {
   }
 }
 
-function showSuccessToast() {
+function showSuccessToast(title = "Submitted!", message = "Thanks for contributing 🎉") {
   const toast = document.getElementById("successToast");
   const progress = document.getElementById("successToastProgress");
 
   if (!toast || !progress) return;
+
+  // Update text
+  const p = toast.querySelector("p");
+  if (p) p.textContent = `${title} ${message}`;
 
   // Reset and show
   progress.classList.remove("animate");
@@ -3387,6 +3484,21 @@ function initUI() {
       if (sort1) sort1.onchange({ target: { value: newSort } });
     };
   });
+
+  // Data Export / Import Bindings
+  const exportBtn = document.getElementById("exportDataBtn");
+  const importBtn = document.getElementById("importDataBtn");
+  const importFileInput = document.getElementById("importFile");
+
+  if (exportBtn) exportBtn.onclick = handleExportData;
+  if (importBtn && importFileInput) {
+    importBtn.onclick = () => importFileInput.click();
+    importFileInput.onchange = (e) => {
+      handleImportData(e.target.files[0]);
+      // Reset input so same file can be selected again
+      e.target.value = "";
+    };
+  }
 }
 
 async function loadData() {
