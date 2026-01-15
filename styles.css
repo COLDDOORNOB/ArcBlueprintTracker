@@ -147,6 +147,7 @@ body::before {
 /* Mirrored background removed as requested (single image) */
 
 /* Low Cost Film Grain Overlay */
+/* Low Cost Film Grain Overlay */
 #bg-grain {
   position: absolute;
   inset: 0;
@@ -1364,10 +1365,9 @@ input[type=range]::-webkit-slider-runnable-track {
 /* 
    Main Map Layer: Sharp, rounded corners.
 */
+/* Main Map Layer: Sharp, rounded corners. */
 .crt-map-image {
   /* No mask - sharp edges with rounding */
-  mask-image: none;
-  -webkit-mask-image: none;
   border-radius: 40px;
   /* Requested rounding */
   z-index: 10;
@@ -1386,37 +1386,14 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Vignette removed - using mask + background color instead */
 
 /* Scanlines: RGB TV Mask */
-.crt-scanlines {
-  background: linear-gradient(to bottom,
-      rgba(255, 0, 0, 0.15) 0%,
-      rgba(255, 0, 0, 0.15) 33.3%,
-      rgba(0, 255, 0, 0.15) 33.3%,
-      rgba(0, 255, 0, 0.15) 66.6%,
-      rgba(0, 0, 255, 0.15) 66.6%,
-      rgba(0, 0, 255, 0.15) 100%);
-  background-size: 100% 3px;
-  opacity: 0.5;
-  mix-blend-mode: hard-light;
-  pointer-events: none;
-}
+/* Scanlines Removed */
 
 /* Flicker Animation to simulate refresh rate instability */
-.crt-flicker-anim {
-  animation: crt-flicker 0.15s infinite;
-  background: rgba(255, 255, 255, 0.02);
-  mix-blend-mode: overlay;
-  will-change: opacity;
-}
+/* Flicker Animation Removed */
 
 /* Color Separation / Chromatic Aberration (Simulated via text shadow / border, or subtle gradient mix) */
 /* Real RGB shift is hard without Canvas/WebGL, but we can fake a "phosphor" grid or tint */
-.crt-phosphor {
-  /* Tiny grid pattern to simulate RGB mask */
-  background-image: radial-gradient(circle, rgba(20, 255, 20, 0.05) 1px, transparent 1px);
-  background-size: 3px 3px;
-  mix-blend-mode: screen;
-  opacity: 0.2;
-}
+/* Phosphor Effect Removed */
 
 /* Scanline Sweep Removed */
 /* Scanline Sweep Removed */
@@ -1424,22 +1401,7 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Removed separate aberration - merged into scanlines/RGB effect */
 
 /* Optional: Slight color shift pulse */
-.crt-pulse {
-  animation: crt-color-pulse 8s infinite ease-in-out;
-  will-change: filter;
-}
-
-@keyframes crt-color-pulse {
-
-  0%,
-  100% {
-    filter: hue-rotate(0deg);
-  }
-
-  50% {
-    filter: hue-rotate(3deg);
-  }
-}
+/* Pulse Animation Removed */
 
 /* =====================================================
    Data Tab Secondary Navigation (Drop Registry / Heatmap)

@@ -2607,17 +2607,25 @@ function showCollectToast(blueprintName) {
   }
 
   pendingBlueprintName = blueprintName;
-  toastText.textContent = `${blueprintName} Blueprint collected? Tell us where!`;
-
-  // Reset and start progress animation
-  toastProgress.classList.remove("animate");
-  void toastProgress.offsetWidth; // Force reflow
-  toastProgress.classList.add("animate");
+  toastText.textContent = `${blueprintName} Collected? Tell us where!`;
 
   toast.classList.remove("hidden");
 
   // Hide FAB while toast is visible (mobile only)
   if (fab && window.innerWidth <= 768) fab.classList.add("hidden");
+
+  // Reset Animation (Full Width, No Transition)
+  toastProgress.style.transition = 'none';
+  toastProgress.style.width = '100%';
+
+  // Double RAF to ensure the 100% width is painted before we start the transition
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // Start Animation (Width to 0 over 10s)
+      toastProgress.style.transition = 'width 10000ms linear';
+      toastProgress.style.width = '0%';
+    });
+  });
 
   // Hide after 10 seconds
   toastTimeout = setTimeout(() => {
@@ -2631,7 +2639,11 @@ function hideToast() {
   const fab = document.getElementById("submitLocationFab");
 
   if (toast) toast.classList.add("hidden");
-  if (toastProgress) toastProgress.classList.remove("animate");
+
+  if (toastProgress) {
+    toastProgress.style.transition = 'none';
+    toastProgress.style.width = '100%';
+  }
 
   // Show FAB again when toast is hidden (only on blueprints tab and mobile)
   if (fab && state.currentTab === "blueprints" && window.innerWidth <= 768) fab.classList.remove("hidden");
@@ -2649,6 +2661,7 @@ async function submitBlueprintLocation() {
   const mapId = document.getElementById("submitMapId")?.value;
   const mapX = document.getElementById("submitMapX")?.value;
   const mapY = document.getElementById("submitMapY")?.value;
+  const mapLayer = document.getElementById("submitMapLayer")?.value || "0";
 
   const condition = document.getElementById("submitCondition")?.value;
   // Notes replaces Location
@@ -2705,7 +2718,8 @@ async function submitBlueprintLocation() {
       userId: auth.currentUser?.uid || "anonymous",
       // Coordinates moved to bottom
       mapX: mapX || "",
-      mapY: mapY || ""
+      mapY: mapY || "",
+      mapLayer: parseInt(mapLayer) || 0
     });
 
     closeSubmissionModal();
@@ -5128,6 +5142,11 @@ const MAP_CONFIG = {
     name: "Stella Montis (Lower)",
     url: "/images/maps/stella_montis_upper.webp", // Swapped
     bounds: [[0, 0], [1000, 1333]] // Swapped bounds
+  },
+  "the_blue_gate_underground": {
+    name: "The Blue Gate (Underground)",
+    url: "/images/maps/the_blue_gate_underground.webp",
+    bounds: [[0, 0], [469, 1000]] // [Height, Width] for Leaflet
   }
 };
 
@@ -5270,8 +5289,8 @@ function initLeafletMap() {
     minZoom: -1,
     maxZoom: 2,
     zoomSnap: 0,       // Allow fractional zoom levels (smooth zoom)
-    zoomDelta: 0.1,    // Small zoom steps for wheel/pinch
-    wheelPxPerZoomLevel: 120, // Slower, smoother wheel zooming
+    zoomDelta: 0.5,    // Larger zoom steps (5x sensitivity)
+    wheelPxPerZoomLevel: 120, // Keep wheel smooth
     zoomControl: false,
     attributionControl: false
   });
@@ -5291,7 +5310,7 @@ function renderMapTabs() {
   const container = document.getElementById("mapTabsContainer");
   if (!container) return;
 
-  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => !id.includes("stella"));
+  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => !id.includes("stella") && !id.includes("blue_gate"));
 
   // Render standard tabs
   let html = visibleMaps.map(([id, config]) => `
@@ -5301,6 +5320,12 @@ function renderMapTabs() {
       ${config.name}
     </button>
   `).join('');
+
+  // Cleanup existing teleported menus to prevent duplicates
+  const existingStella = document.getElementById("stellaDropdownMenu");
+  if (existingStella) existingStella.remove();
+  const existingBg = document.getElementById("bgDropdownMenu");
+  if (existingBg) existingBg.remove();
 
   // Add Stella Montis Dropdown Tab
   const currentStellaLevel = mapPickerState.stellaLevel || "upper";
@@ -5314,7 +5339,7 @@ function renderMapTabs() {
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
       </button>
       
-      <div id="stellaDropdownMenu" class="hidden absolute right-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
+      <div id="stellaDropdownMenu" class="hidden absolute left-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
         <div class="py-1">
           <button onclick="loadMap('stella_montis_upper'); toggleStellaDropdown(false)" 
             class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'upper' ? 'text-emerald-500 font-bold' : ''}">
@@ -5323,6 +5348,32 @@ function renderMapTabs() {
           <button onclick="loadMap('stella_montis_lower'); toggleStellaDropdown(false)" 
             class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'lower' ? 'text-emerald-500 font-bold' : ''}">
             Lower Level
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add Blue Gate Dropdown
+  const currentBgLayer = mapPickerState.currentMapId.includes('blue_gate_underground') ? 'underground' : 'surface';
+  html += `
+    <div class="relative inline-block text-left" id="bgDropdownContainer">
+      <button onclick="toggleBgDropdown()" 
+        class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2"
+        id="map-tab-blue-gate">
+        The Blue Gate
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </button>
+      
+      <div id="bgDropdownMenu" class="hidden absolute left-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
+        <div class="py-1">
+          <button onclick="loadMap('the_blue_gate'); toggleBgDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentBgLayer === 'surface' ? 'text-emerald-500 font-bold' : ''}">
+            Surface
+          </button>
+          <button onclick="loadMap('the_blue_gate_underground'); toggleBgDropdown(false)" 
+            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentBgLayer === 'underground' ? 'text-emerald-500 font-bold' : ''}">
+            Underground
           </button>
         </div>
       </div>
@@ -5340,28 +5391,69 @@ window.toggleStellaDropdown = (forceState) => {
   const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
 
   if (show) {
-    // Calculate position
+    if (window.toggleBgDropdown) window.toggleBgDropdown(false);
+
+    // Teleport to body to escape container transforms
+    if (menu.parentElement !== document.body) {
+      document.body.appendChild(menu);
+    }
+
+    menu.classList.remove("hidden");
     const rect = btn.getBoundingClientRect();
+
     menu.style.position = 'fixed';
     menu.style.top = `${rect.bottom + 8}px`; // 8px gap
     menu.style.left = `${rect.left}px`;
-    menu.style.width = `${Math.max(rect.width, 160)}px`; // At least button width or 160px
-    menu.style.zIndex = '9999'; // Very high z-index
+    menu.style.minWidth = `${Math.max(rect.width, 160)}px`;
+    menu.style.zIndex = '20000'; // Must be > 10002 (modal z-index)
+    menu.style.opacity = '1';
 
-    // Remove hidden
-    menu.classList.remove("hidden");
   } else {
     menu.classList.add("hidden");
   }
 };
 
+window.toggleBgDropdown = (forceState) => {
+  const menu = document.getElementById("bgDropdownMenu");
+  const btn = document.getElementById("map-tab-blue-gate");
+  if (!menu || !btn) return;
+
+  const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
+
+  if (show) {
+    if (window.toggleStellaDropdown) window.toggleStellaDropdown(false);
+
+    // Teleport to body
+    if (menu.parentElement !== document.body) {
+      document.body.appendChild(menu);
+    }
+
+    menu.classList.remove("hidden");
+    const rect = btn.getBoundingClientRect();
+
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 8}px`;
+    menu.style.left = `${rect.left}px`;
+    menu.style.minWidth = `${Math.max(rect.width, 160)}px`;
+    menu.style.zIndex = '20000'; // Must be > 10002 (modal z-index)
+    menu.style.opacity = '1';
+
+  } else {
+    menu.classList.add("hidden");
+  }
+};
+
+
+
 function loadMap(mapId) {
-  // Handle Stella Montis consolidation
+  // Handle Stella/BlueGate consolidation
   let actualMapId = mapId;
   const isStella = mapId.includes("stella");
+  const isBlueGate = mapId.includes("blue_gate");
 
-  // Close dropdown if clicking away or loading another map
+  // Close dropdowns
   if (!isStella) toggleStellaDropdown(false);
+  if (!isBlueGate) toggleBgDropdown(false);
 
   // If switching TO Stella (generic or upper), verify state
   if (isStella) {
@@ -5396,6 +5488,14 @@ function loadMap(mapId) {
     }
   }
 
+  // Blue Gate Tab Highlight
+  const bgBtn = document.getElementById(`map-tab-blue-gate`);
+  if (isBlueGate && bgBtn) {
+    bgBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 flex items-center gap-2";
+  } else if (!isBlueGate && bgBtn) {
+    bgBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2";
+  }
+
   // Remove existing layers (images)
   mapPickerState.map.eachLayer(layer => {
     if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
@@ -5410,12 +5510,12 @@ function loadMap(mapId) {
   // Clear pin state
   mapPickerState.currentPin = null;
   mapPickerState.selectedLocation = null;
-  document.getElementById("confirmPinBtn").disabled = true;
+  document.getElementById("confirmPinBtn").disabled = false; // Allow submitting just the map
   document.getElementById("coordinatesDisplay").textContent = "No location selected";
 
   // Add image overlay with specific bounds
   const bounds = config.bounds;
-  L.imageOverlay(config.url, bounds, { className: 'crt-map-image' }).addTo(mapPickerState.map);
+  L.imageOverlay(config.url, bounds).addTo(mapPickerState.map);
 
   // Fit bounds
   mapPickerState.map.fitBounds(bounds);
@@ -5431,6 +5531,17 @@ function loadMap(mapId) {
   dropItems.forEach(btn => {
     if (btn.innerText.includes("Upper") && mapPickerState.stellaLevel === 'upper') btn.classList.add("text-emerald-500", "font-bold");
     else if (btn.innerText.includes("Lower") && mapPickerState.stellaLevel === 'lower') btn.classList.add("text-emerald-500", "font-bold");
+    else {
+      btn.classList.remove("text-emerald-500", "font-bold");
+      btn.classList.add("text-zinc-300");
+    }
+
+  });
+
+  const bgItems = document.querySelectorAll("#bgDropdownMenu button");
+  bgItems.forEach(btn => {
+    if (btn.innerText.includes("Surface") && !actualMapId.includes("underground")) btn.classList.add("text-emerald-500", "font-bold");
+    else if (btn.innerText.includes("Underground") && actualMapId.includes("underground")) btn.classList.add("text-emerald-500", "font-bold");
     else {
       btn.classList.remove("text-emerald-500", "font-bold");
       btn.classList.add("text-zinc-300");
@@ -5498,6 +5609,20 @@ function onMapClick(e) {
 function confirmMapSelection() {
   // Use selected location OR current map ID if no pin
   const mapId = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.mapId : mapPickerState.currentMapId;
+
+  // Determine Map ID and Layer Code (0 = Surface/Upper, 1 = Underground/Lower)
+  let cleanMapId = mapId;
+  let layerCode = 0; // Default
+
+  // Handle Special Maps
+  if (mapId.includes("stella_montis")) {
+    cleanMapId = "stella_montis";
+    if (mapId.includes("lower")) layerCode = 1;
+  } else if (mapId.includes("the_blue_gate")) {
+    cleanMapId = "the_blue_gate";
+    if (mapId.includes("underground")) layerCode = 1;
+  }
+
   const x = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.x : null;
   const y = mapPickerState.selectedLocation ? mapPickerState.selectedLocation.y : null;
 
@@ -5505,16 +5630,20 @@ function confirmMapSelection() {
   const idInput = document.getElementById("submitMapId");
   const xInput = document.getElementById("submitMapX");
   const yInput = document.getElementById("submitMapY");
+  const layerInput = document.getElementById("submitMapLayer");
 
-  if (idInput) idInput.value = mapId || "";
+  if (idInput) idInput.value = cleanMapId || "";
   if (xInput) xInput.value = x !== null ? x : "";
   if (yInput) yInput.value = y !== null ? y : "";
+  if (layerInput) layerInput.value = layerCode;
 
   // Update Display
   let mapName = MAP_CONFIG[mapId]?.name || "Map";
   // Simplify Stella names
   if (mapId === "stella_montis_upper") mapName = "Stella Upper";
   if (mapId === "stella_montis_lower") mapName = "Stella Lower";
+  if (mapId === "the_blue_gate_underground") mapName = "Blue Gate (Und)";
+  if (mapId === "the_blue_gate") mapName = "Blue Gate (Surf)";
 
   const displayVal = x !== null && y !== null ? `${mapName} (${x}, ${y})` : mapName;
   const displayEl = document.getElementById("mapDisplayValue");
