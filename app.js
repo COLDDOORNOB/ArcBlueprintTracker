@@ -1,8 +1,10 @@
 ﻿import { animate, stagger } from "motion";
 import "./tutorial_slideshow.js";
-import { auth, db, googleProvider } from "./firebase-config.js";
+import { auth, db, storage, googleProvider } from "./firebase-config.js";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { createWorldHeatmap } from "./src/simple-world-heatmap.js";
 
 const CSV_URL_DEFAULT = "./data.csv";
 let toastTimeout = null;
@@ -40,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // loadData is core, but we wrap it too just in case
   safeInit("Data Loading", loadData);
+  safeInit("Data Tabs", initDataTabs);
 });
 
 
@@ -2667,13 +2670,49 @@ async function submitBlueprintLocation() {
   // Notes replaces Location
   const notes = document.getElementById("submitNotes")?.value;
 
-  const container = getContainerValue(); // Use container picker value
+  // Container Logic - Use getContainerValue() to handle both selected and custom containers
+  const container = getContainerValue();
+
   const trialsReward = document.getElementById("submitTrialsReward")?.checked || false;
   const questReward = document.getElementById("submitQuestReward")?.checked || false;
 
   if (!blueprintName) {
     alert("Please select a Blueprint Name.");
     return;
+  }
+
+  // Helper: Compress Image to WebP
+  async function compressImageToWebP(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1920;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/webp', 0.8);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
   }
 
   // Require at least one data field
@@ -2693,9 +2732,39 @@ async function submitBlueprintLocation() {
     // If using custom container, save it to separate collection
     if (customForm && !customForm.classList.contains("hidden") && customNameInput?.value.trim()) {
       try {
+        let screenshotUrl = "";
+        const screenshotInput = document.getElementById("customContainerScreenshot");
+
+        if (screenshotInput?.files?.length > 0) {
+          const file = screenshotInput.files[0];
+          console.log("Compressing screenshot...");
+          const compressedBlob = await compressImageToWebP(file);
+
+          // Create filename from container name (sanitized) + timestamp for uniqueness
+          const containerName = customNameInput.value.trim();
+          const safeName = containerName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+          const filename = `${safeName}_${Date.now()}.webp`;
+          const storageRef = ref(storage, `custom_containers/${filename}`);
+
+          console.log("Uploading screenshot...");
+          const description = customDescInput?.value.trim() || "";
+          const metadata = {
+            contentType: 'image/webp',
+            customMetadata: {
+              containerName: containerName,
+              description: description,
+              submittedAt: new Date().toISOString()
+            }
+          };
+          await uploadBytes(storageRef, compressedBlob, metadata);
+          screenshotUrl = await getDownloadURL(storageRef);
+          console.log("Upload complete:", screenshotUrl);
+        }
+
         await addDoc(collection(db, "containerSubmissions"), {
           name: customNameInput.value.trim(),
           description: customDescInput?.value.trim() || "",
+          screenshotUrl: screenshotUrl,
           submittedAt: new Date().toISOString(),
           userId: auth.currentUser?.uid || "anonymous"
         });
@@ -2727,6 +2796,34 @@ async function submitBlueprintLocation() {
   } catch (error) {
     console.error("Error submitting blueprint location:", error);
     alert("Failed to submit. Please try again.");
+  }
+}
+
+async function fetchBlueprintHeatmap(blueprintName, mapId) {
+  console.log(`[Heatmap] Fetching for ${blueprintName} on ${mapId}`);
+  try {
+    const q = query(
+      collection(db, "blueprintSubmissions"),
+      where("blueprintName", "==", blueprintName),
+      where("map", "==", mapId)
+    );
+    const snapshot = await getDocs(q);
+    console.log(`[Heatmap] Snapshot size: ${snapshot.size}`);
+    const data = [];
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      // Filter out invalid coords or missing values (client-side)
+      if (d.mapX && d.mapY && d.mapX !== "" && d.mapY !== "") {
+        data.push({ x: Number(d.mapX), y: Number(d.mapY), value: 1 });
+      }
+    });
+
+    console.log(`[Heatmap] Processed data length: ${data.length}`, data);
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching heatmap data:", error);
+    return [];
   }
 }
 
@@ -4646,6 +4743,280 @@ function processDataResults(rawData) {
   renderDataRegistry();
 }
 
+function initDataTabs() {
+  const tabDropRegistry = document.getElementById("tabDropRegistry");
+  const tabHeatmap = document.getElementById("tabHeatmap");
+  const title = document.getElementById("dataTitle");
+  const subtitle = document.getElementById("dataSubtitle"); // e.g. "Select a blueprint from the dropdown..."
+
+  const registryElements = document.getElementsByClassName("registry-view");
+  const heatmapContainer = document.getElementById("heatmapMainContainer");
+
+  if (!state.dataViewMode) state.dataViewMode = "registry";
+
+  const populateDropdown = () => {
+    const input = document.getElementById("heatmapBlueprintInput");
+    const dropdown = document.getElementById("heatmapDropdown");
+
+    if (!input || !dropdown) return;
+
+    // Helper to render items
+    const renderItems = (items) => {
+      dropdown.innerHTML = "";
+      if (items.length === 0) {
+        const div = document.createElement("div");
+        div.className = "px-4 py-3 text-sm text-zinc-500 italic";
+        div.textContent = "No blueprints found";
+        dropdown.appendChild(div);
+        return;
+      }
+
+      items.forEach(item => {
+        const btn = document.createElement("button");
+        btn.className = "w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-white transition-colors flex items-center justify-between group";
+
+        // Name
+        const spanName = document.createElement("span");
+        spanName.textContent = item.name;
+        btn.appendChild(spanName);
+
+        // Optional: Add rarity dot or icon?
+        // Let's add a small rarity dot
+        const dot = document.createElement("span");
+        dot.className = "w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity";
+        dot.style.backgroundColor = rarityColor(item.rarity);
+        btn.appendChild(dot);
+
+        btn.onclick = () => {
+          input.value = item.name;
+          dropdown.classList.add("hidden");
+          const overlay = document.getElementById("hm-global-overlay");
+          if (overlay) overlay.classList.add("hidden");
+
+          initHeatmapViewV2(item.name, "hm-global-container", "hm-global-tabs");
+
+          if (subtitle) subtitle.textContent = `Visualized spawn density for ${item.name}`;
+        };
+        dropdown.appendChild(btn);
+      });
+    };
+
+    // Close on click outside
+    document.addEventListener("click", (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add("hidden");
+      }
+    });
+
+    // Input Handler
+    input.oninput = (e) => {
+      const val = e.target.value.toLowerCase();
+
+      if (!val) {
+        dropdown.classList.add("hidden");
+        return;
+      }
+
+      const puncClean = (str) => str.replace(/['’]/g, ''); // Handle 'Nade vs Nade
+
+      const filtered = state.all.filter(i => {
+        // Simple fuzzy: includes
+        return puncClean(i.name.toLowerCase()).includes(puncClean(val));
+      }).sort((a, b) => a.name.localeCompare(b.name)); //.slice(0, 50); // Limit results for performance?
+
+      renderItems(filtered);
+      dropdown.classList.remove("hidden");
+    };
+
+    // Focus Handler (Show all or filtered)
+    input.onfocus = () => {
+      const val = input.value.toLowerCase();
+      let items = state.all;
+      if (val) {
+        const puncClean = (str) => str.replace(/['’]/g, '');
+        items = state.all.filter(i => puncClean(i.name.toLowerCase()).includes(puncClean(val)));
+      }
+      // Sort
+      items = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+      renderItems(items);
+      dropdown.classList.remove("hidden");
+    };
+  };
+
+  const updateTabs = () => {
+    const isHeatmap = state.dataViewMode === "heatmap";
+
+    if (isHeatmap) {
+      tabHeatmap?.classList.add("data-tab-active");
+      tabDropRegistry?.classList.remove("data-tab-active");
+
+      if (title) title.textContent = "SPAWN HEATMAPS";
+      if (subtitle) subtitle.textContent = "Search for a blueprint to view spawn locations.";
+
+      populateDropdown();
+
+    } else {
+      tabDropRegistry?.classList.add("data-tab-active");
+      tabHeatmap?.classList.remove("data-tab-active");
+
+      if (title) title.textContent = "DROP REGISTRY";
+      if (subtitle) subtitle.textContent = "Community-sourced spawn data analysis";
+    }
+
+    // Toggle Visibility
+    Array.from(registryElements).forEach(el => el.classList.toggle("hidden", isHeatmap));
+    heatmapContainer?.classList.toggle("hidden", !isHeatmap);
+  };
+
+  if (tabDropRegistry) {
+    tabDropRegistry.onclick = () => {
+      state.dataViewMode = "registry";
+      updateTabs();
+    };
+  }
+  if (tabHeatmap) {
+    tabHeatmap.onclick = () => {
+      state.dataViewMode = "heatmap";
+      updateTabs();
+    };
+  }
+}
+
+// Heatmap Initialization Logic
+async function initHeatmapView(blueprintName, containerId, tabsId) {
+  const container = document.getElementById(containerId);
+  const tabsContainer = document.getElementById(tabsId);
+
+  if (!container || !tabsContainer) return;
+
+
+  if (!container || !tabsContainer || container.dataset.init === "true") return;
+  container.dataset.init = "true";
+
+  // Available Maps
+  const maps = Object.entries(MAP_CONFIG);
+
+  // Default Map
+  let currentMapId = "dam_battlegrounds";
+
+  // Create Tabs
+  maps.forEach(([id, config]) => {
+    const btn = document.createElement("button");
+    btn.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all";
+    btn.textContent = config.name;
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      loadMap(id, config);
+    };
+
+    tabsContainer.appendChild(btn);
+  });
+
+  // Function to load map and heatmap
+  const loadMap = async (id, config) => {
+    currentMapId = id;
+
+    // Update Tabs UI
+    Array.from(tabsContainer.children).forEach(b => {
+      if (b.textContent === config.name) {
+        b.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all";
+      } else {
+        b.className = "whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700 hover:text-white transition-all";
+      }
+    });
+
+    // Clear Container
+    container.innerHTML = "";
+
+    // Loader
+    const loader = document.createElement("div");
+    loader.className = "absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10";
+    loader.innerHTML = `<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>`;
+    container.appendChild(loader);
+
+    // Load Image
+    const img = new Image();
+    img.src = config.url;
+    img.className = "w-full h-full object-contain pointer-events-none select-none";
+    img.style.opacity = "0"; // Hide until loaded
+
+    img.onload = async () => {
+      img.style.opacity = "1";
+      loader.remove();
+
+      // Setup Heatmap Overlay
+      const hmWrapper = document.createElement("div");
+      hmWrapper.className = "absolute inset-0 w-full h-full";
+      // Position heatmap wrapper to match image exactly logic? 
+      // object-contain centers the image. 
+      // Simplification: We assume image fills container or is close enough for MVP. 
+      // For precision, we'd need to calculate aspect ratio.
+
+      container.insertBefore(hmWrapper, loader); // Insert before loader if it persisted
+
+      // Heatmap Instance
+      const heatmap = h337.create({
+        container: hmWrapper,
+        radius: 20,
+        maxOpacity: 0.8,
+        minOpacity: 0,
+        blur: 0.85,
+        gradient: {
+          // Custom Gradient matching site theme (Emerald/Teal)
+          '.2': '#064e3b', // emerald-900
+          '.4': '#065f46', // emerald-800
+          '.6': '#059669', // emerald-600
+          '.8': '#10b981', // emerald-500
+          '.95': '#34d399' // emerald-400
+        }
+      });
+
+      // Fetch Data
+      const points = await fetchBlueprintHeatmap(blueprintName, id);
+
+      if (points.length === 0) {
+        // Show "No Data" message
+        const msg = document.createElement("div");
+        msg.className = "absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 rounded-full text-xs text-white backdrop-blur";
+        msg.textContent = "No data points for this map";
+        container.appendChild(msg);
+        return;
+      }
+
+      // Scaling Logic
+      // MAP_CONFIG bounds[1] is [maxY, maxX] (y, x). Note: Swapped in config but let's trust maxX is index 1.
+      const [maxY, maxX] = config.bounds[1];
+      const displayW = img.offsetWidth;
+      const displayH = img.offsetHeight;
+
+      // Ensure we have valid dimensions
+      if (displayW === 0 || displayH === 0) return;
+
+      const scaleX = displayW / maxX;
+      const scaleY = displayH / maxY;
+
+      const scaledData = points.map(p => ({
+        x: Math.round(p.x * scaleX),
+        y: Math.round(p.y * scaleY),
+        value: 1
+      }));
+
+      heatmap.setData({
+        max: 5, // Threshold for max intensity
+        data: scaledData
+      });
+    };
+
+    container.appendChild(img);
+  };
+
+  // Initial Load
+  const initialMapKey = Object.keys(MAP_CONFIG)[0];
+  loadMap(initialMapKey, MAP_CONFIG[initialMapKey]);
+}
+
 function renderDataRegistry() {
   const container = document.getElementById("dataRows");
   if (!container) return;
@@ -4775,7 +5146,7 @@ function renderDataRegistry() {
       const rA = rarityRank(getRarity(a));
       const rB = rarityRank(getRarity(b));
 
-      // Secondary is always High->Low (Exotic first) unless... ?
+      // Secondary is always High->Low (0 first) unless... ?
       // Let's stick to High->Low (0 first) for secondary.
       return rA - rB;
     }
@@ -4932,10 +5303,13 @@ function renderDataRegistry() {
     // Detail Section (Initially Hidden)
     const detail = document.createElement("div");
     detail.className = "hidden border-t border-zinc-800/50 bg-black/20";
+
+    // Unique ID for tabs
+    const slug = item.name.replace(/[^a-zA-Z0-9]/g, '_');
+
     detail.innerHTML = `
-      <div class="p-4 md:p-6">
-        <!-- Analytics Only -->
-        <div class="space-y-6 w-full min-w-0">
+      <div class="p-4 md:p-6" id="detail-${slug}">
+         <div class="space-y-6 w-full min-w-0">
           <!-- Maps Chart -->
           <div>
             <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Map Distribution</h4>
@@ -4948,14 +5322,14 @@ function renderDataRegistry() {
            <div>
             <h4 class="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-3">Condition Distribution</h4>
             <div class="space-y-2">
-              ${renderDistBars(item.conditions, item.entries)}
+               ${renderDistBars(item.conditions, item.entries)}
             </div>
           </div>
         </div>
       </div>
     `;
 
-    // Click to toggle
+    // Click to toggle Detail
     header.onclick = () => {
       const isHidden = detail.classList.contains("hidden");
 
@@ -5274,12 +5648,6 @@ function closeMapPicker() {
     modal.classList.add("hidden");
     modal.classList.remove("flex");
   }
-  // Ensure dropdowns are closed
-  if (typeof toggleStellaDropdown === 'function') toggleStellaDropdown(false);
-  else if (window.toggleStellaDropdown) window.toggleStellaDropdown(false);
-
-  if (typeof toggleBgDropdown === 'function') toggleBgDropdown(false);
-  else if (window.toggleBgDropdown) window.toggleBgDropdown(false);
 }
 
 function initLeafletMap() {
@@ -5316,138 +5684,34 @@ function renderMapTabs() {
   const container = document.getElementById("mapTabsContainer");
   if (!container) return;
 
-  const visibleMaps = Object.entries(MAP_CONFIG).filter(([id]) => !id.includes("stella") && !id.includes("blue_gate"));
+  // Define Groups
+  // We want: Dam, Spaceport, Buried City, Blue Gate (Merged), Stella (Merged)
+  const mapTabs = [
+    { id: 'dam_battlegrounds', name: 'Dam Battlegrounds' },
+    { id: 'the_spaceport', name: 'The Spaceport' },
+    { id: 'buried_city', name: 'Buried City' },
+    { id: 'the_blue_gate', name: 'The Blue Gate' }, // Loads default surface
+    { id: 'stella_montis_upper', name: 'Stella Montis', genericId: 'stella_montis' } // Loads default upper
+  ];
 
-  // Render standard tabs
-  let html = visibleMaps.map(([id, config]) => `
-    <button onclick="loadMap('${id}')" 
+  container.innerHTML = mapTabs.map(m => `
+    <button onclick="loadMap('${m.id}')" 
       class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white"
-      id="map-tab-${id}">
-      ${config.name}
+      id="map-tab-${m.genericId || m.id}"
+      data-generic-id="${m.genericId || m.id}">
+      ${m.name}
     </button>
   `).join('');
 
-  // Cleanup existing teleported menus to prevent duplicates
+  // Cleanup old dropdowns if any
   const existingStella = document.getElementById("stellaDropdownMenu");
   if (existingStella) existingStella.remove();
   const existingBg = document.getElementById("bgDropdownMenu");
   if (existingBg) existingBg.remove();
-
-  // Add Stella Montis Dropdown Tab
-  const currentStellaLevel = mapPickerState.stellaLevel || "upper";
-
-  html += `
-    <div class="relative inline-block text-left" id="stellaDropdownContainer">
-      <button onclick="toggleStellaDropdown()" 
-        class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2"
-        id="map-tab-stella">
-        Stella Montis
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      </button>
-      
-      <div id="stellaDropdownMenu" class="hidden absolute left-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
-        <div class="py-1">
-          <button onclick="loadMap('stella_montis_upper'); toggleStellaDropdown(false)" 
-            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'upper' ? 'text-emerald-500 font-bold' : ''}">
-            Upper Level
-          </button>
-          <button onclick="loadMap('stella_montis_lower'); toggleStellaDropdown(false)" 
-            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentStellaLevel === 'lower' ? 'text-emerald-500 font-bold' : ''}">
-            Lower Level
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Add Blue Gate Dropdown
-  const currentBgLayer = mapPickerState.currentMapId.includes('blue_gate_underground') ? 'underground' : 'surface';
-  html += `
-    <div class="relative inline-block text-left" id="bgDropdownContainer">
-      <button onclick="toggleBgDropdown()" 
-        class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2"
-        id="map-tab-blue-gate">
-        The Blue Gate
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      </button>
-      
-      <div id="bgDropdownMenu" class="hidden absolute left-0 mt-2 w-40 rounded-lg shadow-lg bg-zinc-900 border border-zinc-700 ring-1 ring-black ring-opacity-5 z-50 focus:outline-none">
-        <div class="py-1">
-          <button onclick="loadMap('the_blue_gate'); toggleBgDropdown(false)" 
-            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentBgLayer === 'surface' ? 'text-emerald-500 font-bold' : ''}">
-            Surface
-          </button>
-          <button onclick="loadMap('the_blue_gate_underground'); toggleBgDropdown(false)" 
-            class="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors ${currentBgLayer === 'underground' ? 'text-emerald-500 font-bold' : ''}">
-            Underground
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  container.innerHTML = html;
 }
 
-window.toggleStellaDropdown = (forceState) => {
-  const menu = document.getElementById("stellaDropdownMenu");
-  const btn = document.getElementById("map-tab-stella");
-  if (!menu || !btn) return;
+// Dropdowns removed
 
-  const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
-
-  if (show) {
-    if (window.toggleBgDropdown) window.toggleBgDropdown(false);
-
-    // Teleport to body to escape container transforms
-    if (menu.parentElement !== document.body) {
-      document.body.appendChild(menu);
-    }
-
-    menu.classList.remove("hidden");
-    const rect = btn.getBoundingClientRect();
-
-    menu.style.position = 'fixed';
-    menu.style.top = `${rect.bottom + 8}px`; // 8px gap
-    menu.style.left = `${rect.left}px`;
-    menu.style.minWidth = `${Math.max(rect.width, 160)}px`;
-    menu.style.zIndex = '20000'; // Must be > 10002 (modal z-index)
-    menu.style.opacity = '1';
-
-  } else {
-    menu.classList.add("hidden");
-  }
-};
-
-window.toggleBgDropdown = (forceState) => {
-  const menu = document.getElementById("bgDropdownMenu");
-  const btn = document.getElementById("map-tab-blue-gate");
-  if (!menu || !btn) return;
-
-  const show = forceState !== undefined ? forceState : menu.classList.contains("hidden");
-
-  if (show) {
-    if (window.toggleStellaDropdown) window.toggleStellaDropdown(false);
-
-    // Teleport to body
-    if (menu.parentElement !== document.body) {
-      document.body.appendChild(menu);
-    }
-
-    menu.classList.remove("hidden");
-    const rect = btn.getBoundingClientRect();
-
-    menu.style.position = 'fixed';
-    menu.style.top = `${rect.bottom + 8}px`;
-    menu.style.left = `${rect.left}px`;
-    menu.style.minWidth = `${Math.max(rect.width, 160)}px`;
-    menu.style.zIndex = '20000'; // Must be > 10002 (modal z-index)
-    menu.style.opacity = '1';
-
-  } else {
-    menu.classList.add("hidden");
-  }
-};
 
 
 
@@ -5457,15 +5721,20 @@ function loadMap(mapId) {
   const isStella = mapId.includes("stella");
   const isBlueGate = mapId.includes("blue_gate");
 
-  // Close dropdowns
-  if (!isStella) toggleStellaDropdown(false);
-  if (!isBlueGate) toggleBgDropdown(false);
-
   // If switching TO Stella (generic or upper), verify state
   if (isStella) {
     if (mapId === "stella_montis_upper") mapPickerState.stellaLevel = "upper";
     if (mapId === "stella_montis_lower") mapPickerState.stellaLevel = "lower";
+    // Default fallback
+    if (!mapPickerState.stellaLevel) mapPickerState.stellaLevel = "upper";
     actualMapId = `stella_montis_${mapPickerState.stellaLevel}`;
+  }
+
+  // Verify blue gate state if generic
+  // (Assuming direct call uses correct ID, but ensuring fallback)
+  if (isBlueGate && mapId === 'the_blue_gate') {
+    // generic link usually points here, which IS surface.
+    // No separate generic key needed for simple logic unless we store preference.
   }
 
   // Config Validation
@@ -5477,30 +5746,19 @@ function loadMap(mapId) {
   // Update tabs styles
   document.querySelectorAll('#mapTabsContainer > button').forEach(btn => {
     btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white";
+
+    // Highlight Logic
+    const gId = btn.dataset.genericId || btn.id.replace('map-tab-', '');
+    let isActive = false;
+
+    if (isStella && gId === 'stella_montis') isActive = true;
+    else if (isBlueGate && gId === 'the_blue_gate') isActive = true;
+    else if (gId === actualMapId) isActive = true;
+
+    if (isActive) {
+      btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
+    }
   });
-
-  // Stella Tab Highlight
-  const stellaBtn = document.getElementById(`map-tab-stella`);
-  if (isStella && stellaBtn) {
-    stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 flex items-center gap-2";
-  } else if (!isStella) {
-    // Normal Tab Highlight
-    const activeBtn = document.getElementById(`map-tab-${actualMapId}`);
-    if (activeBtn) {
-      activeBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20";
-    }
-    if (stellaBtn) {
-      stellaBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2";
-    }
-  }
-
-  // Blue Gate Tab Highlight
-  const bgBtn = document.getElementById(`map-tab-blue-gate`);
-  if (isBlueGate && bgBtn) {
-    bgBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 flex items-center gap-2";
-  } else if (!isBlueGate && bgBtn) {
-    bgBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2";
-  }
 
   // Remove existing layers (images)
   mapPickerState.map.eachLayer(layer => {
@@ -5509,9 +5767,52 @@ function loadMap(mapId) {
     }
   });
 
-  // Remove old in-map toggle if exists
-  const oldToggle = document.getElementById("stellaLevelToggle");
-  if (oldToggle) oldToggle.remove();
+  // Remove old in-map toggles
+  const oldSwitcher = document.getElementById("mapPickerLevelSwitcher");
+  if (oldSwitcher) oldSwitcher.remove();
+
+  // INJECT NEW SWITCHER if needed
+  const mapContainer = document.getElementById('leafletMap');
+
+  if (isStella || isBlueGate) {
+    const switcher = document.createElement('div');
+    switcher.id = "mapPickerLevelSwitcher";
+    switcher.className = 'absolute top-4 right-4 flex bg-black/80 backdrop-blur rounded-lg border border-zinc-700 overflow-hidden z-[1000]';
+
+    if (isStella) {
+      ['Upper', 'Lower'].forEach(lvl => {
+        const key = lvl.toLowerCase();
+        const isActive = mapPickerState.stellaLevel === key;
+        const b = document.createElement('button');
+        b.textContent = lvl;
+        b.className = `px-3 py-1.5 text-xs font-bold transition-colors ${isActive ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`;
+        b.onclick = (e) => {
+          e.stopPropagation();
+          loadMap(`stella_montis_${key}`);
+        };
+        switcher.appendChild(b);
+      });
+    } else if (isBlueGate) {
+      // Surface vs Underground
+      const layers = [
+        { label: 'Surface', id: 'the_blue_gate' },
+        { label: 'Underground', id: 'the_blue_gate_underground' }
+      ];
+      layers.forEach(l => {
+        const isActive = actualMapId === l.id;
+        const b = document.createElement('button');
+        b.textContent = l.label;
+        b.className = `px-3 py-1.5 text-xs font-bold transition-colors ${isActive ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`;
+        b.onclick = (e) => {
+          e.stopPropagation();
+          loadMap(l.id);
+        };
+        switcher.appendChild(b);
+      });
+    }
+
+    if (mapContainer) mapContainer.appendChild(switcher);
+  }
 
   // Clear pin state
   mapPickerState.currentPin = null;
@@ -5529,30 +5830,6 @@ function loadMap(mapId) {
   // Show instructions
   const instructions = document.getElementById("mapInstructions");
   if (instructions) instructions.style.opacity = '1';
-
-  // Re-render tabs to update dropdown highlight state if needed (optional, but good for active state in dropdown)
-  // Actually renderMapTabs calls loadMap so don't call it here to avoid loop. 
-  // Just manual update of dropdown items if we want.
-  const dropItems = document.querySelectorAll("#stellaDropdownMenu button");
-  dropItems.forEach(btn => {
-    if (btn.innerText.includes("Upper") && mapPickerState.stellaLevel === 'upper') btn.classList.add("text-emerald-500", "font-bold");
-    else if (btn.innerText.includes("Lower") && mapPickerState.stellaLevel === 'lower') btn.classList.add("text-emerald-500", "font-bold");
-    else {
-      btn.classList.remove("text-emerald-500", "font-bold");
-      btn.classList.add("text-zinc-300");
-    }
-
-  });
-
-  const bgItems = document.querySelectorAll("#bgDropdownMenu button");
-  bgItems.forEach(btn => {
-    if (btn.innerText.includes("Surface") && !actualMapId.includes("underground")) btn.classList.add("text-emerald-500", "font-bold");
-    else if (btn.innerText.includes("Underground") && actualMapId.includes("underground")) btn.classList.add("text-emerald-500", "font-bold");
-    else {
-      btn.classList.remove("text-emerald-500", "font-bold");
-      btn.classList.add("text-zinc-300");
-    }
-  });
 
   // Reset confirmation state on map change (optional, but consistent)
   removePin();
@@ -5847,3 +6124,246 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 150);
 });
+
+// REFACTORED HEATMAP VIEW V2 (Zoom, Pan, Stella Merge)
+// REFACTORED HEATMAP VIEW V2 (Leaflet + Heatmap.js)
+let heatmapMap = null; // Store map instance globally or in state
+
+async function initHeatmapViewV2(blueprintName, containerId, tabsId) {
+  const container = document.getElementById(containerId);
+  const tabsContainer = document.getElementById(tabsId);
+
+  if (!container || !tabsContainer) return;
+
+  // If we are initializing a NEW blueprint, clear the old map state
+  if (container.dataset.bp !== blueprintName) {
+    if (heatmapMap) {
+      heatmapMap.remove();
+      heatmapMap = null;
+    }
+    container.dataset.bp = blueprintName;
+    container.innerHTML = ''; // Clear any leftover DOM
+  } else if (heatmapMap) {
+    // If same blueprint and map exists, we might just want to return or update?
+    // Let's allow re-init to handle tab switches or just return if it's already good.
+    // For now, full re-init is safer to ensure layer updates.
+  }
+
+  // Available Maps
+  let maps = Object.entries(MAP_CONFIG);
+
+  // GENERIC MERGE LOGIC
+  const mergeConfig = [
+    {
+      baseId: 'stella_montis',
+      name: 'Stella Montis',
+      variants: [
+        { suffix: 'upper', label: 'Upper' },
+        { suffix: 'lower', label: 'Lower' }
+      ]
+    },
+    {
+      baseId: 'the_blue_gate',
+      name: 'The Blue Gate',
+      variants: [
+        // Map keys: 'the_blue_gate' (Surface), 'the_blue_gate_underground' (Underground)
+        { suffix: '', label: 'Surface', key: 'the_blue_gate' },
+        { suffix: 'underground', label: 'Underground', key: 'the_blue_gate_underground' }
+      ]
+    }
+  ];
+
+  mergeConfig.forEach(m => {
+    // Find if variants exist
+    const variantsFound = [];
+    m.variants.forEach(v => {
+      const key = v.key || (v.suffix ? `${m.baseId}_${v.suffix}` : m.baseId);
+      const idx = maps.findIndex(([id]) => id === key);
+      if (idx !== -1) {
+        variantsFound.push({ ...v, key, config: maps[idx][1] });
+      }
+    });
+
+    if (variantsFound.length > 1) {
+      // Remove old entries
+      maps = maps.filter(([id]) => !variantsFound.some(v => v.key === id));
+
+      // Add merged entry
+      maps.push([m.baseId, {
+        name: m.name,
+        isMerged: true,
+        layers: variantsFound.reduce((acc, v) => {
+          acc[v.label] = { id: v.key, config: v.config, label: v.label };
+          return acc;
+        }, {}),
+        layerKeys: variantsFound.map(v => v.label) // Order matters
+      }]);
+    }
+  });
+
+
+  // Clear Tabs
+  tabsContainer.innerHTML = '';
+  tabsContainer.classList.remove("relative"); // Cleanup
+
+  let currentMapId = null;
+
+  // Function to load map and heatmap
+  const loadMap = async (id, config, subLayerLabel = null) => {
+    currentMapId = id;
+    const isMerged = config.isMerged;
+
+    // Determine active layer
+    let activeLayerId, activeConfig, activeLabel;
+
+    if (isMerged) {
+      activeLabel = subLayerLabel || config.layerKeys[0];
+      activeLayerId = config.layers[activeLabel].id;
+      activeConfig = config.layers[activeLabel].config;
+    } else {
+      activeLayerId = id;
+      activeConfig = config;
+    }
+
+    // Update Tabs UI
+    Array.from(tabsContainer.children).forEach(btn => {
+      const isCurrent = btn.dataset.mapId === id;
+      if (isCurrent) {
+        btn.classList.remove('bg-zinc-800', 'text-zinc-500', 'border-zinc-700/50');
+        btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-400/50', 'shadow-[0_0_10px_rgba(16,185,129,0.3)]');
+      } else {
+        btn.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-400/50', 'shadow-[0_0_10px_rgba(16,185,129,0.3)]');
+        btn.classList.add('bg-zinc-800', 'text-zinc-500', 'border-zinc-700/50');
+      }
+    });
+
+    // Destroy existing map if it exists
+    if (heatmapMap) {
+      heatmapMap.remove();
+      heatmapMap = null;
+    }
+
+    container.innerHTML = '';
+
+    // Inject Floor Switcher if merged
+    if (isMerged) {
+      const switcher = document.createElement('div');
+      switcher.className = 'absolute top-4 right-4 flex bg-black/80 backdrop-blur rounded-lg border border-zinc-700 overflow-hidden z-[1000]'; // High z-index for Leaflet
+
+      config.layerKeys.forEach(label => {
+        const isActive = label === activeLabel;
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.className = `px-3 py-1.5 text-xs font-bold transition-colors ${isActive ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`;
+        btn.onclick = (e) => {
+          e.stopPropagation(); // prevent map click?
+          loadMap(id, config, label);
+        };
+        switcher.appendChild(btn);
+      });
+      container.appendChild(switcher);
+    }
+
+    if (!container.id) container.id = "heatmap-leaflet-" + Math.random().toString(36).substr(2, 9);
+
+    heatmapMap = L.map(container, {
+      crs: L.CRS.Simple,
+      minZoom: -2, // Relaxed (was -0.5)
+      maxZoom: 2,
+      zoomSnap: 0.1,
+      center: [0, 0],
+      zoom: 0,
+      zoomControl: false,
+      attributionControl: false
+    });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(heatmapMap);
+
+    const bounds = activeConfig.bounds;
+    L.imageOverlay(activeConfig.url, bounds).addTo(heatmapMap);
+    heatmapMap.fitBounds(bounds);
+
+    // Heatmap Config
+    // World Space means radius is in MAP PIXELS.
+    const heatmapOptions = {
+      radius: 12,  // Balanced radius (tiny dots might miss overlaps)
+      blur: 8,     // Smooths the accumulation
+      max: 5.0,    // CRITICAL: Max intensity. 
+      // max=1 means 1 point = Red. 
+      // max=5 means 1 point = 20% (Blue), 5 points = Red.
+      // This reveals density distribution.
+      minOpacity: 0.1, // Faint background for single points
+      gradient: {
+        0.2: 'blue',
+        0.5: 'lime',
+        0.8: 'yellow',
+        1.0: 'red'
+      }
+    };
+
+    // Fetch Data
+    let points = await fetchBlueprintHeatmap(blueprintName, activeLayerId);
+
+    // Create World Heatmap (Static Overlay)
+    const heatmapLayer = createWorldHeatmap(points, activeConfig.bounds, heatmapOptions);
+
+    // Create Points Layer (High Zoom)
+    const dotsLayer = L.featureGroup();
+    points.forEach(p => {
+      L.circleMarker([p.y, p.x], {
+        radius: 4,        // Smaller (was 6)
+        color: null,
+        fillColor: '#ff0000', // Red
+        fillOpacity: 1.0, // Solid
+        className: 'heatmap-dot'
+      }).addTo(dotsLayer);
+    });
+
+    // Add Layer Logic
+    // Default: Show heatmap, hide dots (Zoom < Threshold)
+    heatmapLayer.addTo(heatmapMap);
+
+    // Zoom Handler for Hybrid View
+    const ZOOM_THRESHOLD = -0.5; // Adjusted down since scale is lower
+
+    const updateLayers = () => {
+      const z = heatmapMap.getZoom();
+      if (z >= ZOOM_THRESHOLD) {
+        // High Zoom: Show Dots, Hide Heatmap
+        if (!heatmapMap.hasLayer(dotsLayer)) heatmapMap.addLayer(dotsLayer);
+        if (heatmapMap.hasLayer(heatmapLayer)) heatmapMap.removeLayer(heatmapLayer);
+      } else {
+        // Low Zoom: Show Heatmap, Hide Dots
+        if (!heatmapMap.hasLayer(heatmapLayer)) heatmapMap.addLayer(heatmapLayer);
+        if (heatmapMap.hasLayer(dotsLayer)) heatmapMap.removeLayer(dotsLayer);
+      }
+    };
+
+    heatmapMap.on('zoomend', updateLayers);
+
+    // Initial State Check
+    updateLayers();
+  };
+
+  // Render Tabs (Simplified)
+  maps.forEach(([id, config]) => {
+    const btn = document.createElement('button');
+    btn.dataset.mapId = id;
+    btn.className = 'tab-main-btn whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium transition-all border';
+    btn.textContent = config.name;
+
+    btn.onclick = () => loadMap(id, config);
+    tabsContainer.appendChild(btn);
+  });
+
+  // Initial Load (First map)
+  if (maps.length > 0) {
+    const first = maps[0];
+    if (first[1].isMerged) {
+      loadMap(first[0], first[1], first[1].layerKeys[0]);
+    } else {
+      loadMap(first[0], first[1]);
+    }
+  }
+}
+
